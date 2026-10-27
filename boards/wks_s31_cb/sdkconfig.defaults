@@ -17,3 +17,10 @@ CONFIG_SPIRAM_MODE_OCT=y
 # sits on GPIO33/34, which carry LCD_R4/R5, so there is no USB console.
 CONFIG_ESP_CONSOLE_UART_CUSTOM=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# PSRAM budgets for 16 MB, see components/core/Kconfig. The GB JIT's second
+# level: on Sila P4, V-Rally's two instant saves of GB task 5-2 used at most
+# 340 KB of it. The GBA's ROM cache, for a build with the GBA: Golden Sun 2
+# loaded with 5 MiB beside the GBA's core (task 7-1 of the GBA plan).
+CONFIG_GBX_GB_JIT_STORE_KB=2048
+CONFIG_GBX_GBA_ROM_CACHE_KB=5120

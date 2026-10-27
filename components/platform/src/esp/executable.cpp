@@ -28,16 +28,27 @@ constexpr size_t kAlignment = alignof(uint32_t);
 #endif
 static_assert((kAlignment & (kAlignment - 1)) == 0);
 
-// Code in PSRAM, on P4 only: with ESP_SYSTEM_MEMPROT off, its PMP entry
-// allows execution on v3.x and none restricts it before v3.0, and PMA entry
-// 13 makes the range executable (IDF components/esp_hw_support/port/esp32p4/
+// Code in PSRAM. On P4, with ESP_SYSTEM_MEMPROT off, its PMP entry allows
+// execution on v3.x and none restricts it before v3.0, and PMA entry 13
+// makes the range executable (IDF components/esp_hw_support/port/esp32p4/
 // cpu_region_protect.c). PSRAM goes through the same L1 caches, so it is
-// published as internal memory is, see publish_executable().
+// published as internal memory is. On S31, PMA entry 7 makes the whole
+// external range readable, writable and executable and no PMP entry
+// restricts it (IDF port/esp32s31/cpu_region_protect.c), and data and
+// instructions share its addresses (SOC_MMU_DI_VADDR_SHARED). Its I- and
+// D-caches lie between the cores and PSRAM only, see publish_executable().
 #if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_SPIRAM
 constexpr bool kExternalCode = true;
+constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_CACHE_LINE_SIZE;
+#elif CONFIG_IDF_TARGET_ESP32S31 && CONFIG_SPIRAM
+constexpr bool kExternalCode = true;
+constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_ICACHE_LINE_SIZE > CONFIG_CACHE_L1_DCACHE_LINE_SIZE
+                                          ? CONFIG_CACHE_L1_ICACHE_LINE_SIZE : CONFIG_CACHE_L1_DCACHE_LINE_SIZE;
 #else
 constexpr bool kExternalCode = false;
+constexpr size_t kExternalAlignment = kAlignment;
 #endif
+static_assert((kExternalAlignment & (kExternalAlignment - 1)) == 0 && kExternalAlignment >= kAlignment);
 #if CONFIG_GBX_JIT_CODE_PSRAM
 constexpr bool kPoolExternal = true;
 #else
@@ -74,11 +85,13 @@ bool executable_available() {
 }
 
 ExecutableMemory allocate_executable(size_t bytes, CodeMemory where) {
-    if (!bytes || bytes > std::numeric_limits<size_t>::max() - (kAlignment - 1)) return {};
-    bytes = (bytes + kAlignment - 1) & ~(kAlignment - 1);
-    if (where == CodeMemory::external || kPoolExternal) {
+    const bool external = where == CodeMemory::external || kPoolExternal;
+    const size_t alignment = external ? kExternalAlignment : kAlignment;
+    if (!bytes || bytes > std::numeric_limits<size_t>::max() - (alignment - 1)) return {};
+    bytes = (bytes + alignment - 1) & ~(alignment - 1);
+    if (external) {
         if (!kExternalCode) return {};
-        auto* data = static_cast<uint32_t*>(heap_caps_aligned_alloc(kAlignment, bytes, MALLOC_CAP_SPIRAM));
+        auto* data = static_cast<uint32_t*>(heap_caps_aligned_alloc(alignment, bytes, MALLOC_CAP_SPIRAM));
         if (!data) return {};
         const auto* last = reinterpret_cast<const uint8_t*>(data) + bytes - 1;
         if (!esp_ptr_external_ram(data) || !esp_ptr_external_ram(last)) {
@@ -122,22 +135,32 @@ bool publish_executable(const ExecutableMemory& memory, size_t offset, size_t by
         bytes > memory.size_bytes - offset) return false;
     if (!bytes) return true;
     asm volatile("fence iorw, iorw" ::: "memory");
+    // P4 caches internal memory and PSRAM through L1, S31 only PSRAM.
+#if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE || (CONFIG_IDF_TARGET_ESP32S31 && CONFIG_SPIRAM)
 #if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE
-    const size_t first = offset & ~(kAlignment - 1);
-    const size_t end = (offset + bytes + kAlignment - 1) & ~(kAlignment - 1);
-    const auto address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(memory.words) + first);
-    // The L1 operations esp_cache_msync() performs for internal memory, minus
-    // its argument checks and its D-cache invalidation for an I-cache request:
-    // written-back lines stay valid. Its lock keeps the other core's cache
-    // operations out. PSRAM needs the same two: behind the L1 I- and
-    // D-caches, P4 has one L2 cache for both (CACHE_MAP_L2_CACHE in IDF
-    // hal/esp32p4/include/hal/cache_ll.h), so an instruction fetch that
-    // misses L1 finds the written-back line there. The JIT backend checks
-    // rewrite published code in both memories and run it again.
-    esp_cache_sync_ops_enter_critical_section();
-    cache_ll_l1_writeback_dcache_addr(CACHE_LL_ID_ALL, address, end - first);
-    cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, address, end - first);
-    esp_cache_sync_ops_exit_critical_section();
+    constexpr bool cached = true;
+#else
+    const bool cached = esp_ptr_external_ram(memory.words);
+#endif
+    if (cached) {
+        const size_t first = offset & ~(kExternalAlignment - 1);
+        const size_t end = (offset + bytes + kExternalAlignment - 1) & ~(kExternalAlignment - 1);
+        const auto address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(memory.words) + first);
+        // The L1 operations esp_cache_msync() performs, minus its argument
+        // checks and its D-cache invalidation for an I-cache request:
+        // written-back lines stay valid. Its lock keeps the other core's
+        // cache operations out. On P4, behind the L1 I- and D-caches, one L2
+        // cache serves both (CACHE_MAP_L2_CACHE in IDF hal/esp32p4/include/
+        // hal/cache_ll.h), so an instruction fetch that misses L1 finds the
+        // written-back line there. S31 has no L2: the fetch reads PSRAM,
+        // which the write-back has reached. Both chips have one I-cache per
+        // core and one D-cache. The JIT backend checks rewrite published
+        // code in both memories and run it again.
+        esp_cache_sync_ops_enter_critical_section();
+        cache_ll_l1_writeback_dcache_addr(CACHE_LL_ID_ALL, address, end - first);
+        cache_ll_l1_invalidate_icache_addr(CACHE_LL_ID_ALL, address, end - first);
+        esp_cache_sync_ops_exit_critical_section();
+    }
 #endif
     // Zifencei synchronizes the local instruction stream, not remote execution.
     asm volatile("fence.i" ::: "memory");
