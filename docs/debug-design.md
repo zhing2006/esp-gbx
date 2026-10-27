@@ -26,7 +26,7 @@
 | Sila P4 和 Sila P4X 屏幕两侧的四个窄格 | 主值和单位下面逐行列出全部附加信息 |
 | JC1060P470 的一行四格 | 主值下方补一项：`EMU` 帧率、平均耗时、欠载次数、两个核的 `IDLE`。这一行放不下 PSRAM 空闲量，所以不显示 |
 | Tab5 的 2×2 四格 | 在格子底行补充全部附加信息 |
-| OSPTEK ESP32-P4C5 和慧勤智远 ESP32-S31 CB 的 2×2 四格 | 格子比 Tab5 的窄，`MEM` 只补两个核的 `IDLE`，不显示 PSRAM 空闲量；其余三格和 Tab5 相同 |
+| OSPTEK ESP32-P4C5 和慧勤智远 ESP32-S31 CB 的 2×2 四格 | 格子比 Tab5 的窄，`MEM` 的底行左边是两个核的 `IDLE`，右边是 PSRAM 空闲量；其余三格和 Tab5 相同 |
 | 后续板子 | 按可用区域选择相同指标的紧凑或完整表达，不为每块板子重新定义统计口径 |
 
 小面板不自动轮播数据，避免同一位置的数字忽然换了含义。`U --(+--)` 的括号外是欠载累计次数，括号内是最近统计窗口的增量；`N` 是帧耗时的有效样本数；`IDLE` 后面的两个数依次是 core 0 和 core 1 的空闲比例。各字段的稳定 ID、单位和枚举值保存在 [telemetry-fields.json](ui-layouts/telemetry-fields.json)，各板 `assets/ui/<板子>/board.json` 的 VFD 配置通过 `binding` 关联它们。

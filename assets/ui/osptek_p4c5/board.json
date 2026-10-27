@@ -263,6 +263,13 @@
           "align": "left",
           "x": 252.5,
           "top": 516
+        },
+        {
+          "text": "{heap_psram_free_mib:.1f}MiB",
+          "pitch": 2,
+          "align": "right",
+          "x": 464,
+          "top": 516
         }
       ]
     }

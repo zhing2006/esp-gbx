@@ -157,6 +157,11 @@
           {
             "text": "IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
             "row": 0
+          },
+          {
+            "text": "{heap_psram_free_mib:.1f}MiB",
+            "row": 0,
+            "align": "right"
           }
         ]
       }
