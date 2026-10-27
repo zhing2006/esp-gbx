@@ -1,0 +1,71 @@
+/**
+ ******************************************************************************
+ * @file        rgb_lcd.h
+ * @version     V1.0
+ * @brief       rgblcd驱动代码
+ ******************************************************************************
+ * @attention   Waiken-Smart 慧勤智远
+ *
+ * 实验平台:     慧勤智远 ESP32-S31 开发板
+ ******************************************************************************
+ */
+
+#ifndef __RGB_LCD_H
+#define __RGB_LCD_H
+
+#include "esp_lcd_panel_rgb.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "esp_check.h"
+#include "driver/gpio.h"
+#include "sdkconfig.h"
+#include <math.h>
+#include <string.h>
+
+/* RGB LCD时序参数(800*480 @ 25MHz PCLK) */
+#define    LCD_PIXEL_CLOCK_HZ      (25 * 1000 * 1000)   /* 像素时钟: 25MHz */
+#define    LCD_H_RES               800                  /* 水平有效像素 */
+#define    LCD_V_RES               480                  /* 垂直有效行数 */
+#define    LCD_HSYNC_WIDTH         48                   /* 水平同步脉冲宽度(HSW) */
+#define    LCD_HBP                 88                   /* 水平后廊(HBP) */
+#define    LCD_HFP                 40                   /* 水平前廊(HFP) */
+#define    LCD_VSYNC_WIDTH         3                    /* 垂直同步脉冲宽度(VSW) */
+#define    LCD_VBP                 32                   /* 垂直后廊(VBP) */
+#define    LCD_VFP                 13                   /* 垂直前廊(VFP) */
+
+/* 帧缓冲区数量 */
+#define    LCD_RGB_PANEL_NUM_FBS   2                    /* 双帧缓冲 */
+
+/* RGB同步信号(IO MUX直连引脚) */
+#define    LCD_PIN_NUM_HSYNC       GPIO_NUM_44
+#define    LCD_PIN_NUM_VSYNC       GPIO_NUM_45
+#define    LCD_PIN_NUM_DE          GPIO_NUM_43
+#define    LCD_PIN_NUM_PCLK        GPIO_NUM_40
+
+/* RGB 16bit数据线
+ * DATA[4:0]   = B[7:3]  (蓝色)
+ * DATA[10:5]  = G[7:2]  (绿色)
+ * DATA[15:11] = R[7:3]  (红色)
+ */
+#define    LCD_PIN_NUM_DATA0       GPIO_NUM_8
+#define    LCD_PIN_NUM_DATA1       GPIO_NUM_9
+#define    LCD_PIN_NUM_DATA2       GPIO_NUM_10
+#define    LCD_PIN_NUM_DATA3       GPIO_NUM_11
+#define    LCD_PIN_NUM_DATA4       GPIO_NUM_12
+#define    LCD_PIN_NUM_DATA5       GPIO_NUM_13
+#define    LCD_PIN_NUM_DATA6       GPIO_NUM_14
+#define    LCD_PIN_NUM_DATA7       GPIO_NUM_15
+#define    LCD_PIN_NUM_DATA8       GPIO_NUM_16
+#define    LCD_PIN_NUM_DATA9       GPIO_NUM_17
+#define    LCD_PIN_NUM_DATA10      GPIO_NUM_18
+#define    LCD_PIN_NUM_DATA11      GPIO_NUM_19
+#define    LCD_PIN_NUM_DATA12      GPIO_NUM_33
+#define    LCD_PIN_NUM_DATA13      GPIO_NUM_34
+#define    LCD_PIN_NUM_DATA14      GPIO_NUM_36
+#define    LCD_PIN_NUM_DATA15      GPIO_NUM_35
+
+/*函数声明*/
+esp_lcd_panel_handle_t rgb_lcd_init(void);      /* rgb_lcd初始化 */
+
+#endif

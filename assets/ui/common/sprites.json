@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "master_scale": "2x of the M5Stack Tab5 logical size",
+  "sprites": {
+    "dpad": {
+      "size": [
+        496,
+        497
+      ],
+      "anchor": [
+        248.0,
+        248.5
+      ],
+      "states": {
+        "normal": "dpad.png",
+        "up": "dpad_up.png",
+        "down": "dpad_down.png",
+        "left": "dpad_left.png",
+        "right": "dpad_right.png",
+        "up_left": "dpad_up_left.png",
+        "up_right": "dpad_up_right.png",
+        "down_left": "dpad_down_left.png",
+        "down_right": "dpad_down_right.png"
+      }
+    },
+    "button_round": {
+      "size": [
+        284,
+        284
+      ],
+      "anchor": [
+        142.0,
+        142.0
+      ],
+      "states": {
+        "normal": "button_round.png",
+        "pressed": "button_round_pressed.png"
+      }
+    },
+    "button_pill": {
+      "size": [
+        226,
+        164
+      ],
+      "anchor": [
+        113.0,
+        82.0
+      ],
+      "states": {
+        "normal": "button_pill.png",
+        "pressed": "button_pill_pressed.png"
+      }
+    },
+    "shoulder_l": {
+      "size": [
+        520,
+        159
+      ],
+      "anchor": [
+        260.0,
+        79.5
+      ],
+      "states": {
+        "normal": "shoulder_l.png",
+        "pressed": "shoulder_l_pressed.png"
+      }
+    },
+    "shoulder_r": {
+      "size": [
+        520,
+        159
+      ],
+      "anchor": [
+        260.0,
+        79.5
+      ],
+      "states": {
+        "normal": "shoulder_r.png",
+        "pressed": "shoulder_r_pressed.png"
+      }
+    },
+    "menu": {
+      "size": [
+        260,
+        144
+      ],
+      "anchor": [
+        130.0,
+        72.0
+      ],
+      "states": {
+        "normal": "menu.png",
+        "pressed": "menu_pressed.png"
+      }
+    },
+    "knob": {
+      "size": [
+        178,
+        101
+      ],
+      "anchor": [
+        89.0,
+        50.5
+      ],
+      "states": {
+        "normal": "knob.png"
+      }
+    }
+  },
+  "lamps": {
+    "size": [
+      160,
+      160
+    ],
+    "anchor": [
+      79.5,
+      79.5
+    ],
+    "dome_radius": 14,
+    "colors": {
+      "green": "lamp_green_on.png",
+      "lime": "lamp_lime_on.png",
+      "berry": "lamp_berry_on.png",
+      "violet": "lamp_violet_on.png",
+      "amber": "lamp_amber_on.png",
+      "red": "lamp_red_on.png"
+    },
+    "use": {
+      "gb": [
+        "lime"
+      ],
+      "gbc": [
+        "berry"
+      ],
+      "gba": [
+        "violet"
+      ],
+      "int": [
+        "green"
+      ],
+      "jit": [
+        "green"
+      ],
+      "save": [
+        "amber",
+        "red"
+      ],
+      "err": [
+        "red"
+      ]
+    }
+  }
+}

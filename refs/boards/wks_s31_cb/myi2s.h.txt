@@ -1,0 +1,40 @@
+/**
+ ******************************************************************************
+ * @file        myi2s.h
+ * @version     V1.0
+ * @brief       I2S TX 驱动(ES8389 音源)
+ ******************************************************************************
+ * @attention   Waiken-Smart 慧勤智远
+ *
+ * 实验平台:     慧勤智远 ESP32-S31 开发板
+ ******************************************************************************
+ */
+
+#ifndef _MYI2S_H_
+#define _MYI2S_H_
+
+#include <stdio.h>
+#include <string.h>
+#include "driver/gpio.h"
+#include "driver/i2s_std.h"
+
+
+/* I2S 引脚定义 */
+#define I2S_BCK_IO              (GPIO_NUM_3)               /* ES8389_SCLK引脚 */
+#define I2S_WS_IO               (GPIO_NUM_4)               /* ES8389_LRCK引脚 */
+#define I2S_DO_IO               (GPIO_NUM_5)               /* ES8389_SDIN数据输出引脚 */
+#define I2S_DI_IO               (-1)                       /* ES8389_SDOUT数据输入引脚（未使用） */
+#define I2S_MCK_IO              (-1)                       /* 主时钟(ES8389 从 BCLK 派生, 无外部 MCLK) */
+
+/* I2S 默认参数 */
+#define I2S_SAMPLE_RATE         (16000)                    /* 默认采样率 */
+
+extern i2s_chan_handle_t tx_handle;
+
+esp_err_t myi2s_init(void);
+void i2s_trx_start(void);
+void i2s_trx_stop(void);
+void i2s_deinit(void);
+size_t i2s_tx_write(uint8_t *buffer, uint32_t frame_size);
+
+#endif

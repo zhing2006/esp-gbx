@@ -1,0 +1,24 @@
+Image 1 is a flat color-coded layout blockout of the front face of a portrait handheld game console, drawn for a 720x1280 touchscreen. Repaint it as a finished illustration of a fictional retro handheld console. Keep every shape at exactly the same position, size and proportion as in Image 1. The device front face fills the whole frame edge to edge, viewed straight-on: orthographic front elevation, no perspective, no tilt, no hands. Only the large rounded bottom-right corner reveals a plain dark charcoal background behind the device.
+
+Style: a 1990s Japanese airbrush product illustration, gouache and airbrush on illustration board, like the cover art of a vintage instruction manual or a hardware feature in a 1990s game magazine. Soft airbrushed gradients, crisp hand-painted specular highlights along molded edges, a single key light from the upper left, fine paper grain and subtle film-like noise over the entire image, slightly muted print colors. Not a photograph, not a 3D render, not flat vector art.
+
+Design intent: an original console that fuses the design language of three handheld generations (the 1989 grey brick, the 1998 translucent color era and the 2001 wide-screen era) into one new shell without copying any real product.
+
+Elements, from top to bottom:
+- Top band: at top-left a small recessed slide switch with a light grey knob, with tiny printed text "SPEED 1X 2X" above the slot. At top-right a small grey rubber pill button with the printed word "MENU". A molded groove runs across the width under the top band.
+- Screen lens: the dark slate-grey glass panel with a soft diagonal glossy reflection on the glass frame. Its bottom-right corner is more rounded than the others. Across its top run three thin printed lines in olive green, berry magenta and violet-blue, with the small caps text "DOT MATRIX · RISC-V JIT" printed once in the gap between them.
+- The black rectangle inside the lens is the display. Keep it solid pure black, completely empty, with sharp straight edges and no reflection, glow or content of any kind.
+- On the lens left of the display: three tiny round indicator lamps stacked vertically, each with a tiny white printed label below it: "GB", "GBC", "GBA". Only the "GBA" lamp is lit with a soft violet glow; the other two are dark and unlit.
+- On the lens right of the display: four tiny round lamps stacked vertically with tiny labels "INT", "JIT", "SAVE", "ERR". Only "JIT" is lit green; the rest are dark and unlit.
+- The empty area between the lens and the dark window below: the logotype "ESP-GBX" in a bold italic geometric sans-serif, molded into the plastic. The letters G, B and X are inlaid in olive green, berry magenta and violet-blue respectively.
+- The dark rectangle with four cells: a vacuum fluorescent display behind smoked glass, glowing cyan-green segments with a faint bloom. Each cell has a small label at its top-left and a large seven-segment value: top-left "SPEED" and "-- %", top-right "FRAME" and "-- ms", bottom-left "AUDIO" and "-- ms", bottom-right "MEM" and "-- KiB".
+- The two light warm-grey bars at the sides: shoulder buttons that wrap around the side edges of the shell, finely ribbed, with "L" and "R" printed on them.
+- A black cross-shaped direction pad sitting in a shallow circular dish recess, with small molded arrows.
+- Two convex berry-maroon round buttons in a slanted capsule-shaped recess, with "B" and "A" printed next to them.
+- Two slanted grey rubber pill buttons with "SELECT" and "START" printed below them.
+- Six diagonal speaker slots in the bottom-right corner.
+- The off-white rectangle at bottom-left: a slightly worn, faintly yellowed paper sticker printed "ENGINEERING SAMPLE" and "S/N TAB5-0001" with a small barcode.
+
+Constraints: render each piece of text exactly once and spelled exactly as given; no other text. No brand names, no Nintendo or Game Boy wording or logos, no trademarks. Do not add any element that is not listed. Keep the display rectangle solid black and empty.
+
+Shell material: a two-tone shell. The upper part, above the straight horizontal seam just below the logotype, is opaque warm light-grey matte plastic with a fine molded texture. Below the seam the lower body is translucent smoky indigo-violet plastic, slightly frosted; through it you can faintly see a green circuit board with copper traces, a square processor chip and a flat ribbon cable, subdued so it never competes with the controls. The seam is a crisp molded parting line where the two plastics meet.

@@ -1,0 +1,7 @@
+# ESP32-P4 display policy, shared by all P4 boards and chip revisions.
+# Keep CPU rendering in source for SoCs without these accelerators, not as
+# another complete display implementation in a P4 firmware.
+CONFIG_GBX_DISPLAY_ACCEL=y
+CONFIG_LV_USE_PPA=y
+CONFIG_LV_USE_PPA_IMG=y
+CONFIG_GBX_LVGL_PPA_MIN_PIXELS=4096

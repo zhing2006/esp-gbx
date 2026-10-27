@@ -1,0 +1,375 @@
+{
+  "version": 1,
+  "board": "sila_p4x",
+  "size": [
+    1280,
+    452
+  ],
+  "background": "background.png",
+  "sprites": "../common/sprites.json",
+  "font": "../common/vfd_font.json",
+  "sprite_scale": 0.36,
+  "display": [
+    400,
+    86,
+    480,
+    320
+  ],
+  "controls": {
+    "dpad": {
+      "sprite": "dpad",
+      "center": [
+        124,
+        236
+      ]
+    },
+    "a": {
+      "sprite": "button_round",
+      "center": [
+        1200.11,
+        198.99
+      ]
+    },
+    "b": {
+      "sprite": "button_round",
+      "center": [
+        1111.89,
+        273.01
+      ]
+    },
+    "select": {
+      "sprite": "button_pill",
+      "center": [
+        81,
+        384
+      ]
+    },
+    "start": {
+      "sprite": "button_pill",
+      "center": [
+        167,
+        384
+      ]
+    },
+    "l": {
+      "sprite": "shoulder_l",
+      "center": [
+        100,
+        27
+      ]
+    },
+    "r": {
+      "sprite": "shoulder_r",
+      "center": [
+        1180,
+        27
+      ]
+    },
+    "menu": {
+      "sprite": "menu",
+      "center": [
+        1006,
+        26
+      ]
+    }
+  },
+  "speed_switch": {
+    "slot": [
+      200.0,
+      16.0,
+      107.5,
+      23.0
+    ],
+    "1x": [
+      225.56,
+      27.5
+    ],
+    "2x": [
+      281.94,
+      27.5
+    ]
+  },
+  "lamps": {
+    "gb": {
+      "center": [
+        377.84,
+        199.73
+      ]
+    },
+    "gbc": {
+      "center": [
+        377.89,
+        245.85
+      ]
+    },
+    "gba": {
+      "center": [
+        377.99,
+        291.55
+      ]
+    },
+    "int": {
+      "center": [
+        902.06,
+        176.42
+      ]
+    },
+    "jit": {
+      "center": [
+        901.88,
+        222.38
+      ]
+    },
+    "save": {
+      "center": [
+        901.98,
+        268.75
+      ]
+    },
+    "err": {
+      "center": [
+        902.01,
+        314.74
+      ]
+    }
+  },
+  "vfd": {
+    "speed": {
+      "rect": [
+        260,
+        58,
+        84,
+        173
+      ],
+      "label": [
+        271.0,
+        68.5,
+        42.5,
+        11.0
+      ],
+      "value": {
+        "binding": "{speed_percent:.0f}",
+        "pitch": 4,
+        "right": 335,
+        "unit": "%",
+        "unit_pitch": 2,
+        "unit_position": "below",
+        "top": 87.5,
+        "left_limit": 264
+      },
+      "lines": [
+        {
+          "text": "EMU",
+          "pitch": 2,
+          "align": "left",
+          "x": 271.0,
+          "top": 143.5
+        },
+        {
+          "text": "{emu_fps:.1f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 335,
+          "top": 161.5
+        },
+        {
+          "text": "DRW",
+          "pitch": 2,
+          "align": "left",
+          "x": 271.0,
+          "top": 179.5
+        },
+        {
+          "text": "{drw_fps:.1f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 335,
+          "top": 197.5
+        }
+      ]
+    },
+    "frame": {
+      "rect": [
+        260,
+        239,
+        84,
+        173
+      ],
+      "label": [
+        272.0,
+        250.0,
+        40.5,
+        10.0
+      ],
+      "value": {
+        "binding": "{frame_work_p95_ms:.1f}",
+        "pitch": 4,
+        "right": 335,
+        "unit": "ms",
+        "unit_pitch": 2,
+        "unit_position": "below",
+        "top": 268.0,
+        "left_limit": 264
+      },
+      "lines": [
+        {
+          "text": "AVG",
+          "pitch": 2,
+          "align": "left",
+          "x": 272.0,
+          "top": 324.0
+        },
+        {
+          "text": "{frame_work_avg_ms:.1f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 335,
+          "top": 342.0
+        },
+        {
+          "text": "N",
+          "pitch": 2,
+          "align": "left",
+          "x": 272.0,
+          "top": 360.0
+        },
+        {
+          "text": "{frame_sample_count}",
+          "pitch": 2,
+          "align": "right",
+          "x": 335,
+          "top": 360.0
+        }
+      ]
+    },
+    "audio": {
+      "rect": [
+        936,
+        58,
+        84,
+        173
+      ],
+      "label": [
+        946.5,
+        69.5,
+        41.0,
+        10.5
+      ],
+      "value": {
+        "binding": "{audio_queue_ms:.0f}",
+        "pitch": 4,
+        "right": 1011,
+        "unit": "BUF ms",
+        "unit_pitch": 2,
+        "unit_position": "below",
+        "top": 88.0,
+        "left_limit": 940
+      },
+      "lines": [
+        {
+          "text": "U",
+          "pitch": 2,
+          "align": "left",
+          "x": 946.5,
+          "top": 144.0
+        },
+        {
+          "text": "{audio_underruns_total}(+{audio_underruns_window})",
+          "pitch": 2,
+          "align": "right",
+          "x": 1011,
+          "top": 162.0
+        },
+        {
+          "text": "MIN",
+          "pitch": 2,
+          "align": "left",
+          "x": 946.5,
+          "top": 180.0
+        },
+        {
+          "text": "{audio_min_ms:.0f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 1011,
+          "top": 180.0
+        }
+      ]
+    },
+    "memory": {
+      "rect": [
+        936,
+        239,
+        84,
+        173
+      ],
+      "label": [
+        947.5,
+        250.5,
+        25.0,
+        10.5
+      ],
+      "value": {
+        "binding": "{heap_internal_free_kib:.0f}",
+        "pitch": 4,
+        "right": 1011,
+        "unit": "KiB",
+        "unit_pitch": 2,
+        "unit_position": "below",
+        "top": 269.0,
+        "left_limit": 940
+      },
+      "lines": [
+        {
+          "text": "PSRAM",
+          "pitch": 2,
+          "align": "left",
+          "x": 947.5,
+          "top": 325.0
+        },
+        {
+          "text": "{heap_psram_free_mib:.1f}M",
+          "pitch": 2,
+          "align": "right",
+          "x": 1011,
+          "top": 343.0
+        },
+        {
+          "text": "IDLE %",
+          "pitch": 2,
+          "align": "left",
+          "x": 947.5,
+          "top": 361.0
+        },
+        {
+          "text": "C0",
+          "pitch": 2,
+          "align": "left",
+          "x": 947.5,
+          "top": 379.0
+        },
+        {
+          "text": "{idle_core0_percent:.0f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 1011,
+          "top": 379.0
+        },
+        {
+          "text": "C1",
+          "pitch": 2,
+          "align": "left",
+          "x": 947.5,
+          "top": 397.0
+        },
+        {
+          "text": "{idle_core1_percent:.0f}",
+          "pitch": 2,
+          "align": "right",
+          "x": 1011,
+          "top": 397.0
+        }
+      ]
+    }
+  }
+}

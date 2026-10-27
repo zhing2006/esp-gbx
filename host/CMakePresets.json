@@ -1,0 +1,63 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "debug",
+            "displayName": "PC GUI, debug",
+            "binaryDir": "${sourceDir}/../build/host-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "GBX_HOST_GUI": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "PC GUI, release",
+            "binaryDir": "${sourceDir}/../build/host-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "GBX_HOST_GUI": "ON"
+            }
+        },
+        {
+            "name": "headless-debug",
+            "displayName": "PC headless, debug",
+            "inherits": "debug",
+            "binaryDir": "${sourceDir}/../build/host-headless-debug",
+            "cacheVariables": {
+                "GBX_HOST_GUI": "OFF"
+            }
+        },
+        {
+            "name": "headless-release",
+            "displayName": "PC headless, release",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/../build/host-headless-release",
+            "cacheVariables": {
+                "GBX_HOST_GUI": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "configuration": "Release"
+        },
+        {
+            "name": "headless-debug",
+            "configurePreset": "headless-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "headless-release",
+            "configurePreset": "headless-release",
+            "configuration": "Release"
+        }
+    ]
+}

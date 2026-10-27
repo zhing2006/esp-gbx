@@ -1,0 +1,128 @@
+/**
+ ******************************************************************************
+ * @file        myi2s.c
+ * @version     V1.0
+ * @brief       I2S TX 驱动
+ ******************************************************************************
+ * @attention   Waiken-Smart 慧勤智远
+ *
+ * 实验平台:     慧勤智远 ESP32-S31 开发板
+ ******************************************************************************
+ */
+
+#include "myi2s.h"
+
+
+i2s_chan_handle_t tx_handle = NULL;
+
+/**
+ * @brief       初始化 I2S TX 通道(主机, 标准 Philips 模式, 16bit 立体声)
+ * @param       无
+ * @retval      ESP_OK: 成功; 其他: 失败
+ */
+esp_err_t myi2s_init(void)
+{
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+    chan_cfg.auto_clear = true;
+    /* 8 描述符 × 1023 帧 × 4 字节 ≈ 32KB, 48kHz 下约 170ms 缓冲, 避免 SD 读取延迟导致欠载 */
+    chan_cfg.dma_frame_num = 1023;
+    chan_cfg.dma_desc_num  = 8;
+    ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &tx_handle, NULL));
+
+    i2s_std_config_t std_cfg = {
+        .clk_cfg  = {
+            .sample_rate_hz = I2S_SAMPLE_RATE,
+            .clk_src        = I2S_CLK_SRC_DEFAULT,
+            .mclk_multiple  = I2S_MCLK_MULTIPLE_256,
+            .bclk_div       = 8,
+        },
+
+        .slot_cfg = {
+            .data_bit_width = I2S_DATA_BIT_WIDTH_16BIT,
+            .slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO,
+            .slot_mode      = I2S_SLOT_MODE_STEREO,
+            .slot_mask      = I2S_STD_SLOT_BOTH,
+            .ws_width       = I2S_DATA_BIT_WIDTH_16BIT,
+            .ws_pol         = false,
+            .bit_shift      = true,
+            .left_align     = true,
+            .big_endian     = false,
+            .bit_order_lsb  = false
+        },
+
+        .gpio_cfg = {
+            .mclk = I2S_MCK_IO,
+            .bclk = I2S_BCK_IO,
+            .ws   = I2S_WS_IO,
+            .dout = I2S_DO_IO,
+            .din  = I2S_DI_IO,
+        },
+    };
+
+    ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle, &std_cfg));
+    ESP_ERROR_CHECK(i2s_channel_enable(tx_handle));
+
+    return ESP_OK;
+}
+
+/**
+ * @brief       启动 I2S TX 通道
+ * @param       无
+ * @retval      无
+ */
+void i2s_trx_start(void)
+{
+    i2s_chan_info_t chan_info;
+
+    if (tx_handle == NULL) return;
+
+    if (i2s_channel_get_info(tx_handle, &chan_info) == ESP_OK && chan_info.is_enabled)
+    {
+        return;     
+    }
+
+    i2s_channel_enable(tx_handle);
+}
+
+/**
+ * @brief       停止 I2S TX 通道
+ * @param       无
+ * @retval      无
+ */
+void i2s_trx_stop(void)
+{
+    i2s_chan_info_t chan_info;
+
+    if (tx_handle == NULL) return;
+
+    if (i2s_channel_get_info(tx_handle, &chan_info) == ESP_OK && !chan_info.is_enabled)
+    {
+        return;
+    }
+
+    i2s_channel_disable(tx_handle);
+}
+
+/**
+ * @brief       卸载 I2S TX 通道
+ * @param       无
+ * @retval      无
+ */
+void i2s_deinit(void)
+{
+    ESP_ERROR_CHECK(i2s_del_channel(tx_handle));
+    tx_handle = NULL;
+}
+
+/**
+ * @brief       阻塞式 I2S 发送
+ * @param       buffer     : 发送数据缓冲
+ * @param       frame_size : 发送字节数
+ * @retval      实际发送字节数
+ */
+size_t i2s_tx_write(uint8_t *buffer, uint32_t frame_size)
+{
+    size_t bytes_written = 0;
+    i2s_channel_write(tx_handle, buffer, frame_size, &bytes_written, 1000);
+    return bytes_written;
+}

@@ -1,0 +1,23 @@
+CONFIG_IDF_TARGET="esp32p4"
+
+# The connected board has P4 v3.2 silicon; v1.x needs a separate build.
+# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set
+CONFIG_ESP32P4_REV_MIN_301=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# JEDEC 68 40 18, a Boya chip, which the factory bootloader runs in QIO.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_SPI_FLASH_SUPPORT_BOYA_CHIP=y
+
+# 32 MB in-package AP PSRAM; 250 MHz needs revision v3.x
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_250M=y
+
+# CH343P connects the debug port to UART0 (GPIO37/38). GPIO24/25 reach only
+# the pin header, so there is no USB-Serial/JTAG console.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# Keep the QIO bootloader within the 0x2000..0x8000 boot area.
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y

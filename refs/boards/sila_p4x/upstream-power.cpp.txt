@@ -1,0 +1,88 @@
+// Source: https://gitee.com/Ergou-/esp32-p4xc5-aibox
+// Commit: 8c6bc38bc7a082d9c4475e08c40778442a8dd8be
+// Verbatim excerpts; omitted sections are not needed for board wiring.
+
+// Original: main/pmu_axp2101.cpp
+// SHA-256: bfe7f1ad5011671c61af9a11382a9609c9b50683d984830c23c004aab7791db8
+
+// Original lines 1-37
+// -*- coding: utf-8 -*-
+// AXP2101 中断测试：I2C 读写回调与芯片识别沿用摄像头分支的 pmu_axp2101.cpp，
+// 删除了 ALDO2/3/4 供电配置——本分支不对任何电源轨写电压/使能。
+#include "pmu_axp2101.h"
+#include "board_gpio_isr.h"
+
+#include <string.h>
+
+#include "REG/AXP2101Constants.h"
+#include "XPowersLib.h"
+#include "driver/i2c_master.h"
+#include "esp_check.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "PMU";
+
+#define PMU_I2C_PORT            I2C_NUM_1
+#define PMU_I2C_ADDR            0x34
+#define PMU_I2C_FREQ_HZ         400000
+#define PMU_I2C_TIMEOUT_MS      100
+
+#define PMU_IRQ_TASK_STACK      4096
+#define PMU_IRQ_TASK_PRIO       5
+#define PMU_IRQ_HEARTBEAT_MS    5000    // 无中断时的心跳，顺带兜底轮询状态寄存器
+
+static i2c_master_bus_handle_t s_bus = NULL;
+static i2c_master_dev_handle_t s_dev = NULL;
+static XPowersAXP2101 *s_pmu = nullptr;
+static TaskHandle_t s_irq_task = NULL;
+static gpio_num_t s_irq_gpio = GPIO_NUM_NC;
+// XPowers 的状态读取/清除接口不返回 I2C 错误，由底层回调记录本轮失败。
+static esp_err_t s_io_error = ESP_OK;
+
+static int pmu_component_read(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint8_t len)
+{
+// Original lines 189-230
+extern "C" esp_err_t axp2101_irq_test_start(gpio_num_t sda, gpio_num_t scl, gpio_num_t irq_gpio)
+{
+    ESP_RETURN_ON_FALSE(s_bus == NULL, ESP_ERR_INVALID_STATE, TAG, "已初始化");
+    s_irq_gpio = irq_gpio;
+
+    // 1. I2C 总线 + 设备
+    const i2c_master_bus_config_t bus_cfg = {
+        .i2c_port = PMU_I2C_PORT,
+        .sda_io_num = sda,
+        .scl_io_num = scl,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .intr_priority = 0,
+        .trans_queue_depth = 0,
+        .flags = { .enable_internal_pullup = 1, .allow_pd = 0 },
+    };
+    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &s_bus), TAG, "创建 I2C%d 总线失败", PMU_I2C_PORT);
+    ESP_LOGI(TAG, "I2C%d 总线已创建：SDA=IO%d SCL=IO%d，用于 AXP2101", PMU_I2C_PORT, sda, scl);
+
+    i2c_device_config_t dev_cfg = {};
+    dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    dev_cfg.device_address = PMU_I2C_ADDR;
+    dev_cfg.scl_speed_hz = PMU_I2C_FREQ_HZ;
+    ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(s_bus, &dev_cfg, &s_dev), TAG, "添加 AXP2101 设备失败");
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // 2. 识别芯片（不调用 XPowersLib::init()，它会顺带改 TS/充电等配置）
+    s_pmu = new XPowersAXP2101(PMU_I2C_ADDR, pmu_component_read, pmu_component_write);
+    ESP_RETURN_ON_FALSE(s_pmu, ESP_ERR_NO_MEM, TAG, "AXP2101 对象创建失败");
+    const uint8_t chip_id = s_pmu->getChipID();
+    if (chip_id != XPOWERS_AXP2101_CHIP_ID && chip_id != XPOWERS_AXP2101_CHIP_ID_2) {
+        ESP_LOGE(TAG, "❌ AXP2101 芯片识别失败，读取ID=0x%02X（期望 0x%02X）", chip_id, XPOWERS_AXP2101_CHIP_ID);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "🔧 AXP2101 芯片 ID: 0x%02X", chip_id);
+    pmu_dump_status();
+
+    // 3. 中断源：先全关并清掉残留状态，再只打开测试关心的几类
+    s_io_error = ESP_OK;
+    ESP_RETURN_ON_FALSE(s_pmu->disableIRQ(XPOWERS_AXP2101_ALL_IRQ), ESP_FAIL, TAG, "关闭旧 IRQ 使能失败");
+    s_pmu->clearIrqStatus();
+    ESP_RETURN_ON_ERROR(s_io_error, TAG, "清除旧 AXP 中断状态失败");

@@ -1,0 +1,4 @@
+## The display runs LVGL
+dependencies:
+  lvgl/lvgl: "==9.6.0~1"
+  espressif/esp_lvgl_port: "==2.9.0"

@@ -1,0 +1,10 @@
+# Release build: optimized for speed, failed assertions abort without a message,
+# only warnings and errors are logged
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# The PSRAM test writes and reads back the whole chip at every boot, about
+# 950 ms for 32 MB at 200 MHz. Debug and profiling builds keep it.
+# CONFIG_SPIRAM_MEMTEST is not set

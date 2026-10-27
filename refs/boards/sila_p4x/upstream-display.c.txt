@@ -1,0 +1,149 @@
+// Source: https://gitee.com/Ergou-/esp32-p4xc5-aibox
+// Commit: 8c6bc38bc7a082d9c4475e08c40778442a8dd8be
+// Verbatim excerpts; omitted sections are not needed for board wiring.
+
+// Original: main/axs15260_lcd.c
+// SHA-256: 2a74de405c97fd79fcd698aa83faf0294932169a9389306a83371e06cd9163eb
+
+// Original lines 1-141
+// -*- coding: utf-8 -*-
+// AXS15260D 6.2 寸 452x1280 MIPI-DSI 屏幕驱动实现。
+// 面板时序来自 components/esp_lcd_axs15260，板级 GPIO 来自 Sila P4+C5 原理图。
+
+#include "axs15260_lcd.h"
+#include "sdkconfig.h"
+#include "display_buffers.h"
+
+#include "driver/gpio.h"
+#include "esp_check.h"
+#include "esp_idf_version.h"
+
+#include "esp_lcd_mipi_dsi.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_ldo_regulator.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "axs15260_lcd";
+
+// Sila P4+C5 板级引脚。
+#define PIN_LCD_RST GPIO_NUM_26
+#define PIN_LCD_BL  GPIO_NUM_30
+
+// ESP32-P4 MIPI DSI PHY 使用内部 LDO 通道 3 供电。
+#define MIPI_DSI_PHY_PWR_LDO_CHAN       3
+#define MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV 2500
+
+static esp_ldo_channel_handle_t s_phy_ldo = NULL;
+static esp_lcd_panel_handle_t s_control_panel = NULL;
+
+void axs15260_lcd_set_backlight(bool on)
+{
+    gpio_set_level(PIN_LCD_BL, on ? 1 : 0);
+}
+
+esp_err_t axs15260_lcd_init(esp_lcd_panel_handle_t *out_panel,
+                            esp_lcd_panel_io_handle_t *out_io)
+{
+    ESP_RETURN_ON_FALSE(out_panel != NULL, ESP_ERR_INVALID_ARG, TAG,
+                        "输出面板句柄为空");
+
+    gpio_config_t bl_cfg = {
+        .pin_bit_mask = 1ULL << PIN_LCD_BL,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&bl_cfg), TAG, "背光 GPIO 配置失败");
+    gpio_set_level(PIN_LCD_BL, 0);
+
+    esp_ldo_channel_config_t ldo_cfg = {
+        .chan_id = MIPI_DSI_PHY_PWR_LDO_CHAN,
+        .voltage_mv = MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV,
+    };
+    ESP_RETURN_ON_ERROR(esp_ldo_acquire_channel(&ldo_cfg, &s_phy_ldo), TAG,
+                        "申请 MIPI DSI PHY LDO 失败");
+    ESP_LOGI(TAG, "MIPI DSI PHY 电源已启用：LDO 通道=%d，电压=%dmV",
+             MIPI_DSI_PHY_PWR_LDO_CHAN, MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV);
+
+    // AXS15260D 要求复位低电平至少 10ms，拉高后等待 170ms 再发初始化命令。
+    gpio_config_t rst_cfg = {
+        .pin_bit_mask = 1ULL << PIN_LCD_RST,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&rst_cfg), TAG, "面板复位 GPIO 配置失败");
+    gpio_set_level(PIN_LCD_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(PIN_LCD_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(170));
+
+    esp_lcd_dsi_bus_handle_t dsi_bus = NULL;
+    esp_lcd_dsi_bus_config_t bus_cfg = AXS15260_PANEL_BUS_DSI_2CH_CONFIG();
+    ESP_RETURN_ON_ERROR(esp_lcd_new_dsi_bus(&bus_cfg, &dsi_bus), TAG,
+                        "创建 MIPI DSI 总线失败");
+
+    esp_lcd_panel_io_handle_t io = NULL;
+    esp_lcd_dbi_io_config_t dbi_cfg = AXS15260_PANEL_IO_DBI_CONFIG();
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_dbi(dsi_bus, &dbi_cfg, &io), TAG,
+                        "创建 MIPI DBI 命令接口失败");
+
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+    esp_lcd_dpi_panel_config_t dpi_cfg =
+        AXS15260_452_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_PIXEL_FORMAT_RGB888);
+    dpi_cfg.num_fbs = PANEL_FRAMEBUFFERS;
+    dpi_cfg.in_color_format = LCD_COLOR_FMT_RGB888;
+    dpi_cfg.out_color_format = LCD_COLOR_FMT_RGB888;
+    dpi_cfg.flags.use_dma2d = false;
+#else
+    esp_lcd_dpi_panel_config_t dpi_cfg =
+        AXS15260_452_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_FMT_RGB888);
+    dpi_cfg.num_fbs = PANEL_FRAMEBUFFERS;
+    dpi_cfg.in_color_format = LCD_COLOR_FMT_RGB888;
+    dpi_cfg.out_color_format = LCD_COLOR_FMT_RGB888;
+#endif
+
+
+
+    axs15260_vendor_config_t vendor_cfg = {
+        .mipi_config = {
+            .dsi_bus = dsi_bus,
+            .dpi_config = &dpi_cfg,
+            .lane_num = AXS15260_MIPI_LANES,
+        },
+        .flags = { .use_mipi_interface = 1 },
+    };
+    const esp_lcd_panel_dev_config_t panel_cfg = {
+        .reset_gpio_num = PIN_LCD_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .bits_per_pixel = 24,
+        .vendor_config = &vendor_cfg,
+    };
+
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_axs15260(io, &panel_cfg,
+                                                   &s_control_panel),
+                        TAG, "创建 AXS15260D 面板失败");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_init(s_control_panel), TAG,
+                        "初始化 AXS15260D 面板失败");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(s_control_panel, true), TAG,
+                        "开启 AXS15260D 显示失败");
+
+    esp_lcd_panel_handle_t dpi_panel =
+        esp_lcd_axs15260_get_dpi_panel(s_control_panel);
+    ESP_RETURN_ON_FALSE(dpi_panel != NULL, ESP_FAIL, TAG,
+                        "获取 AXS15260D DPI 面板失败");
+
+    gpio_set_level(PIN_LCD_BL, 1);
+    *out_panel = dpi_panel;
+    if (out_io != NULL) {
+        *out_io = io;
+    }
+
+    ESP_LOGI(TAG, "AXS15260D MIPI LCD 初始化完成：%dx%d，RGB888，2 Lane",
+             AXS15260_LCD_H_RES, AXS15260_LCD_V_RES);
+    return ESP_OK;
+}

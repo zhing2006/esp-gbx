@@ -1,0 +1,6 @@
+## Touch driver for the WKS43WV067-WCT's GT1151Q, which reports touches in
+## the GT911's coordinate registers, see docs/boards/wks_s31_cb.md. The RGB
+## panel needs no driver of its own.
+dependencies:
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_gt911: "==1.2.1"

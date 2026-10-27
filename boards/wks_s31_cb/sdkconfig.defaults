@@ -1,0 +1,19 @@
+CONFIG_IDF_TARGET="esp32s31"
+
+# ESP32-S31-WROOM-3-N16R16V: 16 MB flash, 16 MB octal PSRAM. The vendor's
+# examples run the CPU at 320 MHz, as here.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_320=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# JEDEC 46 40 18, an XMC D-series chip; the bootloader sets QE through its
+# default QIO entry.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+
+# CH343P connects the COM port to UART0 (TX0/RX0). The USB-Serial/JTAG PHY
+# sits on GPIO33/34, which carry LCD_R4/R5, so there is no USB console.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

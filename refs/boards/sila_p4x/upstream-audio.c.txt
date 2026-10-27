@@ -1,0 +1,185 @@
+// Source: https://gitee.com/Ergou-/esp32-p4xc5-aibox
+// Commit: 8c6bc38bc7a082d9c4475e08c40778442a8dd8be
+// Verbatim excerpts; omitted sections are not needed for board wiring.
+
+// Original: main/es8389_sound.c
+// SHA-256: a201c1f04dad97e77d7008f1356f6d67630d81ce7aa20c02d9299faf4854e23e
+
+// Original lines 1-88
+// -*- coding: utf-8 -*-
+// ES8389 音频驱动：开机提示音播放实现
+#include "es8389_sound.h"
+#include "sdkconfig.h"
+
+#include <math.h>
+#include <string.h>
+
+#include "driver/gpio.h"
+#include "driver/i2c_master.h"
+#include "driver/i2s_std.h"
+#include "esp_check.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "esp_codec_dev.h"
+#include "esp_codec_dev_defaults.h"
+
+static const char *TAG = "ES8389_SOUND";
+
+#define AUDIO_I2S_PORT        I2S_NUM_0
+#define AUDIO_SAMPLE_RATE     16000
+
+#define I2S_GPIO_BCLK         ((gpio_num_t)CONFIG_P4_ES8389_I2S_BCLK_GPIO)
+#define I2S_GPIO_WS           ((gpio_num_t)CONFIG_P4_ES8389_I2S_WS_GPIO)
+#define I2S_GPIO_DOUT         ((gpio_num_t)CONFIG_P4_ES8389_I2S_DOUT_GPIO)
+#define CODEC_PA_PIN          ((gpio_num_t)CONFIG_P4_ES8389_PA_GPIO)
+
+static i2s_chan_handle_t s_tx_chan = NULL;
+static esp_codec_dev_handle_t s_codec = NULL;
+static bool s_inited = false;
+
+static esp_err_t pa_ctrl_init(void)
+{
+    if (CODEC_PA_PIN == GPIO_NUM_NC) {
+        return ESP_OK;
+    }
+    const gpio_config_t cfg = {
+        .pin_bit_mask = 1ULL << CODEC_PA_PIN,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&cfg), TAG, "❌ 配置 PA 使能引脚失败");
+    return gpio_set_level(CODEC_PA_PIN, 0);
+}
+
+static void pa_ctrl_enable(bool on)
+{
+    if (CODEC_PA_PIN != GPIO_NUM_NC) {
+        gpio_set_level(CODEC_PA_PIN, on ? 1 : 0);
+    }
+}
+
+static esp_err_t i2s_tx_init(void)
+{
+    if (s_tx_chan != NULL) {
+        return ESP_OK;
+    }
+
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(AUDIO_I2S_PORT, I2S_ROLE_MASTER);
+    chan_cfg.dma_desc_num = 4;
+    chan_cfg.dma_frame_num = 240;
+    chan_cfg.auto_clear = true;
+    ESP_RETURN_ON_ERROR(i2s_new_channel(&chan_cfg, &s_tx_chan, NULL), TAG, "❌ 创建 I2S TX 通道失败");
+
+    const i2s_std_config_t std_cfg = {
+        .clk_cfg = {
+            .sample_rate_hz = AUDIO_SAMPLE_RATE,
+            .clk_src = I2S_CLK_SRC_DEFAULT,
+            .mclk_multiple = I2S_MCLK_MULTIPLE_256,
+        },
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                        I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = {
+            .mclk = I2S_GPIO_UNUSED,        // 本板 MCLK 未连线，Codec 从 BCLK/WS 派生
+            .bclk = I2S_GPIO_BCLK,
+            .ws   = I2S_GPIO_WS,
+            .dout = I2S_GPIO_DOUT,
+            .din  = I2S_GPIO_UNUSED,
+            .invert_flags = { false, false, false },
+        },
+    };
+    esp_err_t ret = i2s_channel_init_std_mode(s_tx_chan, &std_cfg);
+    // esp_codec_dev 1.5.11 的数据接口接管时会先禁用通道；沿用组件示例先启用的时序。
+    if (ret == ESP_OK) ret = i2s_channel_enable(s_tx_chan);
+// Original: main/Kconfig.projbuild
+// SHA-256: 7514b2d48b94c4e74d51bdd5dc692248cb04891b63b34c4f7913be589d74bc54
+
+// Original lines 69-154
+            扫描完成后从 C5 读取的最大 AP 记录数量，过大可能增加内存占用。
+
+    config P4_SC7A20_TEST_ENABLE
+        bool "启动时运行 SC7A20 加速度计测试任务"
+        default y
+        help
+            开机后在 I2C0 上探测 SC7A20（0x18/0x19），配成 100 Hz / ±2g，
+            每 500 ms 打印一次三轴 mg 值。探测失败只报错，不影响 Hosted WiFi。
+
+    config P4_SC7A20_I2C_SDA_GPIO
+        int "SC7A20 I2C SDA 引脚"
+        default 7
+        range 0 54
+        depends on P4_SC7A20_TEST_ENABLE
+
+    config P4_SC7A20_I2C_SCL_GPIO
+        int "SC7A20 I2C SCL 引脚"
+        default 8
+        range 0 54
+        depends on P4_SC7A20_TEST_ENABLE
+
+    config P4_SC7A20_INT_GPIO
+        int "SC7A20 INT1 中断引脚"
+        default 32
+        range 32 32
+        depends on P4_SC7A20_TEST_ENABLE
+        help
+            当前板固定接线：SC7A20 INT1（第5脚）连接 P4 IO32，INT2 未连接。
+
+    config P4_AXP2101_IRQ_TEST_ENABLE
+        bool "启动时运行 AXP2101 中断测试"
+        default y
+        help
+            挂载 AXP2101 只读打印电源状态（不设置、不使能任何 DCDC/LDO），打开按键、
+            VBUS、电池、充电中断，并用 AXP_IRQ 脚的下降沿触发 GPIO 中断解码打印。
+
+    config P4_AXP2101_I2C_SDA_GPIO
+        int "AXP2101 I2C SDA 引脚"
+        default 28
+        range 0 54
+        depends on P4_AXP2101_IRQ_TEST_ENABLE
+
+    config P4_AXP2101_I2C_SCL_GPIO
+        int "AXP2101 I2C SCL 引脚"
+        default 29
+        range 0 54
+        depends on P4_AXP2101_IRQ_TEST_ENABLE
+
+    config P4_AXP2101_IRQ_GPIO
+        int "AXP_IRQ 引脚（低有效）"
+        default 6
+        range 0 54
+        depends on P4_AXP2101_IRQ_TEST_ENABLE
+
+    config P4_ES8389_ENABLE
+        bool "启用 ES8389 音频播放（开机响一声）"
+        default y
+
+    config P4_ES8389_I2S_BCLK_GPIO
+        int "ES8389 I2S BCLK 引脚"
+        default 12
+        range 0 54
+        depends on P4_ES8389_ENABLE
+
+    config P4_ES8389_I2S_WS_GPIO
+        int "ES8389 I2S WS/LRCK 引脚"
+        default 10
+        range 0 54
+        depends on P4_ES8389_ENABLE
+
+    config P4_ES8389_I2S_DOUT_GPIO
+        int "ES8389 I2S DOUT 引脚"
+        default 9
+        range 0 54
+        depends on P4_ES8389_ENABLE
+
+    config P4_ES8389_PA_GPIO
+        int "ES8389 PA 使能引脚"
+        default 31
+        range -1 54
+        depends on P4_ES8389_ENABLE
+
+endmenu
+
+menu "USB 扩展副屏配置"

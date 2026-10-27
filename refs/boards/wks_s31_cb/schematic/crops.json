@@ -1,0 +1,151 @@
+{
+  "sources": [
+    {
+      "source": "ESP32-S31 CB V1.1_SCH.pdf",
+      "sha256": "9a35fbb8e86e4a03575819b001c0d5f454d44d90c8d77ceb8cf4637e4751d1c1",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "01-module.png",
+          "page": 1,
+          "rect_points": [
+            20,
+            37,
+            518,
+            557
+          ]
+        },
+        {
+          "file": "02-tf-card.png",
+          "page": 1,
+          "rect_points": [
+            517,
+            37,
+            821,
+            247
+          ]
+        },
+        {
+          "file": "03-pin-headers.png",
+          "page": 1,
+          "rect_points": [
+            517,
+            247,
+            821,
+            470
+          ]
+        },
+        {
+          "file": "04-rgb-connector.png",
+          "page": 2,
+          "rect_points": [
+            20,
+            37,
+            421,
+            240
+          ]
+        },
+        {
+          "file": "05-spi-connector.png",
+          "page": 2,
+          "rect_points": [
+            419,
+            37,
+            821,
+            240
+          ]
+        },
+        {
+          "file": "06-keys.png",
+          "page": 2,
+          "rect_points": [
+            300,
+            239,
+            518,
+            398
+          ]
+        },
+        {
+          "file": "07-camera.png",
+          "page": 2,
+          "rect_points": [
+            516,
+            239,
+            821,
+            470
+          ]
+        },
+        {
+          "file": "08-rgb-led.png",
+          "page": 2,
+          "rect_points": [
+            20,
+            396,
+            302,
+            557
+          ]
+        },
+        {
+          "file": "09-codec.png",
+          "page": 3,
+          "rect_points": [
+            20,
+            37,
+            421,
+            355
+          ]
+        },
+        {
+          "file": "10-amplifiers.png",
+          "page": 3,
+          "rect_points": [
+            419,
+            37,
+            821,
+            355
+          ]
+        },
+        {
+          "file": "11-audio-ldo.png",
+          "page": 3,
+          "rect_points": [
+            419,
+            353,
+            821,
+            470
+          ]
+        },
+        {
+          "file": "12-usb-uart.png",
+          "page": 4,
+          "rect_points": [
+            20,
+            37,
+            626,
+            298
+          ]
+        },
+        {
+          "file": "13-power.png",
+          "page": 4,
+          "rect_points": [
+            20,
+            296,
+            518,
+            557
+          ]
+        },
+        {
+          "file": "14-usb-power.png",
+          "page": 4,
+          "rect_points": [
+            516,
+            296,
+            821,
+            470
+          ]
+        }
+      ]
+    }
+  ]
+}

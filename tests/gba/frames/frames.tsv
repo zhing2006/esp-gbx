@@ -1,0 +1,36 @@
+# GBX reference frames v1
+# reference	NanoBoyAdvance	v1.8.3	8c3b159c649b027ea8fc87df3290bad4cdcdcf4b
+# capture	frame 60; frames 30-90 equal
+suite	rom	rom_sha256	first_equal_frame	model	mgba_0.10.5
+gbx	ppu/bg_text_4bpp.gba	5e0a3963c58404140c48a7101ed7ca242fc6afec08a2301be5fc5d4f5e549f1e	8	same	same
+gbx	ppu/bg_text_8bpp.gba	0475aeb9e8d96651070574e70294d966811bad770beffb7b5270ab05caf6672f	8	same	same
+gbx	ppu/bg_affine_mode1.gba	eadaf623d729060fb5995800e51ffced4183c3ef5c908961c04ce65eb5c05157	8	same	same
+gbx	ppu/bg_affine_mode2.gba	e1653096a381af3ca9bf8955549efc6652c35d0c973f3efb8627171ce6877500	8	same	same
+gbx	ppu/bitmap_mode3.gba	60b26e09626f2744d81c9fbaed649a90a2c3ae15f15739a1fb45e3441531c72a	8	same	same
+gbx	ppu/bitmap_mode4.gba	b9476ee2283c72f10eb6c4bfe852b506a1851cf776d0255457e24f7c85fd1006	8	same	same
+gbx	ppu/bitmap_mode5.gba	1f16677e90190211ce614bf9a409944352024f62c0dcfb3e548ebedf6d50d6e6	8	same	same
+gbx	ppu/obj_1d.gba	53d4be4ac9da854ea3aa7851321be18e66c42f0f2729e0102db843412056d8bd	8	same	same
+gbx	ppu/obj_2d.gba	db057618ba2d87fd5e5530b534d2d3462448332c0d09be6c4be409938f2ffa41	8	same	same
+gbx	ppu/obj_affine.gba	9bc8b4451f0092498c62b0cdb2e85cfceb126a56491a4b5b0f327fd013388996	8	same	same
+gbx	ppu/obj_priority.gba	294d0b891409f5be1e3f208d5b7f5b60f93771dc8bd6799afbb87d110138dee6	8	same	same
+gbx	ppu/obj_cycles.gba	ad08b01431d0f0af2aa79df04b4e4abb91d3a961fa11c11ea3a1c906af62c210	8	same	same
+gbx	ppu/obj_cycles_hblank_free.gba	9c8b064a037867055699f7c15cc66f8312bb81d9e19765a2ce6a2b60a48ef154	8	same	same
+gbx	ppu/window.gba	ff7ec3d7c75606fed6603931a37e4ad83bef192220c1db2c6364006f40520070	8	same	same
+gbx	ppu/window_garbage.gba	3c13c97d8483f6081ccd4418ed9e1dcad102dcd9461374e1da0a0fa36f5cf441	8	same	same
+gbx	ppu/blend_alpha.gba	fdc6eb15cb865bafb82bebffa310f7e018278f335970cdd987568c301512d8f1	8	same	same
+gbx	ppu/blend_brightness_up.gba	bd4c65c4ef39a5028d1b2451b17bb6843ccc45da1a2e722cf0dc1b42084353e2	8	same	same
+gbx	ppu/blend_brightness_down.gba	2f83e9af8e67a6f63755540f3109e965197276a0ee0b15f94657f67d8f76bd80	8	same	same
+gbx	ppu/mosaic.gba	af81af0e388e8cd23a57da4f32e79154dbdafb3f8494c4b5d8593946ea9db625	8	same	same
+gbx	ppu/forced_blank.gba	f01c5160abb3842de5238f98c52f2d201b0c7d2a315a972c48725c2e87d0ccb6	3	same	same
+gbx	ppu/raster_dma.gba	c601e65d9ef884da1877e049fea05d60fd3671d0661b09f188f93dc2f81a3f28	9	same	same
+gbx	ppu/raster_irq.gba	6c0ad956cb07771358f8746f32cc2a02c929a79d1769e17662649db8e70b5024	10	same	same
+jsmolka-gba-tests	ppu/hello.gba	38aed48b67bc0f701e8aa222b0c3334bd306bd29888707bb7224d81f5576c264	3	-	same
+jsmolka-gba-tests	ppu/shades.gba	127ce348f17e4d5fd8a0821a7af757eda6109c66c9f7b8f7d1e0fa31831b407d	3	-	same
+jsmolka-gba-tests	ppu/stripes.gba	80d6cc05b5f289b9a2392621fc245270f08e9f0d77fd33982120cef240f5a504	2	-	same
+alyosha-gba-tests	ppu/Sprite_Disable_Midline.gba	d8710ac180ee86ca8b3fea6ca3595370f75ac0693c9c78e2e3a0d973ed4c519e	3	-	827 px differ
+alyosha-gba-tests	ppu/Sprite_Disable_on_VRAM_Access.gba	d8710ac180ee86ca8b3fea6ca3595370f75ac0693c9c78e2e3a0d973ed4c519e	3	-	827 px differ
+nba-hw-test	ppu/bgpd/bgpd.gba	beafeec621abd2dc9dd4cb8e0bf310c2b8c69ee0295945506dc74b19767016c3	9	-	37680 px differ
+nba-hw-test	ppu/bgx/bgx.gba	4c27a5091974980b73128bbe5ba86c99ab6779b649352e5973363e0b17dcf304	9	-	318 px differ
+nba-hw-test	ppu/dispcnt-latch/dispcnt-latch.gba	77672a9940828a6d0a4facbf8af6caef80dae3298c72d4a9ff088bddbaa05618	10	-	400 px differ
+nba-hw-test	ppu/greenswap/greenswap.gba	17c5701b342525515c0278f504d812fc6fa028ae542c1a25cb79c0d794e44880	11	-	9222 px differ
+nba-hw-test	ppu/sprite-hmosaic/sprite-hmosaic.gba	792fe1398ffa6f94c9096559d9f5babad2d5a3fdb48babc42ffd634966d6d28f	8	-	730 px differ

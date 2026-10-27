@@ -1,0 +1,15 @@
+# GUITION JC1060P470, see docs/boards/jc1060p470.md
+CONFIG_IDF_TARGET="esp32p4"
+
+# The board carries ESP32-P4 revision v1.0, which runs at up to 360 MHz
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# The W25Q128 gets its QE bit from the bootloader's Winbond entry.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# 32 MB in-package PSRAM; 250 MHz needs revision v3.x
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y

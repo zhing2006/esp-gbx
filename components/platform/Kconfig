@@ -1,0 +1,37 @@
+menu "GBX display"
+
+config GBX_DISPLAY_ACCEL
+    bool "Use the PPA / DMA2D presentation backend"
+    depends on SOC_PPA_SUPPORTED && SOC_DMA2D_SUPPORTED
+    default n
+    help
+        Select one presentation implementation at build time. The CPU
+        implementation is not linked when this is enabled. The shared
+        sdkconfig.defaults.<target> file supplies each SoC's display policy.
+        LVGL's draw unit is configured separately with LV_USE_PPA.
+
+config GBX_LVGL_PPA_MIN_PIXELS
+    int "Minimum clipped area for the LVGL PPA draw unit"
+    depends on LV_USE_PPA
+    range 0 16777216
+    default 4096
+    help
+        Smaller draws stay with LVGL's software renderer. This includes
+        neither the game scaling choice nor the presentation backend.
+        Zero permits all operations supported by the pinned LVGL backend.
+
+endmenu
+
+menu "GBX JIT"
+
+config GBX_JIT_CODE_PSRAM
+    bool "Run all generated code from PSRAM"
+    depends on IDF_TARGET_ESP32P4 && SPIRAM
+    default n
+    help
+        Allocate the JIT code pool and its shared code in PSRAM instead of
+        internal RAM, so that every generated block runs from PSRAM through
+        the caches. The internal RAM this frees can hold a larger L2 cache
+        (CACHE_L2_CACHE_SIZE).
+
+endmenu

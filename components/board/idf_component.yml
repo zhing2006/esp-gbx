@@ -1,0 +1,8 @@
+## board.h exposes touch handles, so the boards and the platform share the
+## touch dependency through this component. The audio codecs the boards
+## share are driven through esp_codec_dev.
+dependencies:
+  espressif/esp_lcd_touch:
+    version: "==1.2.1"
+    public: true
+  espressif/esp_codec_dev: "==1.6.2"

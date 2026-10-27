@@ -1,0 +1,5 @@
+## Panel driver for the Sila P4X, see docs/boards/sila_p4x.md. The touch
+## driver for the same controller is axs15260_touch.cpp.
+dependencies:
+  waveshare/esp_lcd_axs15260d: "==2.0.0"
+  espressif/esp_lcd_touch: "==1.2.1"

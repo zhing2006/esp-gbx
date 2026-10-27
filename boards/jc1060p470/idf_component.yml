@@ -1,0 +1,5 @@
+## Panel and touch drivers for the JC1060P470, see docs/boards/jc1060p470.md
+dependencies:
+  espressif/esp_lcd_jd9165: "==2.0.2"
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_gt911: "==1.2.1"

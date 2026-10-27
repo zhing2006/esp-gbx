@@ -1,0 +1,5 @@
+## The screens are LVGL objects; the version matches components/platform/idf_component.yml
+dependencies:
+  lvgl/lvgl:
+    version: "==9.6.0~1"
+    public: true

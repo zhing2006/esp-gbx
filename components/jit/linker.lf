@@ -1,0 +1,6 @@
+# Block lookup runs on every exit from generated code; it goes to internal
+# RAM with the execution core, see components/core/linker.lf.
+[mapping:gbx_jit]
+archive: libjit.a
+entries:
+    cache_lookup (noflash)

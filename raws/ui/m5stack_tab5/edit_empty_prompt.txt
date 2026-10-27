@@ -1,0 +1,10 @@
+Edit Image 1, a finished illustration of a handheld console front face. Remove only the physical buttons listed below, as if they were never installed, and keep everything else exactly as it is: the same framing, geometry, positions, colors, lighting, paper grain, the circuit board seen through the translucent plastic, every printed label and the solid black display.
+
+Remove:
+1. The black cross-shaped direction pad. Keep the shallow circular dish recess; its smooth concave floor continues where the pad was.
+2. The two berry-maroon round buttons. Keep the slanted capsule-shaped recess and its smooth floor; keep the printed "A" and "B" labels next to it.
+3. The two slanted grey rubber pill buttons. The translucent indigo shell surface continues where they were; keep the printed "SELECT" and "START" labels.
+4. The two warm-grey ribbed shoulder bars at the left and right edges, including their "L" and "R" letters. The translucent indigo shell surface and its side edges continue where they were.
+5. The grey rubber "MENU" pill button at top-right. The warm-grey plastic of the top band continues where it was.
+
+Do not add any holes, outlines, shadows or new elements where the buttons were. Do not change anything else.

@@ -1,0 +1,19 @@
+CONFIG_IDF_TARGET="esp32p4"
+
+# The connected board has P4 v1.3 silicon; v3.x needs a separate build.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# The 0x85 flash chip gets its QE bit from the bootloader's default entry
+# (RDSR2/WRSR2, bit 1).
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+
+# CH340X connects the programming port to UART0 (GPIO37/38).
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+# GPIO24/25 are LCD reset and touch INT, not a secondary USB console.
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

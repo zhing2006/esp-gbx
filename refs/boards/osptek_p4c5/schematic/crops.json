@@ -1,0 +1,128 @@
+{
+  "sources": [
+    {
+      "source": "ESP32-P4-Module_使用指南2026.09.10（含原理图）.pdf",
+      "sha256": "f5c351b32d1e1c1683617b339a8305b444cb40ce2d5f21f34b106440843b3ca8",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "01-module.png",
+          "page": 6,
+          "rect_points": [
+            24.4,
+            16.7,
+            278.7,
+            298.1
+          ]
+        },
+        {
+          "file": "02-pin-headers.png",
+          "page": 6,
+          "rect_points": [
+            283.8,
+            16.7,
+            415.1,
+            298.1
+          ]
+        },
+        {
+          "file": "03-camera-24p.png",
+          "page": 6,
+          "rect_points": [
+            418.5,
+            16.7,
+            655.9,
+            255.9
+          ]
+        },
+        {
+          "file": "04-display-30p-backlight.png",
+          "page": 6,
+          "rect_points": [
+            657.6,
+            16.7,
+            831.9,
+            255.9
+          ]
+        },
+        {
+          "file": "05-csi-dsi-15p.png",
+          "page": 6,
+          "rect_points": [
+            418.5,
+            254.7,
+            831.9,
+            355.8
+          ]
+        },
+        {
+          "file": "06-buck-tf.png",
+          "page": 6,
+          "rect_points": [
+            22.7,
+            302.3,
+            416.0,
+            383.8
+          ]
+        },
+        {
+          "file": "07-usb-uart-download.png",
+          "page": 6,
+          "rect_points": [
+            22.7,
+            387.9,
+            533.8,
+            480.8
+          ]
+        },
+        {
+          "file": "08-c5-boot.png",
+          "page": 6,
+          "rect_points": [
+            425.2,
+            357.0,
+            528.8,
+            385.6
+          ]
+        },
+        {
+          "file": "09-usb-host.png",
+          "page": 6,
+          "rect_points": [
+            22.7,
+            480.2,
+            533.8,
+            580.1
+          ]
+        },
+        {
+          "file": "10-audio.png",
+          "page": 6,
+          "rect_points": [
+            535.5,
+            359.4,
+            831.9,
+            555.1
+          ]
+        }
+      ]
+    },
+    {
+      "source": "4.3寸LCD转接板V1.0.pdf",
+      "sha256": "eb0dfa09150067073664031804d74410be3403518301f68d8bfa1c78a1a95a3c",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "11-lcd-adapter.png",
+          "page": 1,
+          "rect_points": [
+            138.9,
+            163.6,
+            682.0,
+            404.6
+          ]
+        }
+      ]
+    }
+  ]
+}

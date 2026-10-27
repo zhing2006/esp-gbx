@@ -1,0 +1,5 @@
+## Panel and touch drivers for the Sila P4, see docs/boards/sila_p4.md
+dependencies:
+  waveshare/esp_lcd_st7703: "==2.0.0"
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_gt911: "==1.2.1"

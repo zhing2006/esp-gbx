@@ -1,0 +1,97 @@
+// Source: https://gitee.com/Ergou-/esp32-p4xc5-aibox
+// Commit: 8c6bc38bc7a082d9c4475e08c40778442a8dd8be
+// Verbatim excerpts; omitted sections are not needed for board wiring.
+
+// Original: main/sd_scanner.h
+// SHA-256: 2c134f039464d0391bbf5b8ca021a9b086328e8cdcea4567af21cd2a3bb17e22
+
+// Original lines 1-28
+#ifndef SD_SCANNER_H
+#define SD_SCANNER_H
+
+#include "esp_err.h"
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
+#include "soc/soc_caps.h"
+#if SOC_SDMMC_IO_POWER_EXTERNAL
+#include "sd_pwr_ctrl_by_on_chip_ldo.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// ==================== 引脚定义 ====================
+#define MOUNT_POINT "/sdcard"
+
+// SDMMC引脚配置
+#define SDMMC_CLK_PIN   43   //  -> SDMMC_SCK
+#define SDMMC_CMD_PIN   44   //  -> SDMMC_CMD
+#define SDMMC_D0_PIN    39   //  -> SDMMC_D0
+#define SDMMC_D1_PIN    40   //  -> SDMMC_D1
+#define SDMMC_D2_PIN    41   //  -> SDMMC_D2
+#define SDMMC_D3_PIN    42   //  -> SDMMC_D3
+
+// ==================== 类型定义 ====================
+
+// Original: main/sd_scanner.c
+// SHA-256: e4f82b26c5fa2d4c605224f456f8510b0471493c6e68b1346286f8f7ac9c489e
+
+// Original lines 318-374
+    // 一个 SDMMC Host 控制器下挂两个 Slot：Hosted WiFi 固定 Slot 1，SD 卡固定 Slot 0。
+    // DEINIT_ARG 使 FATFS 卸载时调用 deinit_p(Slot 0) 即 sdmmc_host_deinit_slot()，
+    // IDF 6.1 中它只移除 Slot 0，Slot 1 仍在时保留控制器，不影响 Hosted。
+    ESP_LOGI(SD_TAG, "💾 使用SDMMC Slot 0，Hosted WiFi 保持使用 Slot 1");
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+#if WORKAROUND_HOSTED_DOES_SDMMC_HOST_INIT
+    // 控制器已由 esp_hosted_init() 创建，与官方示例一致替换为空操作；
+    // 设置了 DEINIT_ARG 后 FATFS 实际调用的是 deinit_p，deinit 仅为保持与官方示例一致。
+    host.init = &sdmmc_host_init_dummy;
+    host.deinit = &sdmmc_host_deinit_dummy;
+    ESP_LOGI(SD_TAG, "💾 SDMMC Host 控制器由 ESP-Hosted 管理，SD卡只添加 Slot 0");
+#endif
+    // 高速模式（40MHz），若卡或布线不支持会在初始化协商时回退
+    host.max_freq_khz = SDMMC_FREQ_HIGHSPEED;
+    host.slot = SDMMC_HOST_SLOT_0;
+    // 移除DDR模式，保持标准速度
+    // 设置合适的读取超时
+    host.command_timeout_ms = 5000;
+    // 启用DMA提高传输效率
+    host.flags |= SDMMC_HOST_FLAG_DEINIT_ARG | SDMMC_HOST_FLAG_4BIT;
+    // 移除1位模式标志，强制4线模式
+    host.flags &= ~SDMMC_HOST_FLAG_1BIT;
+    ESP_LOGI(SD_TAG, "💾 SD卡标准速度模式配置: 频率=%d kHz, 超时=%d ms", host.max_freq_khz, host.command_timeout_ms);
+
+    // 电源控制配置（ESP32-P4专用）
+#if SOC_SDMMC_IO_POWER_EXTERNAL
+    ESP_LOGI(SD_TAG, "⚡ 启用ESP32-P4片上LDO电源控制，LDO通道ID: 4");
+    sd_pwr_ctrl_ldo_config_t ldo_config = {
+        .ldo_chan_id = 4,
+    };
+
+    ret = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &scanner->pwr_ctrl_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(SD_TAG, "❌ 创建片上LDO电源控制驱动失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(SD_TAG, "🔧 片上LDO电源控制驱动创建成功");
+    host.pwr_ctrl_handle = scanner->pwr_ctrl_handle;
+#else
+    ESP_LOGW(SD_TAG, "⚠️ 未启用ESP32-P4片上LDO电源控制");
+#endif
+
+    // 配置SDMMC插槽和引脚（高速模式）
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    slot_config.width = 4;  // 4线模式
+
+    // 使用预定义的引脚配置
+    slot_config.clk = SDMMC_CLK_PIN;
+    slot_config.cmd = SDMMC_CMD_PIN;
+    slot_config.d0 = SDMMC_D0_PIN;
+    slot_config.d1 = SDMMC_D1_PIN;
+    slot_config.d2 = SDMMC_D2_PIN;
+    slot_config.d3 = SDMMC_D3_PIN;
+
+    slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+    // 如硬件满足UHS-I（1.8V）与走线条件，可启用以下选项
+    // slot_config.flags |= SDMMC_SLOT_FLAG_UHS1;  // 谨慎启用

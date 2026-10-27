@@ -1,0 +1,366 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "jc1060p470-debug",
+            "displayName": "JC1060P470, debug",
+            "binaryDir": "build/jc1060p470-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "jc1060p470-release",
+            "displayName": "JC1060P470, release",
+            "binaryDir": "build/jc1060p470-release",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "jc1060p470-profile",
+            "displayName": "JC1060P470, release, profiler",
+            "binaryDir": "build/jc1060p470-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "jc1060p470-test-debug",
+            "displayName": "JC1060P470, test firmware, debug",
+            "binaryDir": "build/jc1060p470-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "jc1060p470-test-release",
+            "displayName": "JC1060P470, test firmware, release",
+            "binaryDir": "build/jc1060p470-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "jc1060p470-test-profile",
+            "displayName": "JC1060P470, test firmware, release, profiler",
+            "binaryDir": "build/jc1060p470-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "jc1060p470",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "m5stack_tab5-debug",
+            "displayName": "M5Stack Tab5, debug",
+            "binaryDir": "build/m5stack_tab5-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "m5stack_tab5-release",
+            "displayName": "M5Stack Tab5, release",
+            "binaryDir": "build/m5stack_tab5-release",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "m5stack_tab5-profile",
+            "displayName": "M5Stack Tab5, release, profiler",
+            "binaryDir": "build/m5stack_tab5-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "m5stack_tab5-test-debug",
+            "displayName": "M5Stack Tab5, test firmware, debug",
+            "binaryDir": "build/m5stack_tab5-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "m5stack_tab5-test-release",
+            "displayName": "M5Stack Tab5, test firmware, release",
+            "binaryDir": "build/m5stack_tab5-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "m5stack_tab5-test-profile",
+            "displayName": "M5Stack Tab5, test firmware, release, profiler",
+            "binaryDir": "build/m5stack_tab5-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "m5stack_tab5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "sila_p4-debug",
+            "displayName": "Sila P4, debug",
+            "binaryDir": "build/sila_p4-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "sila_p4-release",
+            "displayName": "Sila P4, release",
+            "binaryDir": "build/sila_p4-release",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "sila_p4-profile",
+            "displayName": "Sila P4, release, profiler",
+            "binaryDir": "build/sila_p4-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "sila_p4-test-debug",
+            "displayName": "Sila P4, test firmware, debug",
+            "binaryDir": "build/sila_p4-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "sila_p4-test-release",
+            "displayName": "Sila P4, test firmware, release",
+            "binaryDir": "build/sila_p4-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "sila_p4-test-profile",
+            "displayName": "Sila P4, test firmware, release, profiler",
+            "binaryDir": "build/sila_p4-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "sila_p4x-debug",
+            "displayName": "Sila P4X, debug",
+            "binaryDir": "build/sila_p4x-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4x",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "sila_p4x-release",
+            "displayName": "Sila P4X, release",
+            "binaryDir": "build/sila_p4x-release",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4x",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "sila_p4x-profile",
+            "displayName": "Sila P4X, release, profiler",
+            "binaryDir": "build/sila_p4x-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4x",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "sila_p4x-test-debug",
+            "displayName": "Sila P4X, test firmware, debug",
+            "binaryDir": "build/sila_p4x-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4x",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "sila_p4x-test-release",
+            "displayName": "Sila P4X, test firmware, release",
+            "binaryDir": "build/sila_p4x-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "sila_p4x",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "osptek_p4c5-debug",
+            "displayName": "OSPTEK ESP32-P4C5, debug",
+            "binaryDir": "build/osptek_p4c5-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "osptek_p4c5-release",
+            "displayName": "OSPTEK ESP32-P4C5, release",
+            "binaryDir": "build/osptek_p4c5-release",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "osptek_p4c5-profile",
+            "displayName": "OSPTEK ESP32-P4C5, release, profiler",
+            "binaryDir": "build/osptek_p4c5-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "osptek_p4c5-test-debug",
+            "displayName": "OSPTEK ESP32-P4C5, test firmware, debug",
+            "binaryDir": "build/osptek_p4c5-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "osptek_p4c5-test-release",
+            "displayName": "OSPTEK ESP32-P4C5, test firmware, release",
+            "binaryDir": "build/osptek_p4c5-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "osptek_p4c5-test-profile",
+            "displayName": "OSPTEK ESP32-P4C5, test firmware, release, profiler",
+            "binaryDir": "build/osptek_p4c5-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "osptek_p4c5",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "wks_s31_cb-debug",
+            "displayName": "Waiken-Smart ESP32-S31 CB, debug",
+            "binaryDir": "build/wks_s31_cb-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "wks_s31_cb-release",
+            "displayName": "Waiken-Smart ESP32-S31 CB, release",
+            "binaryDir": "build/wks_s31_cb-release",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "wks_s31_cb-profile",
+            "displayName": "Waiken-Smart ESP32-S31 CB, release, profiler",
+            "binaryDir": "build/wks_s31_cb-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "wks_s31_cb-test-debug",
+            "displayName": "Waiken-Smart ESP32-S31 CB, test firmware, debug",
+            "binaryDir": "build/wks_s31_cb-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "wks_s31_cb-test-release",
+            "displayName": "Waiken-Smart ESP32-S31 CB, test firmware, release",
+            "binaryDir": "build/wks_s31_cb-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "wks_s31_cb-test-profile",
+            "displayName": "Waiken-Smart ESP32-S31 CB, test firmware, release, profiler",
+            "binaryDir": "build/wks_s31_cb-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "wks_s31_cb",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+Edit Image 1, a finished illustration of a handheld console front face. Make only the changes listed below and keep everything else exactly as it is: the same framing, geometry, positions, sizes, colors, lighting, paper grain, scratches, the circuit board seen through the plastic, all other printed text, and the solid pure black display rectangle.
+
+Changes:
+1. Slide switch at top-left: remove the light grey slider knob so the long dark recessed slot is completely empty along its whole length, with an even dark interior and the same rounded ends. Replace the printed text above the slot with exactly two small labels: "1X" centered above the left end of the slot and "2X" centered above the right end of the slot, in the same small dark grey printed typeface. Print the word "SPEED" once, in the same typeface, to the right of the slot, vertically centered on the slot.
+2. Indicator lamps on the dark lens: turn off the lit "GBA" lamp and the lit "JIT" lamp. All seven small lamps are now unlit glass domes with no glow, no light spill and no halo around them. Each keeps its own dark tint: GB dark olive green, GBC dark red, GBA dark violet, INT dark green, JIT dark green, SAVE dark amber, ERR dark red. Keep their labels unchanged.
+3. Vacuum fluorescent display window: remove the glowing dashes and the unit text ("%", "ms", "ms", "KiB") from all four cells. Each cell keeps only its small glowing label at the top-left ("SPEED", "FRAME", "AUDIO", "MEM") and is otherwise empty dark smoked glass with very faint unlit segment ghosts. Keep the divider lines and the window frame unchanged.
+
+Do not add anything else. Render each text exactly once.

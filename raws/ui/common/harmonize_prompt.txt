@@ -1,0 +1,14 @@
+Image 1 is a rough paste-up of the front face of a handheld game console: flat color areas with finished, hand-painted parts pasted on top. Repaint it into one seamless finished illustration in exactly the style of the pasted parts. Keep every element exactly where it is and exactly the same size. Keep all printed text exactly as it is: do not re-letter, move, resize or restyle any text, logo, lamp, label, sticker, slot or recess.
+
+Materials, taken from the pasted parts:
+- The flat light-grey upper area is opaque warm light-grey matte plastic with a fine molded texture, a crisp molded groove under the top band and a soft bevel along the outer edges.
+- The flat indigo lower area is translucent smoky indigo-violet plastic, slightly frosted. Through it a green circuit board with copper traces, a square chip and a flat ribbon cable are faintly visible, subdued. Add a few small screws near the edges.
+- The flat slate rounded rectangle is the screen lens: dark slate-grey glass with a soft diagonal glossy reflection on its frame and fine scratches. Its pasted lamps and labels stay as they are.
+- The black rectangle is the display: keep it solid pure black, completely empty, with crisp straight edges.
+- The dark rounded windows are vacuum fluorescent displays behind smoked glass: empty, keeping their cyan labels, with only very faint small unlit segment ghosts.
+- The round dish and the slanted capsule are shallow empty recesses with smooth floors. Nothing is installed in them.
+- The diagonal dark slots are speaker slots. The paper sticker stays as it is.
+
+Style: a 1990s Japanese airbrush product illustration, gouache and airbrush on illustration board, soft airbrushed gradients, crisp highlights along molded edges, one key light from the upper left, fine paper grain and subtle film-like noise over the whole image. Orthographic front view; the device fills the frame edge to edge; only the large rounded bottom-right corner shows the plain dark charcoal background.
+
+Blend the edges of every pasted part so no seams, boxes or halos remain. Do not add buttons, knobs, text or any other element.

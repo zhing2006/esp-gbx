@@ -1,0 +1,6 @@
+[
+  {"name": "speed_switch", "rect": [-40, -40, 548, 122], "feather": 8},
+  {"name": "lamp_gba_off", "ellipse": [160, 622, 48, 48], "feather": 10},
+  {"name": "lamp_jit_off", "ellipse": [1280, 480, 48, 48], "feather": 10},
+  {"name": "vfd_empty", "rect": [90, 1190, 1350, 1544], "feather": 8}
+]

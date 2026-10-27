@@ -1,0 +1,207 @@
+{
+  "source": "SCH_P4X_2026-10-13.pdf",
+  "sha256": "c078ca12eef2976b49a3e77402b0a6da3e35fe87c15c024efede1aed7e19ef80",
+  "dpi": 216,
+  "crops": [
+    {
+      "file": "01-pmu.png",
+      "page": 1,
+      "rect_points": [
+        16,
+        20,
+        656,
+        351
+      ]
+    },
+    {
+      "file": "02-p4-wiring.png",
+      "page": 1,
+      "rect_points": [
+        661,
+        20,
+        1125,
+        418
+      ]
+    },
+    {
+      "file": "03-c5.png",
+      "page": 1,
+      "rect_points": [
+        1137,
+        146,
+        1670,
+        418
+      ]
+    },
+    {
+      "file": "04-display.png",
+      "page": 1,
+      "rect_points": [
+        16,
+        357,
+        655,
+        703
+      ]
+    },
+    {
+      "file": "05-camera.png",
+      "page": 1,
+      "rect_points": [
+        662,
+        424,
+        1143,
+        702
+      ]
+    },
+    {
+      "file": "06-sensors.png",
+      "page": 1,
+      "rect_points": [
+        1152,
+        425,
+        1409,
+        698
+      ]
+    },
+    {
+      "file": "07-audio.png",
+      "page": 1,
+      "rect_points": [
+        16,
+        706,
+        655,
+        1049
+      ]
+    },
+    {
+      "file": "08-usb-keys-expansion.png",
+      "page": 1,
+      "rect_points": [
+        661,
+        707,
+        1172,
+        1049
+      ]
+    },
+    {
+      "file": "09-p4-chip-power-flash.png",
+      "page": 2,
+      "rect_points": [
+        68,
+        116,
+        910,
+        706
+      ]
+    },
+    {
+      "file": "10-backlight.png",
+      "page": 3,
+      "rect_points": [
+        100,
+        85,
+        375,
+        213
+      ]
+    },
+    {
+      "file": "11-left-amplifier.png",
+      "page": 4,
+      "rect_points": [
+        139,
+        134,
+        570,
+        314
+      ]
+    },
+    {
+      "file": "12-right-amplifier.png",
+      "page": 5,
+      "rect_points": [
+        139,
+        134,
+        570,
+        314
+      ]
+    },
+    {
+      "file": "13-microphone-1.png",
+      "page": 6,
+      "rect_points": [
+        133,
+        235,
+        563,
+        336
+      ]
+    },
+    {
+      "file": "14-microphone-2.png",
+      "page": 7,
+      "rect_points": [
+        133,
+        235,
+        563,
+        336
+      ]
+    },
+    {
+      "file": "15-codec.png",
+      "page": 8,
+      "rect_points": [
+        127,
+        139,
+        698,
+        337
+      ]
+    },
+    {
+      "file": "16-usb-connectors.png",
+      "page": 9,
+      "rect_points": [
+        179,
+        350,
+        565,
+        722
+      ]
+    },
+    {
+      "file": "17-sdcard.png",
+      "page": 10,
+      "rect_points": [
+        215,
+        153,
+        616,
+        291
+      ]
+    },
+    {
+      "file": "18-cpu-dcdc.png",
+      "page": 11,
+      "rect_points": [
+        161,
+        197,
+        452,
+        326
+      ]
+    },
+    {
+      "file": "19-i2c-pullups.png",
+      "page": 1,
+      "rect_points": [
+        1120,
+        60,
+        1290,
+        136
+      ]
+    },
+    {
+      "file": "20-mipi-phy-power.png",
+      "page": 2,
+      "rect_points": [
+        487,
+        665,
+        625,
+        740
+      ]
+    }
+  ]
+}

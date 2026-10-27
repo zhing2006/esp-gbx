@@ -1,0 +1,375 @@
+{
+  "version": 1,
+  "board": "sila_p4x",
+  "size": [
+    1280,
+    452
+  ],
+  "control_scale": 0.72,
+  "plate": {
+    "base": "pasteup.png",
+    "blend": [],
+    "soften_vfd": true,
+    "display_border": 2
+  },
+  "display": [
+    400,
+    86,
+    480,
+    320
+  ],
+  "slot": [
+    200,
+    16,
+    106.79,
+    22.81
+  ],
+  "lamps": {
+    "gb": [
+      378,
+      200
+    ],
+    "gbc": [
+      378,
+      246
+    ],
+    "gba": [
+      378,
+      292
+    ],
+    "int": [
+      902,
+      177
+    ],
+    "jit": [
+      902,
+      223
+    ],
+    "save": [
+      902,
+      269
+    ],
+    "err": [
+      902,
+      315
+    ]
+  },
+  "controls": {
+    "dpad": [
+      124,
+      236
+    ],
+    "a": [
+      1200.11,
+      198.99
+    ],
+    "b": [
+      1111.89,
+      273.01
+    ],
+    "select": [
+      81,
+      384
+    ],
+    "start": [
+      167,
+      384
+    ],
+    "l": [
+      100,
+      27
+    ],
+    "r": [
+      1180,
+      27
+    ],
+    "menu": [
+      1006,
+      26
+    ]
+  },
+  "vfd": {
+    "cells": {
+      "speed": [
+        260,
+        58,
+        84,
+        173
+      ],
+      "frame": [
+        260,
+        239,
+        84,
+        173
+      ],
+      "audio": [
+        936,
+        58,
+        84,
+        173
+      ],
+      "memory": [
+        936,
+        239,
+        84,
+        173
+      ]
+    },
+    "value_pitch": 4,
+    "unit_pitch": 2,
+    "unit_position": "below",
+    "line_pitch": 2,
+    "formats": {
+      "speed": {
+        "value": "{speed_percent:.0f}",
+        "unit": "%",
+        "lines": [
+          {
+            "text": "EMU",
+            "row": 0
+          },
+          {
+            "text": "{emu_fps:.1f}",
+            "row": 1,
+            "align": "right"
+          },
+          {
+            "text": "DRW",
+            "row": 2
+          },
+          {
+            "text": "{drw_fps:.1f}",
+            "row": 3,
+            "align": "right"
+          }
+        ]
+      },
+      "frame": {
+        "value": "{frame_work_p95_ms:.1f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "AVG",
+            "row": 0
+          },
+          {
+            "text": "{frame_work_avg_ms:.1f}",
+            "row": 1,
+            "align": "right"
+          },
+          {
+            "text": "N",
+            "row": 2
+          },
+          {
+            "text": "{frame_sample_count}",
+            "row": 2,
+            "align": "right"
+          }
+        ]
+      },
+      "audio": {
+        "value": "{audio_queue_ms:.0f}",
+        "unit": "BUF ms",
+        "lines": [
+          {
+            "text": "U",
+            "row": 0
+          },
+          {
+            "text": "{audio_underruns_total}(+{audio_underruns_window})",
+            "row": 1,
+            "align": "right"
+          },
+          {
+            "text": "MIN",
+            "row": 2
+          },
+          {
+            "text": "{audio_min_ms:.0f}",
+            "row": 2,
+            "align": "right"
+          }
+        ]
+      },
+      "memory": {
+        "value": "{heap_internal_free_kib:.0f}",
+        "unit": "KiB",
+        "lines": [
+          {
+            "text": "PSRAM",
+            "row": 0
+          },
+          {
+            "text": "{heap_psram_free_mib:.1f}M",
+            "row": 1,
+            "align": "right"
+          },
+          {
+            "text": "IDLE %",
+            "row": 2
+          },
+          {
+            "text": "C0",
+            "row": 3
+          },
+          {
+            "text": "{idle_core0_percent:.0f}",
+            "row": 3,
+            "align": "right"
+          },
+          {
+            "text": "C1",
+            "row": 4
+          },
+          {
+            "text": "{idle_core1_percent:.0f}",
+            "row": 4,
+            "align": "right"
+          }
+        ]
+      }
+    },
+    "value_row": "below"
+  },
+  "pasteup": {
+    "shell_radii": [
+      18,
+      18,
+      48,
+      18
+    ],
+    "seam_y": 50,
+    "groove_y": 46,
+    "lens": [
+      356,
+      54,
+      568,
+      362
+    ],
+    "lens_radii": [
+      10,
+      10,
+      44,
+      10
+    ],
+    "print_lines": [
+      370,
+      66,
+      910,
+      554,
+      726
+    ],
+    "lamp_r": 5,
+    "dpad": {
+      "center": [
+        124,
+        236
+      ],
+      "dish_r": 89.16
+    },
+    "ab_capsule": {
+      "center": [
+        1156,
+        236
+      ],
+      "length": 208.4,
+      "thick": 102.12,
+      "angle": -40
+    },
+    "pill_wells": [
+      [
+        81,
+        384,
+        69.47,
+        20.74,
+        -25.6
+      ],
+      [
+        167,
+        384,
+        69.47,
+        20.74,
+        -25.6
+      ]
+    ],
+    "speaker": [
+      [
+        1180.0,
+        420.0,
+        35.25,
+        6.22,
+        -60
+      ],
+      [
+        1192.44,
+        412.74,
+        35.25,
+        6.22,
+        -60
+      ],
+      [
+        1204.88,
+        405.48,
+        35.25,
+        6.22,
+        -60
+      ],
+      [
+        1217.32,
+        398.22,
+        35.25,
+        6.22,
+        -60
+      ],
+      [
+        1229.76,
+        390.96,
+        35.25,
+        6.22,
+        -60
+      ]
+    ],
+    "logo": {
+      "center": [
+        640,
+        28
+      ],
+      "scale": 0.55
+    },
+    "windows": [
+      {
+        "rect": [
+          256,
+          54,
+          92,
+          362
+        ],
+        "dividers": [
+          [
+            264,
+            235,
+            340,
+            235
+          ]
+        ]
+      },
+      {
+        "rect": [
+          932,
+          54,
+          92,
+          362
+        ],
+        "dividers": [
+          [
+            940,
+            235,
+            1016,
+            235
+          ]
+        ]
+      }
+    ]
+  }
+}

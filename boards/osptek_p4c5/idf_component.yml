@@ -1,0 +1,6 @@
+## Touch driver for the OSPTEK ESP32-P4C5-Module's 4.3-inch screen, see
+## docs/boards/osptek_p4c5.md. The registry has no Espressif ST7102 panel
+## driver; board.cpp sends the panel's init sequence itself.
+dependencies:
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_st7123: "==1.0.2"

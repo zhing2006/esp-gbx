@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "status": "implemented",
+  "definition_document": "../debug-design.md",
+  "sampling": {
+    "ui_hz": 1,
+    "rate_window_ms": 1000,
+    "frame_window_samples": 120,
+    "frame_warmup_samples": 20,
+    "heap_hz": 1
+  },
+  "missing": {
+    "uncollected": "--",
+    "unsupported": "N/A",
+    "stale": "STALE",
+    "frame_warmup": "WARMUP"
+  },
+  "fields": {
+    "speed_percent": {
+      "unit": "percent",
+      "description": "Advance of the shared emulated timeline divided by elapsed host time."
+    },
+    "frame_work_p95_ms": {
+      "unit": "ms",
+      "description": "P95 wall time to emulate a game frame, from its start until the emulated PPU ends it, over the latest valid frame samples; excludes pacing waits, the renderer finishing the frame on the other core and scanout waits."
+    },
+    "frame_work_avg_ms": {
+      "unit": "ms",
+      "description": "Mean wall time to emulate a game frame over the same frame sample window."
+    },
+    "frame_sample_count": {
+      "unit": "frames",
+      "description": "Number of valid frame samples, capped at 120; below 20 means WARMUP."
+    },
+    "frame_gap_p95_ms": {
+      "unit": "ms",
+      "description": "P95 interval between consecutive game frames handed to the display, over the latest 120 at the current speed."
+    },
+    "frame_gap_avg_ms": {
+      "unit": "ms",
+      "description": "Mean interval between consecutive game frames handed to the display, over the same window."
+    },
+    "emu_fps": {
+      "unit": "frames/s",
+      "description": "Complete game frames delivered by the emulated PPU per host second."
+    },
+    "drw_fps": {
+      "unit": "frames/s",
+      "description": "Distinct game frame IDs first selected for scanout per host second."
+    },
+    "audio_queue_ms": {
+      "unit": "ms",
+      "description": "Valid PCM sample frames not yet submitted to I2S, divided by output sample rate."
+    },
+    "audio_min_ms": {
+      "unit": "ms",
+      "description": "Minimum PCM software queue duration during the current rate window."
+    },
+    "audio_underruns_total": {
+      "unit": "events",
+      "description": "Cumulative output underruns during normal playback in the current run."
+    },
+    "audio_underruns_window": {
+      "unit": "events",
+      "description": "Output underruns during the current rate window."
+    },
+    "heap_internal_free_kib": {
+      "unit": "KiB",
+      "description": "Currently allocatable internal 8-bit heap; does not represent all physical SRAM."
+    },
+    "heap_psram_free_mib": {
+      "unit": "MiB",
+      "description": "Currently allocatable external PSRAM 8-bit heap."
+    },
+    "idle_core0_percent": {
+      "unit": "percent",
+      "description": "Share of the rate window CPU core 0 spent in its idle task."
+    },
+    "idle_core1_percent": {
+      "unit": "percent",
+      "description": "Share of the rate window CPU core 1 spent in its idle task."
+    },
+    "run_state": {
+      "unit": "enum",
+      "description": "Current application state, independent from snapshot freeze state.",
+      "values": [
+        "NO ROM",
+        "LOADING",
+        "RUN",
+        "PAUSE",
+        "TEST",
+        "ERROR"
+      ]
+    },
+    "backend": {
+      "unit": "enum",
+      "description": "Active emulation backend; INT is the interpreter, JIT is the dynamic compiler.",
+      "values": [
+        "INT",
+        "JIT"
+      ]
+    },
+    "save_state": {
+      "unit": "enum",
+      "description": "Cartridge save state; CLEAN requires durable completion of all pending modifications.",
+      "values": [
+        "CLEAN",
+        "DIRTY",
+        "WRITING",
+        "ERROR"
+      ]
+    },
+    "unhandled_errors": {
+      "unit": "events",
+      "description": "Number of unresolved errors requiring attention; not the historical error total."
+    }
+  }
+}

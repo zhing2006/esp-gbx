@@ -1,0 +1,13 @@
+# The app's state, such as the game and the game page, is touched a few
+# times a frame at most. In PSRAM it leaves internal RAM to the execution
+# core's code and state and to the JIT code pool, which needs one block.
+[scheme:gbx_extram_bss]
+entries:
+    bss -> extern_ram
+    common -> extern_ram
+
+[mapping:gbx_app]
+archive: libapp.a
+entries:
+    if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+        app (gbx_extram_bss)

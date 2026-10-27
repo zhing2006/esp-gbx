@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "board": "osptek_p4c5",
+  "size": [
+    480,
+    800
+  ],
+  "control_scale": 0.6,
+  "plate": {
+    "base": "pasteup.png",
+    "blend": [],
+    "soften_vfd": true,
+    "display_border": 0
+  },
+  "display": [
+    0,
+    64,
+    480,
+    320
+  ],
+  "slot": [
+    14,
+    16,
+    89,
+    19
+  ],
+  "lamps": {
+    "gb": [
+      34,
+      400
+    ],
+    "gbc": [
+      72,
+      400
+    ],
+    "gba": [
+      110,
+      400
+    ],
+    "int": [
+      336,
+      400
+    ],
+    "jit": [
+      374,
+      400
+    ],
+    "save": [
+      412,
+      400
+    ],
+    "err": [
+      450,
+      400
+    ]
+  },
+  "controls": {
+    "dpad": [
+      126.79,
+      658.55
+    ],
+    "a": [
+      374.55,
+      635.08
+    ],
+    "b": [
+      301.04,
+      696.77
+    ],
+    "select": [
+      200.6,
+      764.09
+    ],
+    "start": [
+      272.25,
+      764.32
+    ],
+    "l": [
+      86.15,
+      558
+    ],
+    "r": [
+      393.85,
+      558
+    ],
+    "menu": [
+      430,
+      22
+    ]
+  },
+  "vfd": {
+    "cells": {
+      "speed": [
+        8,
+        436,
+        230,
+        48
+      ],
+      "frame": [
+        242,
+        436,
+        230,
+        48
+      ],
+      "audio": [
+        8,
+        488,
+        230,
+        48
+      ],
+      "memory": [
+        242,
+        488,
+        230,
+        48
+      ]
+    },
+    "value_pitch": 3,
+    "unit_pitch": 2,
+    "unit_position": "right",
+    "line_pitch": 2,
+    "formats": {
+      "speed": {
+        "value": "{speed_percent:.0f}",
+        "unit": "%",
+        "lines": [
+          {
+            "text": "EMU {emu_fps:.1f} DRW {drw_fps:.1f}",
+            "row": 0
+          }
+        ]
+      },
+      "frame": {
+        "value": "{frame_work_p95_ms:.1f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "AVG {frame_work_avg_ms:.1f} N {frame_sample_count}",
+            "row": 0
+          }
+        ]
+      },
+      "audio": {
+        "value": "BUF {audio_queue_ms:.0f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "U {audio_underruns_total}(+{audio_underruns_window}) MIN {audio_min_ms:.0f}",
+            "row": 0
+          }
+        ]
+      },
+      "memory": {
+        "value": "{heap_internal_free_kib:.0f}",
+        "unit": "KiB",
+        "lines": [
+          {
+            "text": "IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
+            "row": 0
+          }
+        ]
+      }
+    },
+    "value_row": "label"
+  },
+  "pasteup": {
+    "shell_radii": [
+      16,
+      16,
+      90,
+      16
+    ],
+    "seam_y": 430,
+    "groove_y": 42,
+    "lens": [
+      0,
+      46,
+      480,
+      380
+    ],
+    "lens_radii": [
+      10,
+      10,
+      40,
+      10
+    ],
+    "print_lines": [
+      16,
+      53,
+      464,
+      170,
+      310
+    ],
+    "lamp_r": 5,
+    "dpad": {
+      "center": [
+        126.79,
+        658.55
+      ],
+      "dish_r": 74.48
+    },
+    "ab_capsule": {
+      "center": [
+        337.8,
+        665.93
+      ],
+      "length": 174.07,
+      "thick": 85.28,
+      "angle": -40
+    },
+    "pill_wells": [
+      [
+        200.6,
+        764.09,
+        58.1,
+        17.9,
+        -25.6
+      ],
+      [
+        272.25,
+        764.32,
+        58.1,
+        17.9,
+        -25.6
+      ]
+    ],
+    "speaker": [
+      [
+        361,
+        773,
+        38.4,
+        5.4,
+        -60
+      ],
+      [
+        373,
+        767,
+        38.4,
+        5.4,
+        -60
+      ],
+      [
+        385,
+        761,
+        38.4,
+        5.4,
+        -60
+      ],
+      [
+        397,
+        755,
+        38.4,
+        5.4,
+        -60
+      ],
+      [
+        409,
+        749,
+        38.4,
+        5.4,
+        -60
+      ]
+    ],
+    "logo": {
+      "center": [
+        274,
+        22
+      ],
+      "scale": 0.48
+    },
+    "windows": [
+      {
+        "rect": [
+          4,
+          432,
+          472,
+          108
+        ],
+        "dividers": [
+          [
+            240,
+            440,
+            240,
+            532
+          ],
+          [
+            12,
+            486,
+            468,
+            486
+          ]
+        ]
+      }
+    ]
+  }
+}

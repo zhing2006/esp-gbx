@@ -1,0 +1,270 @@
+{
+  "version": 1,
+  "board": "wks_s31_cb",
+  "size": [
+    480,
+    800
+  ],
+  "background": "background.png",
+  "sprites": "../common/sprites.json",
+  "font": "../common/vfd_font.json",
+  "sprite_scale": 0.3,
+  "display": [
+    0,
+    64,
+    480,
+    320
+  ],
+  "controls": {
+    "dpad": {
+      "sprite": "dpad",
+      "center": [
+        126.79,
+        658.55
+      ]
+    },
+    "a": {
+      "sprite": "button_round",
+      "center": [
+        374.55,
+        635.08
+      ]
+    },
+    "b": {
+      "sprite": "button_round",
+      "center": [
+        301.04,
+        696.77
+      ]
+    },
+    "select": {
+      "sprite": "button_pill",
+      "center": [
+        200.6,
+        764.09
+      ]
+    },
+    "start": {
+      "sprite": "button_pill",
+      "center": [
+        272.25,
+        764.32
+      ]
+    },
+    "l": {
+      "sprite": "shoulder_l",
+      "center": [
+        86.15,
+        558
+      ]
+    },
+    "r": {
+      "sprite": "shoulder_r",
+      "center": [
+        393.85,
+        558
+      ]
+    },
+    "menu": {
+      "sprite": "menu",
+      "center": [
+        430,
+        22
+      ]
+    }
+  },
+  "speed_switch": {
+    "slot": [
+      14.0,
+      16.0,
+      89.5,
+      19.5
+    ],
+    "1x": [
+      35.3,
+      25.75
+    ],
+    "2x": [
+      82.2,
+      25.75
+    ]
+  },
+  "lamps": {
+    "gb": {
+      "center": [
+        33.81,
+        399.85
+      ]
+    },
+    "gbc": {
+      "center": [
+        71.83,
+        399.83
+      ]
+    },
+    "gba": {
+      "center": [
+        110.04,
+        399.75
+      ]
+    },
+    "int": {
+      "center": [
+        336.04,
+        399.75
+      ]
+    },
+    "jit": {
+      "center": [
+        373.76,
+        399.53
+      ]
+    },
+    "save": {
+      "center": [
+        411.98,
+        399.78
+      ]
+    },
+    "err": {
+      "center": [
+        449.98,
+        399.86
+      ]
+    }
+  },
+  "vfd": {
+    "speed": {
+      "rect": [
+        8,
+        436,
+        230,
+        48
+      ],
+      "label": [
+        18.5,
+        446.0,
+        35.0,
+        8.5
+      ],
+      "value": {
+        "binding": "{speed_percent:.0f}",
+        "pitch": 3,
+        "right": 230,
+        "unit": "%",
+        "unit_pitch": 2,
+        "unit_position": "right",
+        "top": 439.8,
+        "left_limit": 62.5
+      },
+      "lines": [
+        {
+          "text": "EMU {emu_fps:.1f} DRW {drw_fps:.1f}",
+          "pitch": 2,
+          "align": "left",
+          "x": 18.5,
+          "top": 464
+        }
+      ]
+    },
+    "frame": {
+      "rect": [
+        242,
+        436,
+        230,
+        48
+      ],
+      "label": [
+        253.0,
+        446.0,
+        30.5,
+        8.5
+      ],
+      "value": {
+        "binding": "{frame_work_p95_ms:.1f}",
+        "pitch": 3,
+        "right": 464,
+        "unit": "ms",
+        "unit_pitch": 2,
+        "unit_position": "right",
+        "top": 439.8,
+        "left_limit": 292.5
+      },
+      "lines": [
+        {
+          "text": "AVG {frame_work_avg_ms:.1f} N {frame_sample_count}",
+          "pitch": 2,
+          "align": "left",
+          "x": 253.0,
+          "top": 464
+        }
+      ]
+    },
+    "audio": {
+      "rect": [
+        8,
+        488,
+        230,
+        48
+      ],
+      "label": [
+        18.0,
+        498.5,
+        33.5,
+        8.5
+      ],
+      "value": {
+        "binding": "BUF {audio_queue_ms:.0f}",
+        "pitch": 3,
+        "right": 230,
+        "unit": "ms",
+        "unit_pitch": 2,
+        "unit_position": "right",
+        "top": 492.2,
+        "left_limit": 60.5
+      },
+      "lines": [
+        {
+          "text": "U {audio_underruns_total}(+{audio_underruns_window}) MIN {audio_min_ms:.0f}",
+          "pitch": 2,
+          "align": "left",
+          "x": 18.0,
+          "top": 516
+        }
+      ]
+    },
+    "memory": {
+      "rect": [
+        242,
+        488,
+        230,
+        48
+      ],
+      "label": [
+        252.5,
+        498.5,
+        21.0,
+        8.5
+      ],
+      "value": {
+        "binding": "{heap_internal_free_kib:.0f}",
+        "pitch": 3,
+        "right": 464,
+        "unit": "KiB",
+        "unit_pitch": 2,
+        "unit_position": "right",
+        "top": 492.2,
+        "left_limit": 282.5
+      },
+      "lines": [
+        {
+          "text": "IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
+          "pitch": 2,
+          "align": "left",
+          "x": 252.5,
+          "top": 516
+        }
+      ]
+    }
+  }
+}

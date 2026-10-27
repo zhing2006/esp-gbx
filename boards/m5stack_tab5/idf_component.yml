@@ -1,0 +1,7 @@
+## Panel, touch and IO expander drivers for the M5Stack Tab5, see docs/boards/m5stack_tab5.md
+dependencies:
+  m5stack/esp_lcd_st7121: "==1.0.0"
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_st7123: "==1.0.2"
+  espressif/esp_io_expander: "==1.2.1"
+  espressif/esp_io_expander_pi4ioe5v6408: "==1.0.1"

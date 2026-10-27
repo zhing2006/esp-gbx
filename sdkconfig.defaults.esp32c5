@@ -1,0 +1,6 @@
+# ESP32-C5 has no PPA or DMA2D. Keep the CPU display implementation and
+# nearest-neighbour sampling; board bring-up is still pending.
+CONFIG_GBX_DISPLAY_ACCEL=n
+CONFIG_LV_USE_PPA=n
+CONFIG_LV_USE_PPA_IMG=n
+CONFIG_LV_DRAW_BUF_ALIGN=32

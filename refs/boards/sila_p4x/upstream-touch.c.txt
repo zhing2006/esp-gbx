@@ -1,0 +1,208 @@
+// Source: https://gitee.com/Ergou-/esp32-p4xc5-aibox
+// Commit: 8c6bc38bc7a082d9c4475e08c40778442a8dd8be
+// Verbatim excerpts; omitted sections are not needed for board wiring.
+
+// Original: main/usb_screen/app_touch.c
+// SHA-256: 8956775ec891f95117795d485212b8b319670eb87180f2927218ff3436185e35
+
+// Original lines 1-63
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * AXS15260 内置触摸 -> Windows HID 触摸屏。
+ *
+ * 关键约束（本板已验证的坑）：
+ * 1. TP_RST 与 LCD_RST 共用 GPIO26，触摸驱动必须传 rst=-1，
+ *    否则复位脉冲会把已初始化的面板打成黑屏。
+ * 2. AXS15260 空闲时盲读 I2C 会返回指针漫游乱帧，必须 INT 事件驱动，
+ *    空闲期绝不读 I2C。
+ * 3. 触摸与 AXP2101 共享 I2C1（GPIO28/29），复用 main.c 已创建的总线。
+ *
+ * 防抖滤波状态机移植自已验证的 AXS15260 范例工程：
+ * - 按下/抬起各需连续 2 帧确认（拦截拖动中偶发的空帧，避免拖动断裂）；
+ * - ≤6px 抖动做 3:1 加权融合（低通去颤）；
+ * - >80px 跳变需连续 2 帧确认（拦截指针漫游乱帧）。
+ */
+
+#include "app_touch.h"
+#include "board_gpio_isr.h"
+
+#include <string.h>
+
+#include "esp_check.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+#include "esp_lcd_touch_axs15260.h"
+#include "panel_select.h"   // PANEL_NAME / 面板分辨率
+#include "cst826_touch.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "sdkconfig.h"
+// app_usb.h 引入 tusb.h（内部按正确顺序加载 tusb_config.h），勿直接包含 tusb_config.h。
+#include "app_usb.h"
+
+// 触摸芯片与面板绑定，但防抖滤波与 HID 上报是通用的。本文件的结构是：
+//   面板相关 —— 后端创建 / 读一帧 / 面板坐标→Windows 坐标（下面的 #if 分叉）
+//   面板无关 —— 滤波状态机、should_send_report、touch_task、HID 组包
+// 新增面板只需在分叉里补三段，不要复制整套滤波逻辑。
+
+#if CFG_TUD_HID
+
+
+static const char *TAG = "usb_screen_touch";
+
+#define TOUCH_INT_GPIO        GPIO_NUM_27
+#if CONFIG_APP_PANEL_ST7701_2_8IN
+#define TOUCH_PANEL_H_RES     PANEL_H_RES
+#define TOUCH_PANEL_V_RES     PANEL_V_RES
+#else
+#define TOUCH_PANEL_H_RES     AXS15260_TOUCH_H_RES
+#define TOUCH_PANEL_V_RES     AXS15260_TOUCH_V_RES
+#endif
+#define TOUCH_PRESSED_POLL_MS 20      // 触摸会话期间的跟踪采样周期
+
+// 滤波参数与范例工程一致。
+#define TOUCH_FILTER_PRESS_CONFIRM_CNT    2
+#define TOUCH_FILTER_RELEASE_CONFIRM_CNT  2
+#define TOUCH_FILTER_JITTER_PIXELS        6
+#define TOUCH_FILTER_JUMP_PIXELS          80
+#define TOUCH_FILTER_RELOCATE_CONFIRM_CNT 2
+
+// Original lines 94-108
+// 面板竖屏坐标 -> Windows 横屏坐标，与显示路径 PPA ANGLE_90 旋转互逆。
+// 面板原生坐标 → Windows 坐标，必须与显示侧的 PPA 旋转互逆。
+static inline void panel_to_windows(uint16_t px, uint16_t py,
+                                    uint16_t *wx, uint16_t *wy)
+{
+#if CONFIG_APP_PANEL_ST7701_2_8IN
+    // 方屏显示不旋转，触摸坐标也直通。
+    *wx = px;
+    *wy = py;
+#else
+    // 6.2 寸显示走 PPA ANGLE_90，触摸取其逆变换
+    *wx = (uint16_t)(TOUCH_PANEL_V_RES - 1U - py);
+    *wy = px;
+#endif
+}
+
+// Original lines 322-371
+static void touch_task(void *arg)
+{
+    (void)arg;
+    int64_t read_error_since = 0;
+    int64_t last_read_error_log = 0;
+
+    while (1) {
+        // 会话期（已按下或按下候选确认中）以固定周期跟踪；
+        // 真空闲只等 INT，绝不盲读 I2C（避免指针漫游乱帧）。
+        const bool session_active =
+            s_filter.stable_pressed || s_filter.press_candidate.valid;
+#if CONFIG_APP_PANEL_ST7701_2_8IN
+        // 已验证的 CST826 分支采用轮询，避免依赖 GPIO27 中断极性。
+        vTaskDelay(pdMS_TO_TICKS(TOUCH_PRESSED_POLL_MS));
+#else
+        const TickType_t wait = session_active
+                                    ? pdMS_TO_TICKS(TOUCH_PRESSED_POLL_MS)
+                                    : portMAX_DELAY;
+        const uint32_t notified = ulTaskNotifyTake(pdTRUE, wait);
+        if (!notified && !session_active) {
+            continue;
+        }
+#endif
+
+        touch_sample_t raw = {0};
+        bool raw_valid = false;
+#if CONFIG_APP_PANEL_ST7701_2_8IN
+        uint16_t px = 0, py = 0;
+        bool pressed_now = false;
+        esp_err_t read_ret = cst826_touch_read(&px, &py, &pressed_now);
+        if (read_ret == ESP_OK && pressed_now) {
+            raw = (touch_sample_t){ .x = px, .y = py, .size = TOUCH_DEFAULT_SIZE,
+                                    .id = 0, .valid = true };
+            raw_valid = true;
+        }
+#else
+        axs15260_touch_data_t data = {0};
+        esp_err_t read_ret = axs15260_touch_read(s_tp, &data);
+        if (read_ret == ESP_OK && data.point_num > 0) {
+            const axs15260_touch_point_t *pt = &data.points[0];
+            if (pt->x < TOUCH_PANEL_H_RES && pt->y < TOUCH_PANEL_V_RES) {
+                raw.x = pt->x;
+                raw.y = pt->y;
+                raw.size = pt->area ? pt->area : pt->weight;
+                raw.id = pt->id;
+                raw.valid = true;
+                raw_valid = true;
+            }
+        }
+#endif
+
+// Original lines 415-437
+esp_err_t app_touch_init(i2c_master_bus_handle_t i2c_bus)
+{
+    ESP_RETURN_ON_FALSE(i2c_bus != NULL, ESP_ERR_INVALID_ARG, TAG,
+                        "I2C 总线句柄为空");
+
+#if CONFIG_APP_PANEL_ST7701_2_8IN
+    ESP_RETURN_ON_ERROR(cst826_touch_init(i2c_bus), TAG, "创建 CST826 触摸驱动失败");
+#else
+    ESP_RETURN_ON_ERROR(board_gpio_isr_ensure(), TAG, "初始化共享触摸中断服务失败");
+    const axs15260_touch_config_t cfg = {
+        .i2c_bus = i2c_bus,          // 复用 AXP2101 所在的 I2C1
+        .rst_gpio = GPIO_NUM_NC,     // 共享复位线，绝不能由触摸驱动脉冲
+        .int_gpio = TOUCH_INT_GPIO,
+        .x_max = TOUCH_PANEL_H_RES,
+        .y_max = TOUCH_PANEL_V_RES,
+        .isr_service_installed = true,
+    };
+    ESP_RETURN_ON_ERROR(axs15260_touch_new(&cfg, &s_tp), TAG,
+                        "创建 AXS15260 触摸驱动失败");
+#endif
+
+    memset(&s_filter, 0, sizeof(s_filter));
+
+
+// Original: main/cst826_touch.c
+// SHA-256: d3fe79033fed9441ae80ddc735e96778ddd36c43a891003546b436d73b90bb5e
+
+// Original lines 1-38
+// -*- coding: utf-8 -*-
+// 协议来自 xiaozhi-p4c5 分支的 2.8 寸板卡 CST826 驱动。
+#include "cst826_touch.h"
+#include "esp_check.h"
+#include "esp_log.h"
+
+static const char *TAG = "cst826_touch";
+static i2c_master_dev_handle_t s_device;
+
+esp_err_t cst826_touch_init(i2c_master_bus_handle_t bus)
+{
+    ESP_RETURN_ON_FALSE(bus && !s_device, ESP_ERR_INVALID_STATE, TAG, "触摸总线为空或重复初始化");
+    // GPIO26 与 LCD 共用复位线，触摸初始化不再操作该引脚。
+    i2c_device_config_t cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = 0x15,
+        .scl_speed_hz = 400000,
+    };
+    ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(bus, &cfg, &s_device), TAG, "添加 CST826 设备失败");
+    uint8_t reg = 0xA7, id = 0;
+    esp_err_t ret = i2c_master_transmit_receive(s_device, &reg, 1, &id, 1, 100);
+    if (ret != ESP_OK) {
+        i2c_master_bus_rm_device(s_device);
+        s_device = NULL;
+        ESP_LOGE(TAG, "读取 CST826 芯片 ID 失败：%s", esp_err_to_name(ret));
+        return ret;
+    }
+    // 分支记录兼容批次 ID 不同，因此保留后续触摸事件验证。
+    if (id != 0xCA) ESP_LOGW(TAG, "CST826 芯片 ID 与参考值不同：实际=0x%02X，参考=0xCA", id);
+    ESP_LOGI(TAG, "CST826 触摸通信已就绪：地址=0x15，ID=0x%02X，采用 20ms 轮询", id);
+    return ESP_OK;
+}
+
+esp_err_t cst826_touch_read(uint16_t *x, uint16_t *y, bool *pressed)
+{
+    if (!s_device || !x || !y || !pressed) return ESP_ERR_INVALID_ARG;
+    *pressed = false;
+    uint8_t reg = 0x02, data[13] = {0};

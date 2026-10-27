@@ -1,0 +1,49 @@
+# References: the index, fetch scripts and board materials are tracked
+/refs/*
+!/refs/README.md
+!/refs/fetch.sh
+!/refs/fetch.ps1
+!/refs/boards/
+
+# Build output
+build/
+
+# Prepared card data, a copy of the card's tests/ (docs/hardware-testing.md)
+/tests/sdcard/
+
+# ESP-IDF: the active sdkconfig is generated from the sdkconfig.defaults files
+sdkconfig
+sdkconfig.old
+managed_components/
+
+# Local CMake presets
+CMakeUserPresets.json
+
+# Local UI layout studies, including their Python environment and rendered images
+/.local/ui-layouts/
+
+# Game ROMs and saves
+*.gb
+*.gbc
+*.gba
+*.sav
+*.rtc
+
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python bytecode from the tools
+__pycache__/
+
+# The PC build's card is the directory it runs in: game ROMs, the saves and
+# settings it writes there
+roms/
+# but not the sources of the GBX test ROMs
+!/tests/gba/roms/
+/saves/
+/states/
+/config/
+bios/

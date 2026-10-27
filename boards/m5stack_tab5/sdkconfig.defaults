@@ -1,0 +1,22 @@
+# M5Stack Tab5, see docs/boards/m5stack_tab5.md
+CONFIG_IDF_TARGET="esp32p4"
+
+# The board carries ESP32-P4 revision v1.3, which runs at up to 360 MHz
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# The factory firmware runs the XM25QH128C in QIO; the bootloader's default
+# entry sets its QE bit.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# 32 MB in-package PSRAM; 250 MHz needs revision v3.x
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+
+# The USB-C port goes to the USB-Serial/JTAG; UART0 only reaches the M5-Bus pins
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# The ST7121 touch controller reports up to 10 points
+CONFIG_ESP_LCD_TOUCH_MAX_POINTS=10

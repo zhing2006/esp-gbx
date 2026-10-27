@@ -1,0 +1,9 @@
+[
+  {"name": "dpad_dish", "ellipse": [352, 2060, 268, 268], "feather": 14},
+  {"name": "ab_capsule", "capsule": [1058, 2084, 640, 330, -40], "feather": 14},
+  {"name": "select", "capsule": [601, 2411, 230, 84, -26], "feather": 10},
+  {"name": "start", "capsule": [840, 2412, 230, 84, -26], "feather": 10},
+  {"name": "shoulder_l", "rect": [-40, 1578, 490, 1716], "feather": 8},
+  {"name": "shoulder_r", "rect": [950, 1578, 1480, 1716], "feather": 8},
+  {"name": "menu", "rect": [1150, 8, 1400, 128], "feather": 8}
+]

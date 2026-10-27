@@ -1,0 +1,8 @@
+CONFIG_SPIRAM_SPEED_250M=y
+
+# ESP32-S31 has PPA and DMA2D. Prepare the shared display policy before
+# board bring-up; this target has not been validated on hardware.
+CONFIG_GBX_DISPLAY_ACCEL=y
+CONFIG_LV_USE_PPA=y
+CONFIG_LV_USE_PPA_IMG=y
+CONFIG_GBX_LVGL_PPA_MIN_PIXELS=4096

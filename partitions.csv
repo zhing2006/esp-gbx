@@ -1,0 +1,8 @@
+# Flash layout shared by all boards, using the first 16 MB of flash. See docs/architecture.md.
+# Name,   Type, SubType,  Offset,  Size
+nvs,      data, nvs,      0x9000,  0x5000
+otadata,  data, ota,      0xe000,  0x2000
+ota_0,    app,  ota_0,    0x10000, 4M
+ota_1,    app,  ota_1,    ,        4M
+assets,   data, 0x40,     ,        6M
+coredump, data, coredump, ,        256K

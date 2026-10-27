@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "board": "m5stack_tab5",
+  "size": [
+    720,
+    1280
+  ],
+  "control_scale": 1.0,
+  "plate": {
+    "base": "../common/concept.png",
+    "blend": [
+      {
+        "edit": "edit_plate.png",
+        "regions": "edit_plate_regions.json"
+      },
+      {
+        "edit": "edit_empty.png",
+        "regions": "edit_empty_regions.json"
+      }
+    ],
+    "soften_vfd": false,
+    "display_border": 4
+  },
+  "display": [
+    120,
+    118,
+    480,
+    320
+  ],
+  "slot": [
+    35.5,
+    20,
+    149,
+    32
+  ],
+  "lamps": {
+    "gb": [
+      80.5,
+      189.6
+    ],
+    "gbc": [
+      80.5,
+      250.6
+    ],
+    "gba": [
+      80.7,
+      309.0
+    ],
+    "int": [
+      640.1,
+      182.3
+    ],
+    "jit": [
+      639.8,
+      241.6
+    ],
+    "save": [
+      640.0,
+      300.5
+    ],
+    "err": [
+      640.1,
+      360.0
+    ]
+  },
+  "controls": {
+    "dpad": [
+      177.5,
+      1029.75
+    ],
+    "a": [
+      590.0,
+      991.0
+    ],
+    "b": [
+      467.5,
+      1093.75
+    ],
+    "select": [
+      300.5,
+      1205.5
+    ],
+    "start": [
+      419.75,
+      1205.9
+    ],
+    "l": [
+      116.0,
+      823.25
+    ],
+    "r": [
+      604.0,
+      823.25
+    ],
+    "menu": [
+      637.5,
+      34.0
+    ]
+  },
+  "vfd": {
+    "cells": {
+      "speed": [
+        48,
+        593,
+        310,
+        88
+      ],
+      "frame": [
+        362,
+        593,
+        310,
+        88
+      ],
+      "audio": [
+        48,
+        685,
+        310,
+        88
+      ],
+      "memory": [
+        362,
+        685,
+        310,
+        88
+      ]
+    },
+    "value_pitch": 4,
+    "unit_pitch": 3,
+    "unit_position": "right",
+    "line_pitch": 2,
+    "formats": {
+      "speed": {
+        "value": "{speed_percent:.0f}",
+        "unit": "%",
+        "lines": [
+          {
+            "text": "EMU {emu_fps:.1f} DRW {drw_fps:.1f}",
+            "row": 0
+          }
+        ]
+      },
+      "frame": {
+        "value": "{frame_work_p95_ms:.1f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "AVG {frame_work_avg_ms:.1f} N {frame_sample_count}",
+            "row": 0
+          }
+        ]
+      },
+      "audio": {
+        "value": "BUF {audio_queue_ms:.0f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "U {audio_underruns_total}(+{audio_underruns_window}) MIN {audio_min_ms:.0f}",
+            "row": 0
+          }
+        ]
+      },
+      "memory": {
+        "value": "{heap_internal_free_kib:.0f}",
+        "unit": "KiB",
+        "lines": [
+          {
+            "text": "PSRAM {heap_psram_free_mib:.1f}M IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
+            "row": 0
+          }
+        ]
+      }
+    },
+    "value_row": "label"
+  }
+}

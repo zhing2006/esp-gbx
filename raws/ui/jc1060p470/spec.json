@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "board": "jc1060p470",
+  "size": [
+    600,
+    1024
+  ],
+  "control_scale": 0.8055555555555556,
+  "plate": {
+    "base": "harmonized.png",
+    "blend": [],
+    "soften_vfd": true,
+    "display_border": 4
+  },
+  "display": [
+    60,
+    104,
+    480,
+    320
+  ],
+  "slot": [
+    28,
+    18,
+    120,
+    26
+  ],
+  "lamps": {
+    "gb": [
+      36,
+      180
+    ],
+    "gbc": [
+      36,
+      228
+    ],
+    "gba": [
+      36,
+      276
+    ],
+    "int": [
+      564,
+      166
+    ],
+    "jit": [
+      564,
+      214
+    ],
+    "save": [
+      564,
+      262
+    ],
+    "err": [
+      564,
+      310
+    ]
+  },
+  "controls": {
+    "dpad": [
+      148,
+      784
+    ],
+    "a": [
+      480.65,
+      752.49
+    ],
+    "b": [
+      381.95,
+      835.31
+    ],
+    "select": [
+      247.1,
+      925.7
+    ],
+    "start": [
+      343.3,
+      926.0
+    ],
+    "l": [
+      93.44,
+      649
+    ],
+    "r": [
+      506.56,
+      649
+    ],
+    "menu": [
+      533.54,
+      30
+    ]
+  },
+  "vfd": {
+    "cells": {
+      "speed": [
+        20,
+        536,
+        136,
+        76
+      ],
+      "frame": [
+        162,
+        536,
+        136,
+        76
+      ],
+      "audio": [
+        304,
+        536,
+        136,
+        76
+      ],
+      "memory": [
+        446,
+        536,
+        134,
+        76
+      ]
+    },
+    "value_pitch": 3,
+    "unit_pitch": 2,
+    "unit_position": "right",
+    "line_pitch": 2,
+    "formats": {
+      "speed": {
+        "value": "{speed_percent:.0f}",
+        "unit": "%",
+        "lines": [
+          {
+            "text": "EMU {emu_fps:.1f}",
+            "row": 0
+          }
+        ]
+      },
+      "frame": {
+        "value": "{frame_work_p95_ms:.1f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "AVG {frame_work_avg_ms:.1f}",
+            "row": 0
+          }
+        ]
+      },
+      "audio": {
+        "value": "{audio_queue_ms:.0f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "BUF",
+            "row": "label",
+            "align": "right"
+          },
+          {
+            "text": "U {audio_underruns_total}(+{audio_underruns_window})",
+            "row": 0
+          }
+        ]
+      },
+      "memory": {
+        "value": "{heap_internal_free_kib:.0f}",
+        "unit": "KiB",
+        "lines": [
+          {
+            "text": "IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
+            "row": 0
+          }
+        ]
+      }
+    },
+    "value_row": "below"
+  },
+  "pasteup": {
+    "shell_radii": [
+      22,
+      22,
+      121,
+      22
+    ],
+    "seam_y": 522,
+    "groove_y": 56,
+    "lens": [
+      12,
+      64,
+      576,
+      402
+    ],
+    "lens_radii": [
+      12,
+      12,
+      56,
+      12
+    ],
+    "print_lines": [
+      30,
+      76,
+      570,
+      196,
+      404
+    ],
+    "lamp_r": 6,
+    "dpad": {
+      "center": [
+        148,
+        784
+      ],
+      "dish_r": 100
+    },
+    "ab_capsule": {
+      "center": [
+        431.3,
+        793.9
+      ],
+      "length": 233.7,
+      "thick": 114.5,
+      "angle": -40
+    },
+    "pill_wells": [
+      [
+        247.1,
+        925.7,
+        78,
+        24,
+        -25.6
+      ],
+      [
+        343.3,
+        926.0,
+        78,
+        24,
+        -25.6
+      ]
+    ],
+    "speaker": [
+      [
+        471.0,
+        956.3,
+        51.6,
+        7.3,
+        -60
+      ],
+      [
+        487.1,
+        948.2,
+        51.6,
+        7.3,
+        -60
+      ],
+      [
+        503.2,
+        940.2,
+        51.6,
+        7.3,
+        -60
+      ],
+      [
+        519.3,
+        932.1,
+        51.6,
+        7.3,
+        -60
+      ],
+      [
+        535.4,
+        924.1,
+        51.6,
+        7.3,
+        -60
+      ],
+      [
+        551.5,
+        916.0,
+        51.6,
+        7.3,
+        -60
+      ]
+    ],
+    "sticker": [
+      20,
+      945,
+      147,
+      59
+    ],
+    "logo": {
+      "center": [
+        300,
+        494
+      ],
+      "scale": 0.806
+    },
+    "windows": [
+      {
+        "rect": [
+          16,
+          532,
+          568,
+          84
+        ],
+        "dividers": [
+          [
+            158,
+            540,
+            158,
+            608
+          ],
+          [
+            300,
+            540,
+            300,
+            608
+          ],
+          [
+            442,
+            540,
+            442,
+            608
+          ]
+        ]
+      }
+    ]
+  }
+}
