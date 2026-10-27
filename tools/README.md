@@ -24,7 +24,7 @@
 
 | 脚本 | 用途 |
 |---|---|
-| `link_core_layout.py` | 固件和测试固件构建时自动运行，改写 IDF 生成的链接脚本，把 `components/core/linker.lf` 和 `components/jit/linker.lf` 映射到片内的代码按固定顺序排到片内 RAM 代码段的开头，P4 v3 以前的芯片上，GBA 跑在 CPU 所在核上的执行代码放进片内 RAM 后一段的数据区，并检查其中列出的冷函数都在对象里，见[架构](../docs/architecture.md#代码规则)。 |
+| `link_core_layout.py` | 固件和测试固件构建时自动运行，改写 IDF 生成的链接脚本，把 `components/core/linker.lf` 和 `components/jit/linker.lf` 映射到片内的代码按固定顺序排到片内 RAM 代码段的开头，P4 v3 以前的芯片上，GBA 跑在 CPU 所在核上的执行代码放进片内 RAM 后一段的数据区；只编入 GB 的构建（`GBX_SYSTEMS_GB_ONLY`）改排 GB 的执行核心，并把它查的表放到全局指针的寻址范围下面。脚本还检查其中列出的冷函数都在对象里，见[架构](../docs/architecture.md#代码规则)。 |
 | `ui/pack_assets.py` | 正式固件构建时自动运行，把所选板子的 UI 素材打成资源包，写进 assets 分区，见 [UI 布局](../docs/ui-layouts/index.md#资源包)。 |
 
 ## 板上调试和性能分析

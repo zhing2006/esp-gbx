@@ -9,3 +9,9 @@ CONFIG_GBX_LVGL_PPA_MIN_PIXELS=4096
 # The RGB panel's DMA underran when LVGL drew while the PPA drew a game
 # frame, see components/platform/Kconfig.
 CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW=y
+
+# Internal RAM cannot hold the GBA's execution core and run-time data next
+# to the JIT's code pool, so this chip builds the GB alone, whose execution
+# core takes internal RAM instead (docs/plans/gba/task-7-1.md). See
+# components/core/Kconfig.
+CONFIG_GBX_SYSTEMS_GB_ONLY=y

@@ -12,6 +12,7 @@
 #include "gbx/files.h"
 #include "gbx/gb/system.h"
 #include "gbx/gba/system.h"
+#include "gbx/systems.h"
 #include "gbx/worker.h"
 #include "replay.h"
 #include "saves.h"
@@ -20,9 +21,10 @@
 
 namespace gbx::app {
 
-// Runs one game at a time, on a GB or a GBA. The emulation task owns the
-// system on the CPU core; an audio task on the other core moves its PCM to the output, with
-// the menus' sound cues, which it also plays while no game runs. Frames
+// Runs one game at a time, on a GB or a GBA, of those the build runs (see
+// gbx/systems.h; the GBA's headers stay for its constants). The emulation
+// task owns the system on the CPU core; an audio task on the other core
+// moves its PCM to the output, with the menus' sound cues, which it also plays while no game runs. Frames
 // go from the PPU's worker straight to the display's game layer, so the
 // emulation task never converts or copies them. The UI reads counters and
 // sends requests, which the emulation task takes at frame boundaries: pause
@@ -69,7 +71,7 @@ public:
     // and 0 take the card's bios/gba_bios.bin and kGbaRomCache.
     void set_gba_options(const char* bios, size_t rom_cache_bytes);
     // Whether the game loaded runs on the GBA. Any task.
-    bool gba() const { return gba_.load(std::memory_order_acquire); }
+    bool gba() const { return GBX_HAS_GBA && gba_.load(std::memory_order_acquire); }
     GameState state() const { return state_.load(std::memory_order_acquire); }
     // Counts start() calls, so a caller can tell a new load from the state
     // of an old one, however fast the load ends.
@@ -244,6 +246,7 @@ private:
     // FrameSink, on the PPU's worker.
     uint16_t* frame_buffer() override;
     void frame_ready(uint64_t id) override;
+#if GBX_HAS_GBA
     // The GBA's frames and sound go the same way.
     class GbaSink final : public gba::FrameSink {
     public:
@@ -253,6 +256,7 @@ private:
     private:
         Game& game_;
     };
+#endif
     void work_done(uint64_t id, uint64_t began, uint64_t now);
     void gap_done(uint64_t id, uint64_t now);
 
@@ -261,8 +265,10 @@ private:
     void emulate();
     void play();
     void load(const char* path, Backend backend, bool cgb);
+#if GBX_HAS_GBA
     void load_gba(const char* path, Backend backend, int64_t size, const char* title);
     void step_gba();
+#endif
     // Frees all the last game held, when it ends and before another loads.
     void release();
     // Sets jit_reserved_ aside unless it is already.
@@ -270,7 +276,11 @@ private:
     void unshare();
     bool load_save(const char* path, std::span<const uint8_t, 24> identity, Saves::System system, size_t capacity,
                    const char* title);
+#if GBX_HAS_GBA
     SaveCartridge& cartridge() { return gba() ? static_cast<SaveCartridge&>(gba_cart_) : gb_cart_; }
+#else
+    SaveCartridge& cartridge() { return gb_cart_; }
+#endif
     // The running system's sound settings and level.
     void set_audio_speed(int32_t ppm);
     size_t audio_buffered() const;
@@ -347,11 +357,15 @@ private:
     // the GB's palette: system_ or gba_system_, once a ROM has loaded.
     // A task counts itself in readers_ while it uses one, see Reader.
     std::atomic<gb::System*> shared_{nullptr};
+#if GBX_HAS_GBA
     std::atomic<gba::System*> gba_shared_{nullptr};
+#endif
     mutable std::atomic<uint32_t> readers_{0};
     class Reader;
     GbSaveCartridge gb_cart_;
+#if GBX_HAS_GBA
     GbaSaveCartridge gba_cart_;
+#endif
     uint8_t* rom_ = nullptr;
     bool loaded_ = false;  // system_ holds a game, running, paused or stopped
     char path_[platform::files::kMaxPath] = {};  // under request_mutex_
@@ -364,12 +378,14 @@ private:
     // for every BIOS opcode, and the frame paused on (gba::kFramePixels
     // BGR555, external memory).
     std::atomic<bool> gba_{false};
+#if GBX_HAS_GBA
     GbaSink gba_sink_{*this};
     std::unique_ptr<gba::System> gba_system_;
     std::unique_ptr<gba::RomCache> gba_rom_;
     uint8_t* gba_bios_ = nullptr;
     uint16_t* gba_paused_ = nullptr;
     Tick gba_ticks_ = 0;  // since the load
+#endif
     char gba_bios_path_[platform::files::kMaxPath] = {};  // under request_mutex_
     size_t gba_rom_cache_ = 0;                            // under request_mutex_
     int slot_reading_ = 0;     // the slot Slots reads for load_slot()
@@ -456,8 +472,10 @@ private:
         uint32_t payload_waits = 0;
         uint64_t ppu_frame = 0;
     } bench_;
+#if GBX_HAS_GBA
     void bench_start();
     void bench_frame(uint64_t frame, uint32_t cycles, uint32_t retired);
+#endif
     // The JIT's careful access counts as of the last run, for
     // take_slow_access(), and the counts it took last.
     std::array<std::atomic<uint32_t>, 6> slow_reads_{}, slow_writes_{};

@@ -19,6 +19,7 @@
 #include "gbx/executable.h"
 #include "gbx/gb/system.h"
 #include "gbx/gba/ppu.h"
+#include "gbx/systems.h"
 #include "soc/cache_reg.h"
 #include "soc/soc.h"
 
@@ -129,6 +130,7 @@ void stall_task(void* argument) {
             }
         }
         ESP_LOGW(kTag, "%s", line);
+#if GBX_HAS_GBA
         const auto& counters = gba::render_counters;
         const uint32_t drawn = counters.recent_count.load(std::memory_order_acquire);
         for (uint32_t k = drawn - std::min<uint32_t>(drawn, kFrames); k != drawn; ++k) {
@@ -139,6 +141,7 @@ void stall_task(void* argument) {
                 used += std::snprintf(line + used, sizeof line - used, " %lu", static_cast<unsigned long>(retired / 1000));
             ESP_LOGW(kTag, "%s", line);
         }
+#endif
     }
     heap_caps_free(tasks);
     ESP_LOGW(kTag, "stalls: done");

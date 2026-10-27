@@ -12,6 +12,7 @@
 #include "gbx/gba/snapshot.h"
 #include "gbx/gba/system.h"
 #include "gbx/platform.h"
+#include "gbx/systems.h"
 #include "gbx/worker.h"
 #include "saves.h"
 
@@ -72,14 +73,18 @@ public:
     // Takes the slots of the ROM at `rom_path`, which `system` has just
     // loaded, and lists them. False when there is no memory for them.
     bool open(const char* rom_path, const gb::System& system);
+#if GBX_HAS_GBA
     bool open(const char* rom_path, gba::System& system);
+#endif
     // Waits for work under way and releases the buffers.
     void close();
     // Copies the state and has the task write it to `slot`. False while
     // other work is under way, or when the state cannot be taken; that ends
     // like a failed write, see writes().
     bool save(int slot, gb::System& system);
+#if GBX_HAS_GBA
     bool save(int slot, gba::System& system);
+#endif
     // Has the task read `slot` and decode it into the snapshot.
     bool read(int slot);
     // Once read() is done: the slot's kind, ok when snapshot() holds its
@@ -88,7 +93,9 @@ public:
     Kind read_kind() const;
     platform::WallTime read_wall() const;
     const gb::Snapshot& snapshot() const { return snapshot_; }
+#if GBX_HAS_GBA
     const gba::Snapshot& gba_snapshot() const { return gba_snapshot_; }
+#endif
 
     // Any task.
     bool active() const;
@@ -158,9 +165,12 @@ private:
     std::atomic<size_t> written_{0};
 
     // The task's while work_ is not none, the emulation task's otherwise:
-    // a GB's or, with gba_, a GBA's.
+    // a GB's or, with gba_, a GBA's. A build without the GBA lists a GBA's
+    // states in a GB's slots as another system's.
     gb::Snapshot snapshot_;
+#if GBX_HAS_GBA
     gba::Snapshot gba_snapshot_;
+#endif
     bool gba_ = false;
     // The files of this ROM in its run mode have file_size_ bytes; the
     // buffer holds one of the other mode too.

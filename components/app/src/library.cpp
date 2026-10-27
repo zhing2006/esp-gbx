@@ -9,6 +9,7 @@
 
 #include "gbx/files.h"
 #include "gbx/platform.h"
+#include "gbx/systems.h"
 
 namespace gbx::app {
 namespace {
@@ -53,7 +54,8 @@ int natural_compare(std::string_view a, std::string_view b) {
     return a.compare(b);
 }
 
-// .gb, .gbc and .gba in any case; the header decides the machine.
+// .gb and .gbc, and .gba, of the systems the build runs (gbx/systems.h), in
+// any case; the header decides the machine.
 bool rom_name(std::string_view name) {
     const size_t dot = name.rfind('.');
     if (dot == std::string_view::npos) return false;
@@ -62,7 +64,7 @@ bool rom_name(std::string_view name) {
     if (e.size() < 2 || e.size() > 3) return false;
     for (size_t i = 0; i < e.size(); ++i) ext[i] = fold(e[i]);
     const std::string_view x(ext, e.size());
-    return x == "gb" || x == "gbc" || x == "gba";
+    return (GBX_HAS_GB && (x == "gb" || x == "gbc")) || (GBX_HAS_GBA && x == "gba");
 }
 
 // FNV-1a of a name with ASCII case folded, for matching saves to ROMs.

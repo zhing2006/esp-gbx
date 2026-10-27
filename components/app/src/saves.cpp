@@ -142,6 +142,7 @@ void GbSaveCartridge::set_clock(std::span<const uint8_t, kClockBytes> r) {
     system_->set_rtc(rtc);
 }
 
+#if GBX_HAS_GBA
 void GbaSaveCartridge::clock(std::span<uint8_t, kClockBytes> r) {
     const gba::RtcState rtc = system_->rtc_state();
     std::fill(r.begin(), r.end(), uint8_t{0});
@@ -157,6 +158,7 @@ void GbaSaveCartridge::set_clock(std::span<const uint8_t, kClockBytes> r) {
     rtc.subsecond = static_cast<uint32_t>(std::min<uint64_t>(get32(&r[8]), gba::kCyclesPerSecond - 1));
     system_->set_rtc(rtc);
 }
+#endif
 
 uint32_t crc32(std::span<const uint8_t> data) {
     uint32_t c = 0xffffffffu;

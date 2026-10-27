@@ -6,6 +6,7 @@
 #include "gbx/gb/cartridge.h"
 #include "gbx/gb/header.h"
 #include "gbx/gba/rtc.h"
+#include "gbx/systems.h"
 
 namespace gbx::app {
 namespace {
@@ -105,7 +106,13 @@ RomInfo parse_rom(std::span<const uint8_t> header, int64_t size) {
             const uint8_t c = header[0xac + i];
             info.code[i] = c >= 0x20 && c < 0x7f ? static_cast<char>(c) : '?';
         }
+#if GBX_HAS_GBA
         info.rtc = gba::cartridge_has_rtc(header.subspan<0xac, 4>());
+#endif
+    }
+    const bool gba = info.machine == RomInfo::Machine::gba;
+    if (info.machine != RomInfo::Machine::none && (gba ? !GBX_HAS_GBA : !GBX_HAS_GB)) {
+        info.problem = RomInfo::Problem::system;
     }
     return info;
 }
@@ -158,6 +165,10 @@ void describe_problem(const RomInfo& info, char* out, size_t size) {
             std::snprintf(out, size, "The file size and header do not match.");
             break;
         case RomInfo::Problem::ram: std::snprintf(out, size, "The header has an invalid RAM size."); break;
+        case RomInfo::Problem::system:
+            std::snprintf(out, size, "%s", GBX_HAS_GB ? "This firmware runs GB and GBC games only."
+                                                      : "This firmware runs GBA games only.");
+            break;
     }
 }
 

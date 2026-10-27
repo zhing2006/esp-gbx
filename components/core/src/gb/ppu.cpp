@@ -139,7 +139,7 @@ enum : uint8_t { kOamOn = 1, kMode2 = 2, kOamOff = 4, kCompareLy = 8 };
 struct LineEdge { uint8_t at, effects; };
 struct LineEdges { std::array<LineEdge, 4> edges; uint8_t count; };
 namespace {
-LineEdges make_edges(std::initializer_list<LineEdge> list) {
+constexpr LineEdges make_edges(std::initializer_list<LineEdge> list) {
     LineEdges e{};
     for (auto edge : list) {
         unsigned i = 0;
@@ -151,7 +151,7 @@ LineEdges make_edges(std::initializer_list<LineEdge> list) {
     return e;
 }
 // [cgb][line 0]
-const LineEdges kEdges[2][2] = {
+constexpr LineEdges kEdges[2][2] = {
     {make_edges({{uint8_t(kCompare), kCompareLy}, {uint8_t(kModeTwo), kMode2}, {uint8_t(kOamEnd), kOamOff}}),
      make_edges({{uint8_t(kCompare), kCompareLy}, {uint8_t(kZeroOam), kOamOn | kMode2},
                  {uint8_t(kZeroOamEnd), kOamOff}})},

@@ -105,6 +105,11 @@ ARM7_PROGRAM = 0x3f
 # the same when the JIT's run stops every 7 ticks; bit 4, blocks compiled
 # and no fallback. The bits from 5 check the program's results.
 GBA_PROGRAM = 0x1f
+# The checks of the ARM7TDMI's and the GBA's programs. A firmware without the
+# GBA (GBX_SYSTEMS_GB_ONLY, components/core/Kconfig) reports no ARM7TDMI JIT
+# in HELLO (tests/protocol/execution.h) and leaves them out.
+GBA_CHECKS = ('ARM7TDMI JIT against the interpreter: ', 'GBA JIT against the interpreter: ')
+ARM7_JIT = 8
 
 CHECKS = [(f'Load constant 0x{value:08x}', value, 'all') for value in CONSTANTS] + [
     ('ADD wraparound', 0x80000008, 'all'), ('SUB wraparound', 0x7ffffffe, 'all'),
@@ -226,6 +231,10 @@ def run(args):
         link.ping(timeout=args.timeout)
         if not summary['device']['board_ready']:
             raise ValueError('Device board initialization failed')
+        if not summary['device']['backends'] & ARM7_JIT:
+            checks = [check for check in checks if not check[0].startswith(GBA_CHECKS)]
+            summary['selected'] = len(checks)
+            summary['gba'] = 'NOT IN FIRMWARE'
         summary['status'] = 'RUNNING'
         save_json(report / 'summary.json', summary)
         enabled = ENABLED.get(int(summary['device']['chip_revision'].split('.')[0]), ())
@@ -283,7 +292,9 @@ def run(args):
             summary['device_logs'] = list(link.logs)
             link.close()
         save_json(report / 'summary.json', summary)
-        print(f'{summary["status"]}; group={args.group}; single-step suites: NOT RUN. Report: {report}', flush=True)
+        gba = '; ARM7TDMI and GBA checks: NOT IN FIRMWARE' if 'gba' in summary else ''
+        print(f'{summary["status"]}; group={args.group}; single-step suites: NOT RUN{gba}. Report: {report}',
+              flush=True)
         if 'error' in summary:
             print(summary['error'], file=sys.stderr)
     return 2

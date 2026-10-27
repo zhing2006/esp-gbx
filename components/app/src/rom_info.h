@@ -11,7 +11,8 @@ namespace gbx::app {
 struct RomInfo {
     enum class Machine : uint8_t { none, gb, gbc, gbc_only, gba };
     // Why a ROM cannot run.
-    enum class Problem : uint8_t { none, not_rom, too_large, type, size, ram };
+    // system: a machine the build does not run, see gbx/systems.h.
+    enum class Problem : uint8_t { none, not_rom, too_large, type, size, ram, system };
     Machine machine = Machine::none;
     Problem problem = Problem::not_rom;
     uint8_t type = 0;      // 0147, the cartridge type

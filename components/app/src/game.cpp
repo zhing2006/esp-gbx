@@ -54,9 +54,11 @@ constexpr uint64_t kFrameUs = 16743;  // 140448 ticks
 // may be gone, and then the write fails long before this.
 constexpr uint32_t kSaveWaitMs = 10'000;
 
+#if GBX_HAS_GBA
 // The GBA's ROM cache, unless set_gba_options() gives another: a ROM up to
-// this size stays whole in external memory, a larger one is paged.
-constexpr size_t kGbaRomCache = size_t{14} << 20;
+// this size stays whole in external memory, a larger one is paged. The
+// board sets it for its PSRAM, see components/core/Kconfig.
+constexpr size_t kGbaRomCache = GBX_GBA_ROM_CACHE_BYTES;
 constexpr const char* kGbaBios = "bios/gba_bios.bin";
 // The SHA-256 of the GBA BIOS: No-Intro "[BIOS] Nintendo Game Boy Advance
 // Boot ROM (World)", as tools/prepare_gba_tests.py BIOS_SHA256 records it.
@@ -74,15 +76,18 @@ uint16_t gba_keys(uint16_t keys) {
                                  (keys & platform::keys::kR ? gba::key::r : 0) |
                                  (keys & platform::keys::kL ? gba::key::l : 0));
 }
+#endif
 
 // Emulated ticks in `us` microseconds, without overflow for days.
 Tick ticks(uint64_t us) {
     return us / 1'000'000 * kTicksPerSecond + us % 1'000'000 * kTicksPerSecond / 1'000'000;
 }
+#if GBX_HAS_GBA
 // The same in GBA cycles.
 Tick gba_cycles(uint64_t us) {
     return us / 1'000'000 * gba::kCyclesPerSecond + us % 1'000'000 * gba::kCyclesPerSecond / 1'000'000;
 }
+#endif
 
 // The file name in a path, for messages.
 const char* file_name(const char* path) {
@@ -115,13 +120,17 @@ public:
     explicit Reader(const Game& game) : game_(game) {
         game_.readers_.fetch_add(1);
         gb = game_.shared_.load();
+#if GBX_HAS_GBA
         gba = game_.gba_shared_.load();
+#endif
     }
     ~Reader() { game_.readers_.fetch_sub(1); }
     Reader(const Reader&) = delete;
     Reader& operator=(const Reader&) = delete;
     gb::System* gb;
+#if GBX_HAS_GBA
     gba::System* gba;
+#endif
 private:
     const Game& game_;
 };
@@ -216,10 +225,12 @@ std::array<uint16_t, 4> Game::palette() const {
 }
 
 int Game::paused_pixels(std::span<uint16_t> out, bool fixed) const {
+#if GBX_HAS_GBA
     if (gba()) {
         std::copy_n(gba_paused_, std::min<size_t>(out.size(), gba::kFramePixels), out.begin());
         return gba::kScreenWidth;
     }
+#endif
     if (mode() != gb::Mode::dmg) {
         const size_t n = std::min(out.size(), paused_colors_.size());
         if (fixed && color_fix()) {
@@ -249,11 +260,13 @@ void Game::show_colors() const {
 
 // The frame the game stops on, for the pause menu and for resuming.
 void Game::keep_frame() {
+#if GBX_HAS_GBA
     if (gba()) {
         const auto pixels = gba_system_->frame().pixels;
         std::copy_n(pixels.begin(), std::min<size_t>(pixels.size(), gba::kFramePixels), gba_paused_);
         return;
     }
+#endif
     if (system_->memory.color()) {
         const auto pixels = system_->frame().pixels;
         std::copy_n(pixels.begin(), std::min(pixels.size(), paused_colors_.size()), paused_colors_.begin());
@@ -340,7 +353,9 @@ void Game::set_gba_options(const char* bios, size_t rom_cache_bytes) {
 // Clears the shared pointers and waits for the readers that took them.
 void Game::unshare() {
     shared_.store(nullptr);
+#if GBX_HAS_GBA
     gba_shared_.store(nullptr);
+#endif
     while (readers_.load()) platform::sleep_ms(1);
 }
 
@@ -357,6 +372,7 @@ void Game::release() {
     }
     platform::free_external(rom_);
     rom_ = nullptr;
+#if GBX_HAS_GBA
     if (gba_system_) {
         gba_system_->set_frame_sink(nullptr);
         gba_cart_.attach(nullptr);
@@ -368,12 +384,20 @@ void Game::release() {
     platform::free_external(gba_paused_);
     gba_bios_ = nullptr;
     gba_paused_ = nullptr;
+#endif
 }
 
 void Game::reserve_jit() {
     if (jit_reserved_.words) return;
-    jit_reserved_ = platform::allocate_executable(
-        std::max(gb::Sm83Jit::reserved_bytes({}), gba::Arm7Jit::reserved_bytes({})));
+    // The JITs of the systems the build runs.
+#if GBX_HAS_GB && GBX_HAS_GBA
+    const size_t bytes = std::max(gb::Sm83Jit::reserved_bytes({}), gba::Arm7Jit::reserved_bytes({}));
+#elif GBX_HAS_GBA
+    const size_t bytes = gba::Arm7Jit::reserved_bytes({});
+#else
+    const size_t bytes = gb::Sm83Jit::reserved_bytes({});
+#endif
+    jit_reserved_ = platform::allocate_executable(bytes);
 }
 
 void Game::Mark::store(uint64_t count, uint64_t us) {
@@ -419,8 +443,12 @@ void Game::read(Counters& out) {
 
 size_t Game::level() const {
     const Reader reader(*this);
+#if GBX_HAS_GBA
     const size_t queued = reader.gb ? reader.gb->audio_queued() : reader.gba ? reader.gba->audio_queued() : 0;
     return reader.gb || reader.gba ? queued + held_.load(std::memory_order_relaxed) : 0;
+#else
+    return reader.gb ? reader.gb->audio_queued() + held_.load(std::memory_order_relaxed) : 0;
+#endif
 }
 
 uint16_t* Game::frame_buffer() {
@@ -428,6 +456,7 @@ uint16_t* Game::frame_buffer() {
 }
 
 #ifdef GBX_PROFILER
+#if GBX_HAS_GBA
 // The start of bench()'s first frame snapshots the counters, and the end
 // of its last one logs them.
 void Game::bench_start() {
@@ -588,6 +617,7 @@ void Game::bench_frame(uint64_t frame, uint32_t cycles, uint32_t retired) {
     }
     b.last = 0;
 }
+#endif
 
 Game::Profile Game::take_profile() {
     return {worst_run_us_.exchange(0), worst_compiles_.load(), worst_restores_.load(), compiled_.load(),
@@ -867,8 +897,12 @@ void Game::end_game(bool keep_changes) {
     slots_.close();
     slot_reading_ = 0;
     slot_restored_ = false;
+#if GBX_HAS_GBA
     if (gba()) gba_system_->set_frame_sink(nullptr);
     else system_->set_frame_sink(nullptr);
+#else
+    system_->set_frame_sink(nullptr);
+#endif
     platform::display::hide_game();
     loaded_ = false;
     paused_ = false;
@@ -893,6 +927,7 @@ void Game::count_pause() {
     paused_us_ = now;
 }
 
+#if GBX_HAS_GBA
 bool Game::has_rtc() const { return gba() ? gba_system_->has_rtc() : system_->has_rtc(); }
 
 // The cartridge clock moves on by `us` microseconds that passed outside
@@ -910,6 +945,17 @@ void Game::set_audio_speed(int32_t ppm) {
 size_t Game::audio_buffered() const {
     return gba() ? gba_system_->audio_buffered() : system_->audio_buffered();
 }
+#else
+bool Game::has_rtc() const { return system_->has_rtc(); }
+
+// The cartridge clock moves on by `us` microseconds that passed outside
+// emulation.
+void Game::advance_rtc(uint64_t us) { system_->advance_rtc(ticks(us)); }
+
+void Game::set_audio_speed(int32_t ppm) { system_->set_audio_speed(ppm); }
+
+size_t Game::audio_buffered() const { return system_->audio_buffered(); }
+#endif
 
 void Game::leave_pause() {
     const bool on_gba = gba();
@@ -935,8 +981,12 @@ void Game::leave_pause() {
                 frame[i] = static_cast<uint16_t>((c & 0x1f) << 11 | ((g << 1) | (g >> 4)) << 5 | ((c >> 10) & 0x1f));
             }
         }
+#if GBX_HAS_GBA
         platform::display::publish_game_frame(on_gba ? gba_system_->memory.ppu.frame_id()
                                                      : system_->memory.ppu.frame_id());
+#else
+        platform::display::publish_game_frame(system_->memory.ppu.frame_id());
+#endif
     }
     pace_restart();
     // An instant save runs code the JIT may not have compiled yet.
@@ -953,8 +1003,12 @@ void Game::leave_pause() {
 void Game::save_slot_now(int slot) {
     count_pause();
     // A refusal adds its own fault.
+#if GBX_HAS_GBA
     if (gba()) slots_.save(slot, *gba_system_);
     else slots_.save(slot, *system_);
+#else
+    slots_.save(slot, *system_);
+#endif
 }
 
 // Restores the state Slots has decoded. The game stays paused, from the
@@ -965,11 +1019,14 @@ void Game::restore_slot() {
     slot_reading_ = 0;
     SlotResult result{SlotLoad::loaded};
     const auto kind = slots_.read_kind();
-    const bool on_gba = gba();
+    [[maybe_unused]] const bool on_gba = gba();
     if (kind != Slots::Kind::ok) {
         result = {SlotLoad::failed, Clock::untrusted, kind};
-    } else if (on_gba ? !gba_system_->restore(slots_.gba_snapshot(), slot_other_rom_reading_)
-                      : !system_->restore(slots_.snapshot(), slot_other_rom_reading_)) {
+    } else if (
+#if GBX_HAS_GBA
+        on_gba ? !gba_system_->restore(slots_.gba_snapshot(), slot_other_rom_reading_) :
+#endif
+               !system_->restore(slots_.snapshot(), slot_other_rom_reading_)) {
         result = {SlotLoad::failed, Clock::untrusted, Slots::Kind::incompatible};
     }
     if (result.load == SlotLoad::loaded) {
@@ -983,10 +1040,13 @@ void Game::restore_slot() {
                 result.clock = !now.trusted ? Clock::untrusted : !saved.trusted ? Clock::untrusted_save : Clock::behind;
             }
         }
+#if GBX_HAS_GBA
         if (on_gba) {
             const auto frame = slots_.gba_snapshot().frame();
             std::copy_n(frame.begin(), std::min<size_t>(frame.size(), gba::kFramePixels), gba_paused_);
-        } else if (system_->memory.color()) {
+        } else
+#endif
+        if (system_->memory.color()) {
             const auto frame = slots_.snapshot().color_frame();
             std::copy_n(frame.begin(), std::min(frame.size(), paused_colors_.size()), paused_colors_.begin());
         } else {
@@ -999,7 +1059,11 @@ void Game::restore_slot() {
         // The frame IDs went back with the state. restore() left the PPU's
         // worker idle, and the next row handed to it carries these. The
         // next frame delivered follows the state's frame count.
+#if GBX_HAS_GBA
         last_id_ = on_gba ? gba_system_->memory.frames : system_->memory.frames;
+#else
+        last_id_ = system_->memory.frames;
+#endif
         frame_began_us_ = 0;
 #ifdef GBX_PROFILER
         if (bench_absolute_.load(std::memory_order_relaxed)) {
@@ -1020,6 +1084,7 @@ void Game::change_backend() {
     if (requested < 0 || !loaded_) return;
     const auto backend = static_cast<Backend>(requested);
     if (backend == backend_.load()) return;
+#if GBX_HAS_GBA
     if (gba()) {
         if (!gba_system_->select_backend(backend == Backend::jit ? gba::Backend::jit : gba::Backend::interpreter,
                                          &jit_reserved_)) {
@@ -1031,6 +1096,7 @@ void Game::change_backend() {
         platform::log(platform::LogLevel::info, kTag, "backend %s", backend == Backend::jit ? "jit" : "int");
         return;
     }
+#endif
     if (backend == Backend::jit && !system_->jit()) {
         platform::log(platform::LogLevel::info, kTag, "largest executable block %u bytes",
                       static_cast<unsigned>(platform::largest_executable()));
@@ -1053,9 +1119,12 @@ void Game::change_backend() {
 void Game::change_speed(bool fast) {
     fast_.store(fast, std::memory_order_relaxed);
     ++speed_changes_;
+#if GBX_HAS_GBA
     if (gba()) {
         gba_system_->set_audio_rate(fast ? 0 : kAudioRate);
-    } else {
+    } else
+#endif
+    {
         system_->set_audio_rate(fast ? 0 : kAudioRate);
         system_->set_worker_polling(fast);
     }
@@ -1238,10 +1307,13 @@ void Game::load(const char* path, Backend backend, bool cgb) {
         fail(reason);
         return;
     }
+    // parse_rom() leaves only the machines the build runs without a problem.
+#if GBX_HAS_GBA
     if (info.machine == RomInfo::Machine::gba) {
         load_gba(path, backend, size, info.title);
         return;
     }
+#endif
     auto* rom = static_cast<uint8_t*>(platform::allocate_external(static_cast<size_t>(size)));
     if (!rom) {
         fail("Not enough memory for the ROM.");
@@ -1342,10 +1414,12 @@ void Game::step() {
         platform::sleep_ms(1);
         rested_us_ = platform::monotonic_us();
     }
+#if GBX_HAS_GBA
     if (gba()) {
         step_gba();
         return;
     }
+#endif
     const bool fast = fast_requested_.load(std::memory_order_relaxed);
     if (fast != fast_.load(std::memory_order_relaxed)) change_speed(fast);
     const unsigned speed = fast ? 2 : 1;
@@ -1424,6 +1498,7 @@ void Game::step() {
     }
 }
 
+#if GBX_HAS_GBA
 // A GBA game. The BIOS comes from the card, or where set_gba_options()
 // says, and is checked before anything else of the load, so that a missing
 // or wrong one costs no ROM read and no save prompt. The ROM goes through
@@ -1640,6 +1715,7 @@ void Game::step_gba() {
     saves_->snapshot(gba_cart_);
     if (!audio_ || fast) deadline_us_ += elapsed * 1'000'000 / gba::kCyclesPerSecond / speed;
 }
+#endif
 
 void Game::pace_trim(size_t queued, size_t target) {
     // The level before each frame, smoothed over about 16 frames.
@@ -1660,9 +1736,17 @@ void Game::play() {
         bool sound = false;
         {
             const Reader reader(*this);
+#if GBX_HAS_GBA
             sound = (reader.gb || reader.gba) && state_.load(std::memory_order_acquire) == GameState::run;
+#else
+            sound = reader.gb && state_.load(std::memory_order_acquire) == GameState::run;
+#endif
             if (sound) {
+#if GBX_HAS_GBA
                 const size_t queued = reader.gb ? reader.gb->audio_queued() : reader.gba->audio_queued();
+#else
+                const size_t queued = reader.gb->audio_queued();
+#endif
                 size_t lowest = lowest_.load(std::memory_order_relaxed);
                 while (queued < lowest && !lowest_.compare_exchange_weak(lowest, queued, std::memory_order_relaxed)) {}
                 // A start waits for the level the cushion asks for. The
@@ -1670,11 +1754,19 @@ void Game::play() {
                 // room the mixer would otherwise keep.
                 const size_t preroll = preroll_.load(std::memory_order_relaxed);
                 if (preroll && queued < preroll) {
+#if GBX_HAS_GBA
                     if (reader.gb) reader.gb->read_audio({});
                     else reader.gba->read_audio({});
+#else
+                    reader.gb->read_audio({});
+#endif
                 } else {
                     if (preroll) preroll_.store(0, std::memory_order_relaxed);
+#if GBX_HAS_GBA
                     if (queued >= kChunk) n = reader.gb ? reader.gb->read_audio(chunk) : reader.gba->read_audio(chunk);
+#else
+                    if (queued >= kChunk) n = reader.gb->read_audio(chunk);
+#endif
                 }
             }
         }

@@ -12,15 +12,18 @@
 #include "gbx/esp/board.h"
 #include "gbx/esp/storage.h"
 #include "gbx/platform.h"
+#include "gbx/systems.h"
 #include "transport.h"
 #include "sm83_runner.h"
+#if GBX_HAS_GBA
 #include "arm7_runner.h"
+#include "gba_rom_test.h"
+#endif
 #include "test_data.h"
 #include "jit_test.h"
 #include "display_test.h"
 #include "audio_test.h"
 #include "rom_test.h"
-#include "gba_rom_test.h"
 #include "reference_identity.h"
 
 namespace {
@@ -37,7 +40,9 @@ gbx::test::Sm83Runner& runner() {
     }();
     return *instance;
 }
+#if GBX_HAS_GBA
 gbx::test::Arm7Runner arm7_runner;
+#endif
 std::array<uint8_t, 32> manifest_digest{}, gba_manifest_digest{}, bios_digest{};
 
 bool hello(const protocol::Frame& request, bool board_ready, bool mounted, bool data_ready, bool arm7_ready) {
@@ -49,10 +54,10 @@ bool hello(const protocol::Frame& request, bool board_ready, bool mounted, bool 
     std::memcpy(payload.data(), request.payload.data(), protocol::kNonceSize);
     auto* info = payload.data() + protocol::kNonceSize;
     protocol::store16(info, chip.revision);
-    // Both backends of both CPUs are built in. The runners allocate their JIT
-    // code memory on first use and report a failure there.
+    // Both backends of each CPU in the build (gbx/systems.h). The runners
+    // allocate their JIT code memory on first use and report a failure there.
     info[2] = gbx::test::execution::kInterpreter | gbx::test::execution::kJit |
-              gbx::test::execution::kArm7Interpreter | gbx::test::execution::kArm7Jit;
+              (GBX_HAS_GBA ? gbx::test::execution::kArm7Interpreter | gbx::test::execution::kArm7Jit : 0);
     info[3] = static_cast<uint8_t>((board_ready ? 1 : 0) | (mounted ? 2 : 0) | (data_ready ? 4 : 0) |
                                    (arm7_ready ? 8 : 0));
     protocol::store32(info + 4, esp_clk_cpu_freq());
@@ -95,10 +100,14 @@ extern "C" void app_main(void) {
     const bool manifest_ready =
         mounted && gbx::test::read_manifest_digest("/sdcard/tests/gb/manifest.tsv", manifest_digest);
     const bool data_ready = manifest_ready && runner().open("/sdcard/tests/gb/sm83/cases.bin");
+#if GBX_HAS_GBA
     const bool arm7_ready =
         mounted && gbx::test::read_manifest_digest("/sdcard/tests/gba/manifest.tsv", gba_manifest_digest) &&
         arm7_runner.open("/sdcard/tests/gba/arm7tdmi/cases.bin");
     if (mounted) bios_digest = gbx::test::gba_rom_test::load_bios();
+#else
+    const bool arm7_ready = false;
+#endif
     ESP_LOGI("test", "SM83 test data: %s; ARM7TDMI test data: %s", data_ready ? "ready" : "unavailable",
              arm7_ready ? "ready" : "unavailable");
     for (;;) {
@@ -138,12 +147,14 @@ extern "C" void app_main(void) {
             ok = gbx::test::audio_test::run(protocol::load32(request.payload.data() + 4));
         } else if (request.kind == protocol::Kind::rom_test && manifest_ready) {
             ok = gbx::test::rom_test::run(request.payload);
+#if GBX_HAS_GBA
         } else if (request.kind == protocol::Kind::gba_rom_test && mounted) {
             ok = gbx::test::gba_rom_test::run(request.payload);
-        } else if (request.kind == protocol::Kind::run && data_ready) {
-            ok = runner().run(request.payload);
         } else if (request.kind == protocol::Kind::arm7_run && arm7_ready) {
             ok = arm7_runner.run(request.payload);
+#endif
+        } else if (request.kind == protocol::Kind::run && data_ready) {
+            ok = runner().run(request.payload);
         } else {
             constexpr std::string_view message = "Unsupported request or test data unavailable";
             ok = transport::send(protocol::Kind::error,

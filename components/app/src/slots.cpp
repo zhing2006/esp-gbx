@@ -135,6 +135,7 @@ bool Slots::open(const char* rom_path, const gb::System& system) {
     return false;
 }
 
+#if GBX_HAS_GBA
 bool Slots::open(const char* rom_path, gba::System& system) {
     close();
     if (!system.memory.rom || !gba_snapshot_.allocate()) return false;
@@ -145,6 +146,7 @@ bool Slots::open(const char* rom_path, gba::System& system) {
     gba_snapshot_.release();
     return false;
 }
+#endif
 
 // The buffers and paths of the slots, and their listing.
 bool Slots::begin(const char* rom_path, const gb::RomIdentity& identity, size_t file_size, size_t buffer_size) {
@@ -190,7 +192,9 @@ void Slots::close() {
     file_ = nullptr;
     file_size_ = buffer_size_ = 0;
     snapshot_.release();
+#if GBX_HAS_GBA
     gba_snapshot_.release();
+#endif
     generation_.fetch_add(1, std::memory_order_release);
 }
 
@@ -198,9 +202,11 @@ bool Slots::save(int slot, gb::System& system) {
     return reserve(slot) && submit(slot, !gba_ && system.capture(snapshot_));
 }
 
+#if GBX_HAS_GBA
 bool Slots::save(int slot, gba::System& system) {
     return reserve(slot) && submit(slot, gba_ && system.capture(gba_snapshot_));
 }
+#endif
 
 // Reserves the snapshot for a save to `slot`, so that it is this task's
 // while the state is copied.
@@ -409,6 +415,7 @@ Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
     if (crc32({h, file_size - kTrailer}) != get32(h + file_size - kTrailer) || state_size > file_size - at - kTrailer)
         return Kind::damaged;
     gb::RomIdentity identity{};
+#if GBX_HAS_GBA
     if (gba) {
         switch (gba::Snapshot::inspect(state, &identity)) {
         case gba::Snapshot::Status::ok: break;
@@ -418,7 +425,9 @@ Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
         }
         if (file_size != file_size_) return Kind::damaged;
         info.kind = Kind::ok;
-    } else {
+    } else
+#endif
+    {
         size_t ram_size = 0;
         gb::Mode state_mode;
         switch (gb::Snapshot::inspect(state, &identity, &ram_size, &state_mode)) {
@@ -487,18 +496,26 @@ void Slots::write_slot(int slot) {
     put16(h + 10, kHeader);
     put32(h + 12, wall.trusted ? kWallTrusted : 0);
     put64(h + 16, static_cast<uint64_t>(wall.us));
+#if GBX_HAS_GBA
     const auto& state_identity = gba_ ? gba_snapshot_.identity() : snapshot_.identity();
     std::copy(state_identity.begin(), state_identity.end(), h + 24);
     put32(h + 48, static_cast<uint32_t>(gba_ ? gba_snapshot_.backup().size() : snapshot_.ram_size()));
+#else
+    std::copy(snapshot_.identity().begin(), snapshot_.identity().end(), h + 24);
+    put32(h + 48, static_cast<uint32_t>(snapshot_.ram_size()));
+#endif
     h[56] = gba_ ? kGbaByte : mode_byte(mode_);
     Thumbnail& thumbnail = thumbnails_[kScratch];
     thumbnail.mode = mode_;
     thumbnail.gba = gba_;
+#if GBX_HAS_GBA
     if (gba_) {
         const auto frame = gba_snapshot_.frame();
         for (size_t i = 0; i < frame.size(); ++i) put16(h + kHeader + 2 * i, frame[i]);
         std::copy(frame.begin(), frame.end(), thumbnail.colors.begin());
-    } else if (mode_ == gb::Mode::dmg) {
+    } else
+#endif
+    if (mode_ == gb::Mode::dmg) {
         const auto frame = snapshot_.frame();
         for (size_t i = 0; i + 3 < frame.size(); i += 4) {
             h[kHeader + i / 4] = static_cast<uint8_t>((frame[i] & 3) | (frame[i + 1] & 3) << 2 |
@@ -526,7 +543,11 @@ void Slots::write_slot(int slot) {
     }
     generation_.fetch_add(1, std::memory_order_release);
     const std::span<uint8_t> room(h + at, file_size_ - at - kTrailer);
+#if GBX_HAS_GBA
     const size_t state_size = gba_ ? gba_snapshot_.encode(room) : snapshot_.encode(room);
+#else
+    const size_t state_size = snapshot_.encode(room);
+#endif
     put32(h + 52, static_cast<uint32_t>(state_size));
     put32(h + file_size_ - kTrailer, crc32({h, file_size_ - kTrailer}));
 #ifdef GBX_PROFILER
@@ -582,8 +603,12 @@ void Slots::read_slot(int slot) {
 #endif
     if (kind == Kind::ok) {
         const std::span<const uint8_t> state(file_ + state_offset(mode_, gba_), get32(file_ + 52));
+#if GBX_HAS_GBA
         const bool decoded = gba_ ? gba_snapshot_.decode(state) == gba::Snapshot::Status::ok
                                   : snapshot_.decode(state) == gb::Snapshot::Status::ok;
+#else
+        const bool decoded = snapshot_.decode(state) == gb::Snapshot::Status::ok;
+#endif
         if (!decoded) kind = Kind::damaged;
     }
 #ifdef GBX_PROFILER

@@ -13,6 +13,7 @@
 #include "gbx/executable.h"
 #include "gbx/files.h"
 #include "gbx/platform.h"
+#include "gbx/systems.h"
 #include "color_fix.h"
 #include "rom_info.h"
 
@@ -898,8 +899,9 @@ bool Menus::setting_enabled(int row) const {
                                               : true;
     // A game does not move between a GB and a GBC: one in color keeps its
     // colors, and one in GB mode has no COLOR FIX. A GBA game has neither:
-    // its colors are its own, and COLOR FIX is the GBC screen's.
-    if (in_game_ && (row == kPalette || row == kColorFix) && parts_.game->gba()) return false;
+    // its colors are its own, and COLOR FIX is the GBC screen's. A build of
+    // the GBA alone has neither at all.
+    if ((row == kPalette || row == kColorFix) && (!GBX_HAS_GB || (in_game_ && parts_.game->gba()))) return false;
     if (in_game_ && row == kPalette && in_color_game()) return false;
     if (in_game_ && row == kColorFix && !in_color_game()) return false;
     return supported && (!in_game_ || kInGame[row]);
@@ -1214,7 +1216,9 @@ void Menus::build_roms(Screen& s) {
         put(s.icon, "cartridge");
         if (state == Library::State::done) {
             put(s.heading, "NO ROMS");
-            put(s.body, "Put .gb, .gbc or .gba files in the roms folder on the card.");
+            put(s.body, !GBX_HAS_GBA  ? "Put .gb or .gbc files in the roms folder on the card."
+                        : !GBX_HAS_GB ? "Put .gba files in the roms folder on the card."
+                                      : "Put .gb, .gbc or .gba files in the roms folder on the card.");
         } else {
             put(s.heading, "SCANNING");
             put(s.body, "Looking for ROMs on the card.");
@@ -1332,13 +1336,15 @@ void Menus::build_settings(Screen& s) {
                               : in_game_ ? "Sampling changes on resume." : "Game image sampling.");
             break;
         case kPalette:
-            put(s.footer, !in_game_                ? "GB colors, or COLOR to play on a GBC."
+            put(s.footer, !GBX_HAS_GB              ? "GBA games have their own colors."
+                          : !in_game_              ? "GB colors, or COLOR to play on a GBC."
                           : parts_.game->gba()     ? "Set by the game: GBA games have their own colors."
                           : in_color_game()        ? "Set by the game: it runs on a GBC."
                                                    : "Pick COLOR before a game starts.");
             break;
         case kColorFix:
             put(s.footer, on                   ? "Colors as a GBC screen shows them."
+                          : !GBX_HAS_GB        ? "GBA games have their own colors."
                           : parts_.game->gba() ? "Only for GBC games: GBA colors stay as they are."
                                                : "Only for games in color.");
             break;

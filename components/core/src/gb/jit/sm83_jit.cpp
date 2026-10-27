@@ -1804,6 +1804,167 @@ JitResult Sm83Jit::run(Sm83State& state, Tick until, bool frame) {
 // a new context and deadline window, more than a leg does: a CGB frame is
 // 35112 M-cycles at double speed.
 constexpr uint32_t kLeg = 1024, kBatch = 1u << 16;
+// A block that execute() finds in neither level: compiled now, or its copy
+// in the second level moved into the pool.
+Sm83Jit::Installed Sm83Jit::install(const Sm83State& state, jit::BlockKey key, unsigned block_limit,
+                                    std::span<const uint8_t> prefix, bool halt_bug, bool promote,
+                                    const jit::CodeStore::Record& copy, Reinstall* reinstall, uint16_t reinstall_tag) {
+    jit::BlockEntry entry = nullptr;
+    uintptr_t target = 0;
+    bool start = false;
+    JitFallback failure = JitFallback::unavailable;
+    const auto hot = std::span(scratch_).first(kStreamWords);
+    const auto cold = std::span(scratch_).subspan(kStreamWords, kStreamWords);
+    const auto output = std::span(scratch_).subspan(2 * kStreamWords, kOutputWords);
+    // One relocation more than a block makes, for count_entry's
+    // call in the second level.
+    constexpr size_t kRelocations = 97;
+    static_assert(sizeof(jit::Relocation) * kRelocations + sizeof(Compiler) <= kStateWords * 4 &&
+                  alignof(Compiler) <= 8 && alignof(jit::Relocation) <= 8);
+    static_assert(std::is_trivially_destructible_v<Compiler>);
+    auto* storage = reinterpret_cast<std::byte*>(scratch_.data() + 2 * kStreamWords + kOutputWords);
+    const std::span relocations(reinterpret_cast<jit::Relocation*>(storage), kRelocations);
+    void* compiler_storage = storage + sizeof(jit::Relocation) * kRelocations;
+    std::span<const uint32_t> words;
+    size_t relocation_count = 0;
+    Compiler* compiler = nullptr;
+    // A copy keeps the boundaries and then the block's instruction
+    // count, which they do not give: they leave out the
+    // instruction after EI.
+    std::array<Compiler::Boundary, 17> stored{};
+    std::span<const Compiler::Boundary> boundaries;
+    unsigned instructions = 0;
+    if (promote) {
+        // No compilation, only relocation, and the CLOCK mark
+        // back in place of the call to count_entry.
+        std::copy(copy.code.begin(), copy.code.end(), output.begin());
+        output[kHeaderWords] = rv::lw(R::ra, R::t6, -4).bits;
+        words = output.first(copy.code.size());
+        for (size_t i = 0; i < copy.relocations.size(); ++i) {
+            const auto call = store_.target(copy, i);
+            if (call != stubs_.count_entry) relocations[relocation_count++] = {copy.relocations[i], call};
+        }
+        std::memcpy(stored.data(), copy.data.data(), copy.data.size());
+        const size_t count = copy.data.size() / sizeof(Compiler::Boundary) - 1;
+        boundaries = std::span(stored).first(count);
+        instructions = stored[count].completed;
+        // The next eviction gets a count twice as long, so that a
+        // block the pool keeps evicting moves less often.
+        const auto level = std::min<uint32_t>(*copy.tag + 1, kMaxStoredLevel);
+        *copy.tag = level;
+        copy.code[1] = kStoredEntries << level;
+    }
+    // A block whose 16-bit jumps do not reach is compiled again
+    // with 32-bit ones; one too large for those ends earlier.
+    for (unsigned length = block_limit; length && words.empty(); length /= 2) {
+        const bool verify = memory_ &&
+            unstable_[state.pc & ((1u << kUnstableBits) - 1)] < kUnstable;
+        for (bool short_jumps : {true, false}) {
+            compiler = new (compiler_storage) Compiler(hot, cold, stubs_, code_, memory_, state.pc,
+                stop_on_marker_, prefix, halt_bug, state.ei_pending, verify,
+                short_jumps);
+            words = compiler->compile(length, output, relocations.first(kRelocations - 1), relocation_count);
+            if (!words.empty() || !compiler->short_range_failed()) break;
+        }
+        boundaries = compiler->boundaries();
+        instructions = compiler->instructions();
+    }
+    if (words.empty()) failure = JitFallback::encoding;
+    else {
+        auto result = cache_.install_replacing(key, words, relocations.first(relocation_count),
+                                               memory_ ? &retired : nullptr, this);
+        evictions_ += result.evicted;
+        entry = result.entry;
+        if (entry) target = reinterpret_cast<uintptr_t>(entry) + (memory_ ? kHeaderWords * 4 : 0);
+        start = entry != nullptr;
+        if (entry) {
+            if (promote) ++restored_blocks_;
+            else {
+                ++compiled_blocks_; GBX_JIT_COUNT(compiles);
+#ifdef GBX_PROFILER
+                compiled_bytes_ += static_cast<uint32_t>(words.size_bytes());
+#endif
+            }
+            if (memory_) {
+                // Inline data, never executed: no republication.
+                auto* block = reinterpret_cast<uint32_t*>(entry);
+                block[0] = state.pc;
+                block[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(result.referenced));
+                // A repeated installation number could match an
+                // old mid-block entry.
+                if (result.installation < installation_) for (auto& mid : *mid_) mid.block = 0;
+                installation_ = result.installation;
+                const size_t size = words.size(), count = block[size - 1];
+                for (size_t i = 0; i < count; ++i)
+                    block[block[size - 1 - count + i] + 2] = static_cast<uint32_t>(stubs_.unlinked);
+                // Instruction starts inside the block, under the
+                // mapping it was compiled for.
+                for (const auto& boundary : boundaries) {
+                    const auto pc = boundary.pc;
+                    // Same limit; no HALT bug, delayed EI or prefix.
+                    const jit::BlockKey mid_key = (key & UINT64_C(0xf0000)) | pc |
+                        (uint64_t{memory_->code_bank(pc)} << 22) |
+                        (uint64_t{memory_->code_bank(static_cast<uint16_t>((pc | 127) + 1))} << 32);
+                    (*mid_)[mid_slot(mid_key)] = {mid_key, key, reinterpret_cast<uintptr_t>(entry),
+                        result.live, result.installation, static_cast<uint16_t>(boundary.offset),
+                        static_cast<uint16_t>(compiler ? compiler->code_copy() : 0),
+                        boundary.completed, static_cast<uint8_t>(instructions - boundary.completed),
+                        boundary.lazy_zero};
+                }
+                if (promote) {
+                    // Links into the copy in the second level now
+                    // enter this one; their records move along.
+                    auto* second = copy.code.data();
+                    for (auto index = second[0] >> 16; index; index = link_records_[index - 1].next)
+                        *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(link_records_[index - 1].word)) =
+                            static_cast<uint32_t>(target);
+                    block[0] |= second[0] & 0xffff0000u;
+                    second[0] &= 0xffff;
+                }
+            }
+            // Only blocks that the pool accepted are stored. The
+            // copy enters through count_entry instead of the
+            // CLOCK mark, see Stubs.
+            if (!promote && compiler->fixed_code()) {
+                const auto count = boundaries.size();
+                std::copy(boundaries.begin(), boundaries.end(), stored.begin());
+                stored[count] = {0, 0, static_cast<uint8_t>(instructions), false};
+                relocations[relocation_count] = {kHeaderWords * 4, stubs_.count_entry};
+                output[kHeaderWords] = rv::jal(R::ra, 0).bits;
+                const auto second = store_.store(key, words, relocations.first(relocation_count + 1),
+                    std::as_bytes(std::span(stored).first(count + 1)), &retired, this);
+                if (!second.empty()) {
+                    second[0] = state.pc;
+                    second[1] = kStoredEntries;
+                    const size_t size = second.size(), links = second[size - 1];
+                    for (size_t i = 0; i < links; ++i)
+                        second[second[size - 1 - links + i] + 2] = static_cast<uint32_t>(stubs_.unlinked);
+                }
+            }
+            if (reinstall && compiler->fixed_code()) {
+                auto& r = *reinstall;
+                if (!r.count || r.tag != reinstall_tag) r = {reinstall_tag, 0, 0, 0};
+                r.count = static_cast<uint8_t>(instructions);
+            }
+        } else if (promote) {
+            // The pool did not take it: run the copy where it is.
+            target = reinterpret_cast<uintptr_t>(copy.code.data()) + kHeaderWords * 4;
+            start = true;
+            ++stored_entries_;
+        }
+        failure = result.status == jit::InstallStatus::full ? JitFallback::capacity :
+            result.status == jit::InstallStatus::invalid ? JitFallback::encoding : JitFallback::publication;
+    }
+    return {entry, target, start, failure};
+}
+// Retires the block that contains the address, if one does.
+void Sm83Jit::retire_containing(uintptr_t address) {
+    uintptr_t begin, end;
+    if (cache_.erase_containing(address, begin, end)) {
+        ++invalidations_;
+        retired(this, begin, end);
+    }
+}
 JitResult Sm83Jit::execute(Sm83State& state, const Bus* bus, Tick until, unsigned limit, bool batch, bool frame) {
     if (state.mode != CpuMode::running) return {0, 0, JitExit::suspended};
     if (memory_ && !prefetched_count_ && until <= memory_->clock.now) return {};
@@ -1991,148 +2152,12 @@ JitResult Sm83Jit::execute(Sm83State& state, const Bus* bus, Tick until, unsigne
                 }
             }
             if (!target) {
-                const auto hot = std::span(scratch_).first(kStreamWords);
-                const auto cold = std::span(scratch_).subspan(kStreamWords, kStreamWords);
-                const auto output = std::span(scratch_).subspan(2 * kStreamWords, kOutputWords);
-                // One relocation more than a block makes, for count_entry's
-                // call in the second level.
-                constexpr size_t kRelocations = 97;
-                static_assert(sizeof(jit::Relocation) * kRelocations + sizeof(Compiler) <= kStateWords * 4 &&
-                              alignof(Compiler) <= 8 && alignof(jit::Relocation) <= 8);
-                static_assert(std::is_trivially_destructible_v<Compiler>);
-                auto* storage = reinterpret_cast<std::byte*>(scratch_.data() + 2 * kStreamWords + kOutputWords);
-                const std::span relocations(reinterpret_cast<jit::Relocation*>(storage), kRelocations);
-                void* compiler_storage = storage + sizeof(jit::Relocation) * kRelocations;
-                std::span<const uint32_t> words;
-                size_t relocation_count = 0;
-                Compiler* compiler = nullptr;
-                // A copy keeps the boundaries and then the block's instruction
-                // count, which they do not give: they leave out the
-                // instruction after EI.
-                std::array<Compiler::Boundary, 17> stored{};
-                std::span<const Compiler::Boundary> boundaries;
-                unsigned instructions = 0;
-                if (promote) {
-                    // No compilation, only relocation, and the CLOCK mark
-                    // back in place of the call to count_entry.
-                    std::copy(copy.code.begin(), copy.code.end(), output.begin());
-                    output[kHeaderWords] = rv::lw(R::ra, R::t6, -4).bits;
-                    words = output.first(copy.code.size());
-                    for (size_t i = 0; i < copy.relocations.size(); ++i) {
-                        const auto call = store_.target(copy, i);
-                        if (call != stubs_.count_entry) relocations[relocation_count++] = {copy.relocations[i], call};
-                    }
-                    std::memcpy(stored.data(), copy.data.data(), copy.data.size());
-                    const size_t count = copy.data.size() / sizeof(Compiler::Boundary) - 1;
-                    boundaries = std::span(stored).first(count);
-                    instructions = stored[count].completed;
-                    // The next eviction gets a count twice as long, so that a
-                    // block the pool keeps evicting moves less often.
-                    const auto level = std::min<uint32_t>(*copy.tag + 1, kMaxStoredLevel);
-                    *copy.tag = level;
-                    copy.code[1] = kStoredEntries << level;
-                }
-                // A block whose 16-bit jumps do not reach is compiled again
-                // with 32-bit ones; one too large for those ends earlier.
-                for (unsigned length = block_limit; length && words.empty(); length /= 2) {
-                    const bool verify = memory_ &&
-                        unstable_[state.pc & ((1u << kUnstableBits) - 1)] < kUnstable;
-                    for (bool short_jumps : {true, false}) {
-                        compiler = new (compiler_storage) Compiler(hot, cold, stubs_, code_, memory_, state.pc,
-                            stop_on_marker_, std::span(prefix).first(prefix_count), halt_bug, state.ei_pending, verify,
-                            short_jumps);
-                        words = compiler->compile(length, output, relocations.first(kRelocations - 1), relocation_count);
-                        if (!words.empty() || !compiler->short_range_failed()) break;
-                    }
-                    boundaries = compiler->boundaries();
-                    instructions = compiler->instructions();
-                }
-                if (words.empty()) failure = JitFallback::encoding;
-                else {
-                    auto result = cache_.install_replacing(key, words, relocations.first(relocation_count),
-                                                           memory_ ? &retired : nullptr, this);
-                    evictions_ += result.evicted;
-                    entry = result.entry;
-                    if (entry) target = reinterpret_cast<uintptr_t>(entry) + (memory_ ? kHeaderWords * 4 : 0);
-                    start = entry != nullptr;
-                    if (entry) {
-                        if (promote) ++restored_blocks_;
-                        else {
-                            ++compiled_blocks_; GBX_JIT_COUNT(compiles);
-#ifdef GBX_PROFILER
-                            compiled_bytes_ += static_cast<uint32_t>(words.size_bytes());
-#endif
-                        }
-                        if (memory_) {
-                            // Inline data, never executed: no republication.
-                            auto* block = reinterpret_cast<uint32_t*>(entry);
-                            block[0] = state.pc;
-                            block[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(result.referenced));
-                            // A repeated installation number could match an
-                            // old mid-block entry.
-                            if (result.installation < installation_) for (auto& mid : *mid_) mid.block = 0;
-                            installation_ = result.installation;
-                            const size_t size = words.size(), count = block[size - 1];
-                            for (size_t i = 0; i < count; ++i)
-                                block[block[size - 1 - count + i] + 2] = static_cast<uint32_t>(stubs_.unlinked);
-                            // Instruction starts inside the block, under the
-                            // mapping it was compiled for.
-                            for (const auto& boundary : boundaries) {
-                                const auto pc = boundary.pc;
-                                // Same limit; no HALT bug, delayed EI or prefix.
-                                const jit::BlockKey mid_key = (key & UINT64_C(0xf0000)) | pc |
-                                    (uint64_t{memory_->code_bank(pc)} << 22) |
-                                    (uint64_t{memory_->code_bank(static_cast<uint16_t>((pc | 127) + 1))} << 32);
-                                (*mid_)[mid_slot(mid_key)] = {mid_key, key, reinterpret_cast<uintptr_t>(entry),
-                                    result.live, result.installation, static_cast<uint16_t>(boundary.offset),
-                                    static_cast<uint16_t>(compiler ? compiler->code_copy() : 0),
-                                    boundary.completed, static_cast<uint8_t>(instructions - boundary.completed),
-                                    boundary.lazy_zero};
-                            }
-                            if (promote) {
-                                // Links into the copy in the second level now
-                                // enter this one; their records move along.
-                                auto* second = copy.code.data();
-                                for (auto index = second[0] >> 16; index; index = link_records_[index - 1].next)
-                                    *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(link_records_[index - 1].word)) =
-                                        static_cast<uint32_t>(target);
-                                block[0] |= second[0] & 0xffff0000u;
-                                second[0] &= 0xffff;
-                            }
-                        }
-                        // Only blocks that the pool accepted are stored. The
-                        // copy enters through count_entry instead of the
-                        // CLOCK mark, see Stubs.
-                        if (!promote && compiler->fixed_code()) {
-                            const auto count = boundaries.size();
-                            std::copy(boundaries.begin(), boundaries.end(), stored.begin());
-                            stored[count] = {0, 0, static_cast<uint8_t>(instructions), false};
-                            relocations[relocation_count] = {kHeaderWords * 4, stubs_.count_entry};
-                            output[kHeaderWords] = rv::jal(R::ra, 0).bits;
-                            const auto second = store_.store(key, words, relocations.first(relocation_count + 1),
-                                std::as_bytes(std::span(stored).first(count + 1)), &retired, this);
-                            if (!second.empty()) {
-                                second[0] = state.pc;
-                                second[1] = kStoredEntries;
-                                const size_t size = second.size(), links = second[size - 1];
-                                for (size_t i = 0; i < links; ++i)
-                                    second[second[size - 1 - links + i] + 2] = static_cast<uint32_t>(stubs_.unlinked);
-                            }
-                        }
-                        if (reinstall && compiler->fixed_code()) {
-                            auto& r = *reinstall;
-                            if (!r.count || r.tag != reinstall_tag) r = {reinstall_tag, 0, 0, 0};
-                            r.count = static_cast<uint8_t>(instructions);
-                        }
-                    } else if (promote) {
-                        // The pool did not take it: run the copy where it is.
-                        target = reinterpret_cast<uintptr_t>(copy.code.data()) + kHeaderWords * 4;
-                        start = true;
-                        ++stored_entries_;
-                    }
-                    failure = result.status == jit::InstallStatus::full ? JitFallback::capacity :
-                        result.status == jit::InstallStatus::invalid ? JitFallback::encoding : JitFallback::publication;
-                }
+                const auto installed = install(state, key, block_limit, std::span(prefix).first(prefix_count), halt_bug,
+                                               promote, copy, reinstall, reinstall_tag);
+                entry = installed.entry;
+                target = installed.target;
+                start = installed.start;
+                failure = installed.failure;
             }
             if (target) {
                 // The exit that requested this block is still alive only if
@@ -2171,22 +2196,14 @@ JitResult Sm83Jit::execute(Sm83State& state, const Bus* bus, Tick until, unsigne
                     // A verified block changed its own code: compile it again,
                     // with per-fetch opcode checks, before it runs on.
                     unstable(static_cast<uint16_t>(*reinterpret_cast<const uint32_t*>(context.smc)), kUnstable);
-                    uintptr_t begin, end;
-                    if (cache_.erase_containing(context.smc, begin, end)) {
-                        ++invalidations_;
-                        retired(this, begin, end);
-                    }
+                    retire_containing(context.smc);
                     context.smc = 0;
                     link = 0;
                 }
                 if (exit == JitExit::refetch && (context.exit & exit_bits::stale)) {
                     // A verified block found its code changed before running
                     // any of it. Compile the current code and enter again.
-                    uintptr_t begin, end;
-                    if (cache_.erase_containing(context.link, begin, end)) {
-                        ++invalidations_;
-                        retired(this, begin, end);
-                    }
+                    retire_containing(context.link);
                     unstable(state.pc, 1);
                     GBX_JIT_COUNT(stale);
                     link = 0;
@@ -2207,11 +2224,7 @@ JitResult Sm83Jit::execute(Sm83State& state, const Bus* bus, Tick until, unsigne
                     // RAM remains directly writable. An opcode mismatch retires
                     // this translation only after its native frame has returned.
                     // Other cached entries validate their own fetches on use.
-                    uintptr_t begin, end;
-                    if (cache_.erase_containing(context.active, begin, end)) {
-                        ++invalidations_;
-                        retired(this, begin, end);
-                    }
+                    retire_containing(context.active);
                     // The fetch already happened at its original bus timestamp.
                     // Continue using those latched bytes; do not read them twice,
                     // undo device events, or silently run the interpreter. The

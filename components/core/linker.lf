@@ -1,15 +1,20 @@
-# The execution core runs from internal RAM: the GBA's interpreter, the
-# devices' execution code and the JIT runtime helpers, with their read-only
-# data, and the worker queues of both systems. tools/link_core_layout.py
-# moves these objects to the start of internal RAM in a fixed order; this
-# fragment only says which code goes there.
+# The execution core runs from internal RAM: the interpreter, the devices'
+# execution code and the JIT runtime helpers, with their read-only data, and
+# the worker queues. tools/link_core_layout.py moves these objects to the
+# start of internal RAM in a fixed order; this fragment only says which code
+# goes there.
 #
 # Functions that run only while a ROM loads or the machine resets, or only
 # in single-step tests, stay in flash and run from PSRAM: constructors,
 # initialize(), reset(), loading and the flat test bus. Nothing the CPU
-# core runs per instruction, access, scanline or sample is listed. The GB's
-# whole core stays in flash too: internal RAM goes to the GBA, which is
-# harder to run at full speed, and to the JIT's code pools.
+# core runs per instruction, access, scanline or sample is listed. In a
+# build of the GB alone, so do the entries that only the app or the tests
+# call, at most once a frame: the linker drops those a build does not
+# reference, which would move the code after them. With the
+# GBA in the build, the GB's whole core stays in flash: internal RAM goes to
+# the GBA, which is harder to run at full speed, and to the JIT's code
+# pools. A build of the GB alone (GBX_SYSTEMS_GB_ONLY) puts the GB's core
+# there instead.
 [mapping:gbx_core]
 archive: libcore.a
 entries:
@@ -17,51 +22,125 @@ entries:
     offload (noflash)
     offload:_ZN3gbx2gb7Offload5startEv (default)
     offload:_ZN3gbx2gb7OffloadD2Ev (default)
-    # GBA: the interpreter's shared functions. Its copy on the flat bus
-    # (arm7_step) and the test bus are other objects, left in flash.
-    arm7 (noflash)
-    arm7:_ZN3gbx3gba18arm7_set_registersERNS0_9Arm7StateERKNS0_13Arm7RegistersE (default)
-    arm7:_ZN3gbx3gba14arm7_registersERKNS0_9Arm7StateE (default)
-    # The interpreter on the memory map with the JIT dispatcher's single
-    # steps, its scheduler and the devices. The ROM cache's reads from the
-    # card and the backup chips stay in flash: the card access or the save
-    # is slower than the code.
-    arm7_mapped (noflash)
-    gba_scheduler (noflash)
-    gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE5resetEv (default)
-    gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE7restoreEyRKSt5arrayIyLj5EERKS2_IPFvPvELj5EERKS2_IS6_Lj5EE (default)
-    gba_memory (noflash)
-    gba_memory:_ZN3gbx3gba6MemoryC2Ev (default)
-    gba_memory:_ZN3gbx3gba6MemoryD2Ev (default)
-    gba_memory:_ZN3gbx3gba6Memory10initializeEv (default)
-    gba_memory:_ZN3gbx3gba6Memory4loadESt4spanIKhLj16384EERNS0_8RomCacheE (default)
-    gba_memory:_ZN3gbx3gba6Memory5resetEb (default)
-    gba_io (noflash)
-    gba_io:_ZN3gbx3gba6Memory11io_snapshotESt4spanIhLj1024EE (default)
-    gba_irq (noflash)
-    gba_irq:_ZN3gbx3gba6Memory9reset_irqEv (default)
-    gba_timer (noflash)
-    gba_dma (noflash)
-    gba_ppu (noflash)
-    gba_ppu:_ZN3gbx3gba3PpuC2Ev (default)
-    gba_ppu:_ZN3gbx3gba3PpuD2Ev (default)
-    gba_ppu:_ZN3gbx3gba3Ppu10initializeERNS_2gb7OffloadE (default)
-    gba_ppu:_ZN3gbx3gba3Ppu5resetERNS0_6MemoryEyjj (default)
-    # The ARM7TDMI JIT's dispatch loop and runtime helpers, apart from the
-    # compiler. The flat bus of the tests and its fallback stay in flash.
-    arm7_jit_runtime (noflash)
-    arm7_jit_runtime:_ZN3gbx3gba12arm7_runtime11flat_accessEPNS1_5FrameEmmm (default)
-    arm7_jit_runtime:_ZN3gbx3gba12arm7_runtime10flat_fetchEPNS1_5FrameEmm (default)
-    arm7_jit_runtime:_ZN3gbx3gba12_GLOBAL__N_111CountingBus5cycleEPvmmm (default)
-    arm7_jit_runtime:_ZN3gbx3gba7Arm7Jit3runERNS0_9Arm7StateERKNS0_3BusENS0_14Arm7CodeSourceERlj (default)
-    # The sound registers and FIFOs, and the mixer on the other core.
-    gba_sound (noflash)
-    gba_sound:_ZN3gbx3gba6Memory11reset_soundEv (default)
-    gba_mixer (noflash)
-    gba_mixer:_ZN3gbx3gba5MixerC2ERNS_2gb7OffloadE (default)
-    # The renderer runs on the other core, line by line.
-    gba_renderer (noflash)
-    gba_renderer:_ZN3gbx3gba8RendererC2Ev (default)
-    gba_renderer:_ZN3gbx3gba8RendererD2Ev (default)
-    gba_renderer:_ZN3gbx3gba8Renderer10initializeEv (default)
-    gba_renderer:_ZN3gbx3gba8Renderer5resetEv (default)
+    if GBX_SYSTEMS_GB_ONLY = y:
+        # GB: the interpreter on the memory map. Its copy on the flat bus of
+        # the single-step tests stays in flash, as does that bus (bus).
+        sm83 (noflash)
+        sm83:_ZN3gbx2gb9sm83_stepERNS0_9Sm83StateERKNS0_3BusE (default)
+        sm83:_ZN3gbx2gb9sm83_waitERKNS0_9Sm83StateERKNS0_3BusE (default)
+        # The scheduler, the memory map with its timers, DMA and serial
+        # port, and the cartridge's banking and clock.
+        scheduler (noflash)
+        scheduler:_ZN3gbx14BasicSchedulerILj4EE5resetEv (default)
+        scheduler:_ZN3gbx14BasicSchedulerILj4EE7restoreEyRKSt5arrayIyLj4EERKS2_IPFvPvELj4EERKS2_IS6_Lj4EE (default)
+        memory (noflash)
+        memory:_ZN3gbx2gb6MemoryC2Ev (default)
+        memory:_ZN3gbx2gb6MemoryD2Ev (default)
+        memory:_ZN3gbx2gb6Memory10initializeEv (default)
+        memory:_ZN3gbx2gb6Memory4loadESt4spanIKhLj4294967295EENS0_4ModeE (default)
+        memory:_ZN3gbx2gb6Memory5resetEv (default)
+        memory:_ZN3gbx2gb6Memory5traceEPNS_11TraceBufferEb (default)
+        memory:_ZN3gbx2gb6Memory11traced_readEPS1_t (default)
+        memory:_ZN3gbx2gb6Memory12traced_writeEPS1_th (default)
+        memory:_ZN3gbx2gb6Memory11set_buttonsEh (default)
+        memory:_ZN3gbx2gb6Memory18set_worker_pollingEb (default)
+        memory:_ZNK3gbx2gb6Memory7dividerEv (default)
+        cartridge (noflash)
+        cartridge:_ZN3gbx2gb9Cartridge4loadESt4spanIKhLj4294967295EE (default)
+        cartridge:_ZN3gbx2gb9Cartridge5resetERKNS0_8RtcStateEy (default)
+        cartridge:_ZN3gbx2gb9Cartridge6layoutESt4spanIKhLj4294967295EEjRNS1_6LayoutE (default)
+        cartridge:_ZN3gbx2gb9Cartridge8load_ramESt4spanIKhLj4294967295EE (default)
+        cartridge:_ZN3gbx2gb9Cartridge8supportsESt4spanIKhLj4294967295EEj (default)
+        rtc (noflash)
+        rtc:_ZN3gbx2gb3Rtc7advanceEyy (default)
+        # The PPU, with the renderer that runs on the other core, and the
+        # APU's registers.
+        ppu (noflash)
+        ppu:_ZN3gbx2gb3PpuC2Ev (default)
+        ppu:_ZN3gbx2gb3PpuD2Ev (default)
+        ppu:_ZN3gbx2gb3Ppu10initializeERNS0_7OffloadE (default)
+        ppu:_ZN3gbx2gb3Ppu5resetERNS0_6MemoryE (default)
+        ppu:_ZN3gbx2gb3Ppu6finishEv (default)
+        ppu:_ZN3gbx2gb3Ppu6pixelsEv (default)
+        ppu:_ZN3gbx2gb3Ppu6shadesEv (default)
+        ppu:_ZN3gbx2gb3Ppu8frame_idEv (default)
+        ppu:_ZNK3gbx2gb3Ppu8in_frameEv (default)
+        ppu:_ZN3gbx2gb3Ppu8set_sinkEPNS0_9FrameSinkE (default)
+        ppu:_ZN3gbx2gb3Ppu11set_paletteERKSt5arrayItLj4EE (default)
+        apu (noflash)
+        apu:_ZN3gbx2gb3ApuC2Ev (default)
+        apu:_ZN3gbx2gb3ApuD2Ev (default)
+        apu:_ZN3gbx2gb3Apu10initializeERNS0_7OffloadE (default)
+        apu:_ZN3gbx2gb3Apu5resetERNS0_6MemoryE (default)
+        apu:_ZN3gbx2gb3Apu6finishEv (default)
+        apu:_ZN3gbx2gb3Apu11read_framesESt4spanIsLj4294967295EE (default)
+        apu:_ZN3gbx2gb3Apu8set_rateEm (default)
+        apu:_ZN3gbx2gb3Apu9set_speedEl (default)
+        apu:_ZNK3gbx2gb3Apu6queuedEv (default)
+        apu:_ZNK3gbx2gb3Apu8bufferedEv (default)
+        apu:_ZNK3gbx2gb3Apu7droppedEv (default)
+        # The run loop, the JIT's dispatcher and its runtime helpers. The
+        # entries into the run loop stay in flash, as do the compiler and
+        # the code cache's management, which Sm83Jit::install() and
+        # retire_containing() keep out of the dispatcher.
+        system (noflash)
+        system:_ZN3gbx2gb6System5resetEv (default)
+        system:_ZN3gbx2gb6System8load_romESt4spanIKhLj4294967295EEbNS0_4ModeE (default)
+        system:_ZN3gbx2gb6System14select_backendENS0_7BackendEPKNS_8platform16ExecutableMemoryE (default)
+        system:_ZN3gbx2gb6System9set_traceEPNS_11TraceBufferE (default)
+        system:_ZN3gbx2gb6System9run_frameEv (default)
+        system:_ZN3gbx2gb6System9run_untilEy (default)
+        system:_ZN3gbx2gb6System10step_blockEyj (default)
+        sm83_jit:_ZN3gbx2gb7Sm83Jit7executeERNS0_9Sm83StateEPKNS0_3BusEyjbb (noflash)
+        sm83_jit_runtime (noflash)
+        # The mixer, on the other core.
+        mixer (noflash)
+    else:
+        # GBA: the interpreter's shared functions. Its copy on the flat bus
+        # (arm7_step) and the test bus are other objects, left in flash.
+        arm7 (noflash)
+        arm7:_ZN3gbx3gba18arm7_set_registersERNS0_9Arm7StateERKNS0_13Arm7RegistersE (default)
+        arm7:_ZN3gbx3gba14arm7_registersERKNS0_9Arm7StateE (default)
+        # The interpreter on the memory map with the JIT dispatcher's single
+        # steps, its scheduler and the devices. The ROM cache's reads from the
+        # card and the backup chips stay in flash: the card access or the save
+        # is slower than the code.
+        arm7_mapped (noflash)
+        gba_scheduler (noflash)
+        gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE5resetEv (default)
+        gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE7restoreEyRKSt5arrayIyLj5EERKS2_IPFvPvELj5EERKS2_IS6_Lj5EE (default)
+        gba_memory (noflash)
+        gba_memory:_ZN3gbx3gba6MemoryC2Ev (default)
+        gba_memory:_ZN3gbx3gba6MemoryD2Ev (default)
+        gba_memory:_ZN3gbx3gba6Memory10initializeEv (default)
+        gba_memory:_ZN3gbx3gba6Memory4loadESt4spanIKhLj16384EERNS0_8RomCacheE (default)
+        gba_memory:_ZN3gbx3gba6Memory5resetEb (default)
+        gba_io (noflash)
+        gba_io:_ZN3gbx3gba6Memory11io_snapshotESt4spanIhLj1024EE (default)
+        gba_irq (noflash)
+        gba_irq:_ZN3gbx3gba6Memory9reset_irqEv (default)
+        gba_timer (noflash)
+        gba_dma (noflash)
+        gba_ppu (noflash)
+        gba_ppu:_ZN3gbx3gba3PpuC2Ev (default)
+        gba_ppu:_ZN3gbx3gba3PpuD2Ev (default)
+        gba_ppu:_ZN3gbx3gba3Ppu10initializeERNS_2gb7OffloadE (default)
+        gba_ppu:_ZN3gbx3gba3Ppu5resetERNS0_6MemoryEyjj (default)
+        # The ARM7TDMI JIT's dispatch loop and runtime helpers, apart from the
+        # compiler. The flat bus of the tests and its fallback stay in flash.
+        arm7_jit_runtime (noflash)
+        arm7_jit_runtime:_ZN3gbx3gba12arm7_runtime11flat_accessEPNS1_5FrameEmmm (default)
+        arm7_jit_runtime:_ZN3gbx3gba12arm7_runtime10flat_fetchEPNS1_5FrameEmm (default)
+        arm7_jit_runtime:_ZN3gbx3gba12_GLOBAL__N_111CountingBus5cycleEPvmmm (default)
+        arm7_jit_runtime:_ZN3gbx3gba7Arm7Jit3runERNS0_9Arm7StateERKNS0_3BusENS0_14Arm7CodeSourceERlj (default)
+        # The sound registers and FIFOs, and the mixer on the other core.
+        gba_sound (noflash)
+        gba_sound:_ZN3gbx3gba6Memory11reset_soundEv (default)
+        gba_mixer (noflash)
+        gba_mixer:_ZN3gbx3gba5MixerC2ERNS_2gb7OffloadE (default)
+        # The renderer runs on the other core, line by line.
+        gba_renderer (noflash)
+        gba_renderer:_ZN3gbx3gba8RendererC2Ev (default)
+        gba_renderer:_ZN3gbx3gba8RendererD2Ev (default)
+        gba_renderer:_ZN3gbx3gba8Renderer10initializeEv (default)
+        gba_renderer:_ZN3gbx3gba8Renderer5resetEv (default)

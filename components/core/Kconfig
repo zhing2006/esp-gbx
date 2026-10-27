@@ -1,0 +1,53 @@
+menu "GBX systems"
+
+choice GBX_SYSTEMS
+    prompt "Systems in the firmware"
+    default GBX_SYSTEMS_ALL
+    help
+        The systems the firmware and the test firmware run. A chip whose
+        internal RAM holds the execution core of only one of them builds
+        that one alone; the shared sdkconfig.defaults.<target> file makes
+        the choice. The PC build has both.
+
+config GBX_SYSTEMS_ALL
+    bool "GB, GBC and GBA"
+
+config GBX_SYSTEMS_GB_ONLY
+    bool "GB and GBC only"
+    help
+        The GBA's core and JIT are not built. The GB's execution core
+        takes their place in internal RAM, see tools/link_core_layout.py.
+
+config GBX_SYSTEMS_GBA_ONLY
+    bool "GBA only"
+    help
+        The menus list and load GBA games only, and the JIT's block in
+        internal RAM is sized for the GBA's JIT alone. The GB's core stays
+        in the build, in flash, which the app, the GBA's worker queues and
+        the test firmware share.
+
+endchoice
+
+endmenu
+
+menu "GBX PSRAM budgets"
+
+config GBX_GB_JIT_STORE_KB
+    int "GB JIT: second level of the code cache, KiB"
+    range 1024 16384
+    default 8192
+    help
+        The copies of the GB JIT's ROM blocks that run from PSRAM after the
+        code pool evicts them, one record per 256 bytes. Each board sets it
+        for its PSRAM in boards/<board>/sdkconfig.defaults.
+
+config GBX_GBA_ROM_CACHE_KB
+    int "GBA: ROM cache, KiB"
+    range 1024 32768
+    default 14336
+    help
+        A GBA ROM up to this size stays whole in PSRAM, a larger one is
+        paged in. It takes one contiguous block. Each board sets it for its
+        PSRAM in boards/<board>/sdkconfig.defaults.
+
+endmenu

@@ -10,6 +10,7 @@
 #include "gbx/gb/jit/sm83_jit.h"
 #include "gbx/gb/system.h"
 #include "gbx/gba/jit/arm7_jit.h"
+#include "gbx/systems.h"
 
 namespace gbx::test::profiler {
 
@@ -29,9 +30,11 @@ public:
     // the job unprofiled. With a gate, samples count only while it is set,
     // so that another core's profile covers the job's own run.
     void start(const gb::Sm83Jit* jit, const std::atomic<bool>* gate = nullptr);
+#if GBX_HAS_GBA
     // A GBA job: the JIT's code regions, and the CPU core's waits for the
     // renderer as counters.
     void start(const gba::Arm7Jit* jit);
+#endif
     void stop();
     // LOG frames for the PC runner; the transport owner calls this after the
     // job's result. Sends nothing for a job that was not profiled.

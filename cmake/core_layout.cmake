@@ -14,10 +14,11 @@ set_property(TARGET ${gbx_system_lib} PROPERTY INTERFACE_LINK_OPTIONS "${gbx_sys
 idf_build_get_property(gbx_elf EXECUTABLE)
 set(gbx_idf_sections "${CMAKE_BINARY_DIR}/esp-idf/esp_system/ld/sections.ld")
 set(gbx_fragments "${PROJECT_DIR}/components/core/linker.lf" "${PROJECT_DIR}/components/jit/linker.lf")
+idf_build_get_property(gbx_sdkconfig SDKCONFIG)
 add_custom_command(OUTPUT "${gbx_sections}"
     COMMAND "${PYTHON}" "${PROJECT_DIR}/tools/link_core_layout.py"
-        "${gbx_idf_sections}" "${gbx_sections}" ${gbx_fragments}
-    DEPENDS "${gbx_idf_sections}" "${PROJECT_DIR}/tools/link_core_layout.py" ${gbx_fragments}
+        "${gbx_sdkconfig}" "${gbx_idf_sections}" "${gbx_sections}" ${gbx_fragments}
+    DEPENDS "${gbx_sdkconfig}" "${gbx_idf_sections}" "${PROJECT_DIR}/tools/link_core_layout.py" ${gbx_fragments}
     VERBATIM)
 add_custom_target(gbx_core_layout DEPENDS "${gbx_sections}")
 add_dependencies(gbx_core_layout __ldgen_output_sections.ld)

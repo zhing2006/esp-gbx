@@ -9,10 +9,13 @@
 #include "gbx/jit/assembler.h"
 #include "gbx/jit/cache.h"
 #include "gbx/jit/store.h"
+#include "gbx/systems.h"
 #include "transport.h"
 #include "sm83_blocks.h"
+#if GBX_HAS_GBA
 #include "arm7_blocks.h"
 #include "gba_blocks.h"
+#endif
 #include "mapped_blocks.h"
 #include "mapper_dma.h"
 #include "cpu_peripherals.h"
@@ -27,11 +30,18 @@ namespace {
 using namespace jit;
 using namespace jit::rv32;
 
+// A firmware without the GBA has neither the ARM7TDMI's programs nor the
+// GBA's; run_jit.py leaves out their checks when HELLO reports no ARM7TDMI
+// backend.
+constexpr size_t kArm7Programs = GBX_HAS_GBA ? 5 : 0, kGbaPrograms = GBX_HAS_GBA ? 2 : 0;
+constexpr uint16_t kChecks = kCheckCount - (5 - kArm7Programs) - (2 - kGbaPrograms);
+constexpr uint16_t kMemoryChecks = kMemoryCheckCount - (2 - kGbaPrograms);
+
 // These are native-code execution fixtures, not an implementation of an emulated
 // CPU. Expected results follow RV32I/M and psABI; the PC runner judges them.
 class Checks {
 public:
-    explicit Checks(uint32_t request, uint16_t expected = kCheckCount) : request_(request), expected_(expected) {}
+    explicit Checks(uint32_t request, uint16_t expected = kChecks) : request_(request), expected_(expected) {}
     bool start() { return cache_.initialize(); }
     BlockEntry compile(const Assembler& code) {
         if (!code.valid()) { ok_ = false; return nullptr; }
@@ -229,18 +239,22 @@ bool execute_checks(uint32_t request_id, uint16_t group) {
     // Release the program fixture's pool before allocating the backend pool.
     std::array<uint32_t, 8> programs{};
     if (!memory_only && !sm83_blocks(programs)) return false;
-    std::array<uint32_t, 5> arm7{};
+    std::array<uint32_t, kArm7Programs> arm7{};
+#if GBX_HAS_GBA
     if (!memory_only && !arm7_blocks(arm7)) return false;
+#endif
     std::array<uint32_t, 18> mapped{};
     if (!mapped_blocks(mapped)) return false;
     std::array<uint32_t, 10> peripherals{};
     if (!cpu_peripherals(peripherals)) return false;
     std::array<uint32_t, 10> mapper{};
     if (!mapper_dma(mapper)) return false;
-    std::array<uint32_t, 2> gba{};
+    std::array<uint32_t, kGbaPrograms> gba{};
+#if GBX_HAS_GBA
     if (!gba_blocks(gba)) return false;
+#endif
     const auto erased = cache_erase();
-    Checks checks(request_id, memory_only ? kMemoryCheckCount : kCheckCount);
+    Checks checks(request_id, memory_only ? kMemoryChecks : kChecks);
     if (memory_only) {
         for (const auto result : mapped) if (!checks.result(result)) return false;
         if (!checks.result(erased)) return false;

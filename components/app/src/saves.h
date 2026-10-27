@@ -13,6 +13,7 @@
 #include "gbx/gb/system.h"
 #include "gbx/gba/system.h"
 #include "gbx/platform.h"
+#include "gbx/systems.h"
 #include "gbx/worker.h"
 
 namespace gbx::app {
@@ -72,6 +73,7 @@ private:
     gb::System* system_ = nullptr;
 };
 
+#if GBX_HAS_GBA
 class GbaSaveCartridge final : public SaveCartridge {
 public:
     void attach(gba::System* system) { system_ = system; }
@@ -88,6 +90,7 @@ public:
 private:
     gba::System* system_ = nullptr;
 };
+#endif
 
 // The cartridge save of the running game: its battery-backed RAM and clock,
 // in two files on the card written in turn, see saves.cpp for the format.

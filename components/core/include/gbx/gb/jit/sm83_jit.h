@@ -45,9 +45,12 @@ extern Sm83JitCounters sm83_jit_counters;
 #endif
 
 // The code pool and the second level behind it, see Sm83Jit::initialize().
+// The second level's size comes from the board's PSRAM, see
+// components/core/Kconfig: 8 MiB and 32768 records unless the board sets
+// less.
 struct Sm83JitCapacity {
     size_t pool_bytes = 192 * 1024, pool_blocks = 2048;
-    size_t store_bytes = 8u << 20, store_records = 32768;
+    size_t store_bytes = GBX_GB_JIT_STORE_BYTES, store_records = GBX_GB_JIT_STORE_BYTES / 256;
 };
 
 struct JitResult {
@@ -238,7 +241,22 @@ private:
         return (static_cast<uint32_t>(key) * 0x9e3779b1u ^ static_cast<uint32_t>(key >> 32)) * 0x85ebca6bu;
     }
     std::unique_ptr<Reinstall[], Release> reinstall_;
-    void unstable(uint16_t pc, uint8_t count);
+    // Compilation, installation and retirement, apart from execute(): in a
+    // build of the GB alone execute() runs from internal RAM, and these stay
+    // in flash with the compiler they inline, so that compiler changes do
+    // not move the runtime after it (components/core/linker.lf).
+    struct Installed {
+        jit::BlockEntry entry;
+        uintptr_t target;
+        bool start;
+        JitFallback failure;
+    };
+    [[gnu::noinline]] Installed install(const Sm83State& state, jit::BlockKey key, unsigned block_limit,
+                                        std::span<const uint8_t> prefix, bool halt_bug, bool promote,
+                                        const jit::CodeStore::Record& copy, Reinstall* reinstall,
+                                        uint16_t reinstall_tag);
+    [[gnu::noinline]] void retire_containing(uintptr_t address);
+    [[gnu::noinline]] void unstable(uint16_t pc, uint8_t count);
     bool code_matches(const uint32_t* copy) const;
     uint32_t installation_ = 0;  // Latest; a smaller one means numbers wrapped.
     // Native links into each block, so that retiring it resets only those.

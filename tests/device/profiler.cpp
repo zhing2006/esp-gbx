@@ -124,6 +124,7 @@ void Profile::start(const gb::Sm83Jit* jit, const std::atomic<bool>* gate) {
     timer_ = timer;
 }
 
+#if GBX_HAS_GBA
 void Profile::start(const gba::Arm7Jit* jit) {
     start(static_cast<const gb::Sm83Jit*>(nullptr));
     if (!text_) return;
@@ -137,6 +138,7 @@ void Profile::start(const gba::Arm7Jit* jit) {
     store_ = reinterpret_cast<uintptr_t>(jit->code_store().data());
     store_bytes_ = jit->code_store().size_bytes();
 }
+#endif
 
 void Profile::stop() {
     if (!timer_) return;

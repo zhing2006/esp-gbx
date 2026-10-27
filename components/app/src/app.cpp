@@ -501,6 +501,7 @@ void update() {
                               static_cast<unsigned long>(profile.cycles), static_cast<unsigned long>(profile.retired),
                               static_cast<unsigned long>(profile.branches),
                               static_cast<unsigned long>(profile.mispredicts));
+#if GBX_HAS_GBA
             // The GBA renderer's time a frame, and the CPU core's waits for
             // the worker's rows.
             static uint32_t frames_seen = 0, waits_seen = 0, catch_ups_seen = 0;
@@ -583,6 +584,7 @@ void update() {
             draw_seen = draw_us;
             waits_seen = waits;
             wait_us_seen = wait_us;
+#endif
             const auto slow = game.take_slow_access();
             const auto n = [](uint32_t count) { return static_cast<unsigned long>(count); };
             platform::log(platform::LogLevel::warn, kTag,
