@@ -248,7 +248,7 @@ GBA 的状态在 `gba/snapshot.h`，做法和 GB 的相同。状态包括 CPU �
 
 可执行内存的接口在 `gbx/executable.h`。ESP 实现默认把代码池放在片内 RAM，第二级放在 PSRAM；`CONFIG_GBX_JIT_CODE_PSRAM` 把代码池也放进 PSRAM，腾出的片内 RAM 可以配给更大的 L2 缓存，默认不打开。公共 `sdkconfig.defaults` 关闭了 `CONFIG_ESP_SYSTEM_MEMPROT`，否则 JIT 不能写入并执行片内代码池。这会取消 IDF 默认的代码区、数据区权限划分，依据见 [IDF 配置说明](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_system/Kconfig)和 [P4 保护实现](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_hw_support/port/esp32p4/cpu_region_protect.c)。
 
-P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，并执行本核的 `fence.i`；S31 的片内 SRAM 不经过这条缓存路径，只做指令流同步。实现和加锁的约定写在 `components/platform/src/esp/executable.cpp`。代码生成、发布和执行必须由固定在同一核的任务负责，执行期间不能改写指令，发布期间不能并发执行 flash 操作，见 [ESP-IDF 缓存同步接口](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_mm/include/esp_cache.h)。双核之间交接代码还没有实现，不能把缓存失效当成代码生命周期的同步。
+P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，并执行本核的 `fence.i`。S31 的片内 SRAM 不经过缓存，只做指令流同步；PSRAM 里的代码和 P4 一样先写回、再失效。S31 没有 L2，取指令在 L1 未命中时直接读 PSRAM，所以写回到 PSRAM 就够了。实现和加锁的约定写在 `components/platform/src/esp/executable.cpp`。代码生成、发布和执行必须由固定在同一核的任务负责，执行期间不能改写指令，发布期间不能并发执行 flash 操作，见 [ESP-IDF 缓存同步接口](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_mm/include/esp_cache.h)。双核之间交接代码还没有实现，不能把缓存失效当成代码生命周期的同步。
 
 ## 板子
 
@@ -256,7 +256,7 @@ P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，
 
 芯片的差异和板子的差异分开处理。芯片的差异放在 `components/platform/src/esp/`，按 ESP-IDF 的 SOC 能力宏处理，包括可执行内存和缓存同步、双核任务和显示提交。P4 和 S31 都有 PPA 与 2D-DMA，不能用是否有 PPA 区分这两种芯片。
 
-显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。
+显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。S31 的 RGB 屏一边扫描一边由 DMA 从 PSRAM 读帧缓冲，LVGL 画界面和 PPA 画游戏帧同时进行时，DMA 会取数不及，所以 `sdkconfig.defaults.esp32s31` 打开 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`：present 任务画游戏帧时也拿着 LVGL 锁。
 
 板子的差异放在 `boards/<板子>/`，描述板上焊了什么：
 
@@ -379,7 +379,9 @@ PC 版只有解释器，用于开发和调试，不代替板上验收。图形�
 - 用模板展开专用版本之前，先测代码体积，因为 P4 的 L1 指令缓存只有 16KB。
 - ESP-IDF 的 API 只在 `main/`、`components/platform/src/esp/`、`components/board/`、`boards/`、`drivers/` 和 `tests/device/` 里调用。
 
-热代码的位置由链接配置固定，固件和测试固件共用同一套规则。`components/core/linker.lf` 和 `components/jit/linker.lf` 把 GBA 的解释器、设备执行代码和 JIT 运行时 helper，以及两个系统共用的块查找和工作线程队列映射到片内 RAM，其中只在载入、复位或单步测试时运行的函数逐个列出，留在 flash。`tools/link_core_layout.py` 再按固定顺序排列这些对象：共用的代码在前，GBA 的执行代码在后。这样测试、应用和 JIT 编译器的改动不会移动热代码。GBA 比 GB 难跑到原速，所以两个系统争片内 RAM 或位置时 GBA 优先：GB 的整个执行核心都留在 flash，从 PSRAM 运行。P4 v3 以前的芯片把片内 RAM 分成两段，IDF 链接的代码和数据只能放在前一段，装不下 GBA 全部的执行代码。所以跑在 CPU 所在核上的执行代码放在后一段的数据区，和 JIT 代码池所在的堆共用这一段。另一个核上的渲染器和混音器放得进前一段，就留在前一段，这样后一段的堆能多出这部分空间给代码池。P4 上不在片内的代码都从 PSRAM 经两个核共用的 L2 缓存读取，热代码放在片内，另一个核上的任务对模拟速度的影响就小一些。函数改名或删除以后，要同步改 linker.lf 和脚本里的名单；执行代码改动以后，检查 map 里的地址，并上板测量布局对性能的影响。
+热代码的位置由链接配置固定，固件和测试固件共用同一套规则。`components/core/linker.lf` 和 `components/jit/linker.lf` 把 GBA 的解释器、设备执行代码和 JIT 运行时 helper，以及两个系统共用的块查找和工作线程队列映射到片内 RAM，其中只在载入、复位或单步测试时运行的函数逐个列出，留在 flash。`tools/link_core_layout.py` 再按固定顺序排列这些对象：共用的代码在前，GBA 的执行代码在后。这样测试、应用和 JIT 编译器的改动不会移动热代码。GBA 比 GB 难跑到原速，所以两个系统争片内 RAM 或位置时 GBA 优先：GB 的整个执行核心都留在 flash，从 PSRAM 运行。
+
+固件编入哪些系统由 `components/core/Kconfig` 的 `GBX_SYSTEMS` 选择，代码按 `gbx/systems.h` 的 `GBX_HAS_GB` 和 `GBX_HAS_GBA` 区分。S31 的片内 RAM 放不下 GBA 的执行核心和运行时数据，所以 `sdkconfig.defaults.esp32s31` 只编入 GB（`GBX_SYSTEMS_GB_ONLY`），不编入 GBA 的核心和 JIT，GB 的解释器、设备执行代码、运行循环、JIT 的派发和运行时 helper 放进片内 RAM。只有应用或测试调用、每帧最多调用一次的入口也留在 flash，因为链接器会删掉一种构建没有引用的函数，热代码的位置就会随之改变。JIT 的编译、安装和块的撤销放在 `Sm83Jit::install()` 和 `retire_containing()` 里，和编译器一起留在 flash，编译器的改动就不会改变 `Sm83Jit::execute()` 的大小。热代码查的表放在全局指针的寻址范围下面。链接器会把范围里的表的寻址缩成一条指令，表在不在范围里取决于应用和测试的数据，所以留在范围里，代码的大小就会跟着它们变。只编入 GBA（`GBX_SYSTEMS_GBA_ONLY`）时，菜单只列 GBA 游戏，GB 的核心仍然编入，留在 flash。GB JIT 第二级和 GBA ROM cache 在 PSRAM 里的预算由 `GBX_GB_JIT_STORE_KB` 和 `GBX_GBA_ROM_CACHE_KB` 设定，各板在 `boards/<板子>/sdkconfig.defaults` 里按自己的 PSRAM 设值。P4 v3 以前的芯片把片内 RAM 分成两段，IDF 链接的代码和数据只能放在前一段，装不下 GBA 全部的执行代码。所以跑在 CPU 所在核上的执行代码放在后一段的数据区，和 JIT 代码池所在的堆共用这一段。另一个核上的渲染器和混音器放得进前一段，就留在前一段，这样后一段的堆能多出这部分空间给代码池。P4 上不在片内的代码都从 PSRAM 经两个核共用的 L2 缓存读取，热代码放在片内，另一个核上的任务对模拟速度的影响就小一些。函数改名或删除以后，要同步改 linker.lf 和脚本里的名单；执行代码改动以后，检查 map 里的地址，并上板测量布局对性能的影响。
 
 片内 RAM 还留给每次访存都要用的 `gb::System` 和 `gba::System`、JIT 的代码池和块索引，模拟、渲染、音频和呈现任务的栈，中断处理函数和驱动要求的 DMA 缓冲。JIT 代码池要一整块连续的片内空间，所以访问不频繁的代码和数据放进 PSRAM：app 的全局对象由 `components/app/linker.lf` 放置，冷的静态缓冲用 `EXT_RAM_BSS_ATTR`，只处理文件、菜单或串口命令的任务和 LVGL 任务把栈放在 PSRAM，LVGL 的堆优先分配在 PSRAM。GBA 的 BIOS 也由 `Game` 分配在 PSRAM：JIT 只在编译 BIOS 的代码时整段读它，运行时只读 BIOS 里的数据和设 latch 用的字，但是解释器执行 BIOS 时每次取指令都要读。P4 v3 以前的芯片上，片内的堆分成高低两块。IDF 先从高的一块分配片内内存，JIT 的代码池也要从这块里出；低的一块是 IDF 的 retention 内存，只有指明要它的分配，或者高的一块已经放不下的分配，才会用到它。所以留在片内的任务栈申请 retention 内存，放在低的一块，见 `components/platform/src/esp/task_stack.h`。IDF 默认在开机时从最大的空闲块里切 32KB，留给 DMA 和必须在片内的分配，这块正好落在高的一块里，所以公共 `sdkconfig.defaults` 关掉了这项预留。`Game` 初始化时就占住 JIT 代码池要的一块片内 RAM，大小取 GB 和 GBA 两种 JIT 里大的一种，以后每个游戏的 JIT 都把 gateway 和代码池放在这块里面，退出游戏也不释放。游戏运行时高的一块只剩下零碎的空间，任务这时第一次创建、以后一直保留的小对象会落进这些空隙，比如 IDF 第一次初始化函数内的静态变量时建的两个信号量；如果退出游戏时释放了这块，这些对象就会把下一个游戏要的连续空间切开。公共 `sdkconfig.defaults` 还把 IDF 的一部分中断函数和锁放回 flash，前提和依据写在那个文件里。
 

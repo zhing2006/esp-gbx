@@ -34,3 +34,50 @@ ESP32-S31 不跑 GBA。S31 的构建关掉 GBA，片内 RAM 留给 GB 和 GBC。
 - GB 和 GBC 的相关测试在 S31 上两个后端都通过；用户确认以后再决定是否跑全量回归。
 
 ## 记录
+
+### 测试场景和判据
+
+开工时和用户确认的场景：V-Rally 锦标赛版的槽位 1 和槽位 2、史前人的槽位 1、精灵宝可梦 黄的槽位 2。存档是用户这次重新存的，和 P4 上测过的位置不同，所以不和 P4 比较。四个都是 `.gb` 游戏，没有跑在 CGB 双速模式下的 GBC 游戏。判据和用户商定为：JIT 2X 档每个 2 秒的 `stat` 窗口都不低于 199.5%；解释器不要求 2X，1X 最好到原速。验收用 `wks_s31_cb-release`，profile 固件只用来分析。
+
+### 结果
+
+慧勤智远 ESP32-S31 CB（ESP32-S31 v0.0、320MHz、16MB PSRAM），`wks_s31_cb-release`，只编入 GB。每个场景载入 ROM、读槽位、切换速度，等 4 秒以后每 2 秒取一次 `stat`，共 7 个窗口。frm 是每个模拟帧的平均耗时，核 1 是模拟器所在的核。
+
+| 场景 | 后端和速度 | `SPEED` | frm 平均 | 核 1 空闲 |
+|---|---|---|---|---|
+| V-Rally 槽位 1 | JIT 2X | 199.9%～200.3% | 2.07ms | 76% |
+| | 解释器 1X | 99.7%～100.3% | 5.52ms | 66%～67% |
+| | 解释器 2X | 199.9%～200.3% | 5.38ms | 35% |
+| V-Rally 槽位 2 | JIT 2X | 199.9%～200.1% | 3.19ms | 62% |
+| | 解释器 1X | 99.7%～100.3% | 6.39ms | 61%～62% |
+| | 解释器 2X | 199.9%～200.1% | 6.18ms | 26% |
+| 史前人 槽位 1 | JIT 2X | 199.9%～200.1% | 1.84ms | 79% |
+| | 解释器 1X | 99.6%～100.3% | 4.04ms | 76% |
+| | 解释器 2X | 199.9%～200.1% | 3.80ms | 55% |
+| 精灵宝可梦 黄 槽位 2 | JIT 2X | 199.9%～200.1% | 1.57ms | 81% |
+| | 解释器 1X | 99.7%～100.4% | 2.67ms | 83%～84% |
+| | 解释器 2X | 199.9%～200.1% | 2.59ms | 69% |
+
+V-Rally 槽位 1 第一次试跑时有一个窗口是 199.7%，也在判据以内。12 组测试里 LCD 和音频都没有 underrun。游戏运行时片内 RAM 还剩 17KB（JIT）或 57KB（解释器），PSRAM 还剩 4.82MB～5.86MB（JIT）或 7.37MB～8.40MB（解释器）。余量已经够了，用户决定不再做性能优化。
+
+解释器 1X 跑 V-Rally 时，`drw` 只有 55.8～59.0，比模拟帧率 59.5～59.9 低；JIT 1X 也出现过 56.8。2X 档的 `drw` 是 59.5～60.4。原因没有查。
+
+这组数据是在下面“Review 后的改动”之前测的，改动以后没有重测。
+
+### 做法
+
+- 编入哪些系统改成 `components/core/Kconfig` 的 `GBX_SYSTEMS`，S31 选只编入 GB。GB 的执行核心放进片内 RAM，代码池和 GB JIT 的块数都没有缩小。只编入 GBA 的选项也加了，`sila_p4` 的正式固件和测试固件编译通过，没有上板运行。
+- S31 能执行 PSRAM 里的 JIT 代码：完整构建的测试固件上 `run_jit` 179 项全过，其中有 PSRAM 代码首次执行和改写以后再执行的检查；只编入 GB 的测试固件 172 项全过，ARM7TDMI 和 GBA 的检查不在固件里。S31 因此也打开了第二级。第二级按 P4 的 8MiB 分配时，PSRAM 不够即时存档用，载入游戏以后报 “No memory for the instant saves”，所以第二级和 GBA ROM cache 的大小改成各板设定的 `GBX_GB_JIT_STORE_KB` 和 `GBX_GBA_ROM_CACHE_KB`，S31 设成 2048KB 和 5120KB。
+- 只编入 GB 时，ROM 列表只收 `.gb` 和 `.gbc`，空列表的提示不提 `.gba`；卡上的 `.gba` 显示 “This firmware runs GB and GBC games only.”。SETTINGS 里没有只属于 GBA 的选项，提到 GBA 的说明只在运行 GBA 游戏时出现，不用改。
+- 画面错位：先把 PCLK 从 31.70MHz 降到 27.85MHz（907×514），V-Rally 里每 30 秒还有 8～10 次 underrun，和后端、速度都无关，菜单界面 60 秒里没有。PPA 和 2D-DMA 的 burst 从 128 降到 64 没有变化，缩放改成 NEAREST 降到 5 次。underrun 的间隔大多接近 1 秒的整数倍，和 VFD 每秒刷新一次读数对得上。游戏运行时停掉 UI 的刷新，就不再 underrun；UI 照常刷新、present 任务画游戏帧时也拿着 LVGL 锁，也不再 underrun，用户玩了一段时间确认画面不错位。这把锁做成了 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`，只在 `sdkconfig.defaults.esp32s31` 里打开；PCLK 和时序恢复原样。
+- VFD 的 `MEM` 格在 S31 和 OSPTEK ESP32-P4C5 上加了 PSRAM 空闲量，按用户的要求。
+
+### Review 后的改动
+
+- 只有应用或测试调用的 GB 入口留在 flash。改之前 release 和 test-release 的热区里函数不一样，`update_deadline()` 分别在 0x2f015fd8 和 0x2f016010；改完以后两种构建的函数一样，只差全局指针附近的两条查表指令。
+- JIT 的编译、安装和块的撤销移到 `Sm83Jit::install()` 和 `retire_containing()`，留在 flash。片内的 `Sm83Jit::execute()` 从 11216 字节缩到 4752 字节。
+- 热代码查的表移到全局指针能直接寻址的范围下面，`ppu.cpp` 的 `kEdges` 改成编译期常量，release 的热区里不再有相对全局指针的访问。这一项改完以后只编了 S31 的 release，test-release 没有重编，两种构建的地址没有再核对。Mixer 用的浮点常量被链接器合并进了 IDF 的常量池，地址仍然取决于 IDF 和应用的数据，离全局指针约 5.6KB，release 里没有被缩短。
+
+### 测试
+
+ESP32-P4 的 `sila_p4-release` 和 `sila_p4x-release` 改完以后编译通过，热区的边界和改之前相同，没有上板运行。GB 和 GBC 的测试 ROM 和单步测试没有在 S31 上跑，Review 后的改动以后 `run_jit` 也没有重跑，用户决定不跑，按现状完成。
