@@ -10,6 +10,17 @@ config GBX_DISPLAY_ACCEL
         sdkconfig.defaults.<target> file supplies each SoC's display policy.
         LVGL's draw unit is configured separately with LV_USE_PPA.
 
+config GBX_DISPLAY_LOCK_GAME_DRAW
+    bool "Keep LVGL from drawing while a game frame is drawn"
+    default n
+    help
+        The present task holds the LVGL lock while it draws a game frame,
+        as it does while it copies the UI. An RGB panel's DMA reads the
+        frame buffer from PSRAM while the panel scans out; on the
+        ESP32-S31 it underran, and the picture shifted, when LVGL drew
+        while the PPA drew a game frame. LVGL's changes then show after
+        the frame.
+
 config GBX_LVGL_PPA_MIN_PIXELS
     int "Minimum clipped area for the LVGL PPA draw unit"
     depends on LV_USE_PPA

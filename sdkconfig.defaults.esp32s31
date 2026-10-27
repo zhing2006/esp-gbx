@@ -6,3 +6,6 @@ CONFIG_GBX_DISPLAY_ACCEL=y
 CONFIG_LV_USE_PPA=y
 CONFIG_LV_USE_PPA_IMG=y
 CONFIG_GBX_LVGL_PPA_MIN_PIXELS=4096
+# The RGB panel's DMA underran when LVGL drew while the PPA drew a game
+# frame, see components/platform/Kconfig.
+CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW=y

@@ -58,6 +58,12 @@ constexpr int kPresentPriority = 4;  // above LVGL, below the PPU/APU worker
 // The frame step on the emulator's core, see run_frame_step(): below the
 // emulation task (5), so it only takes the time the emulation leaves.
 constexpr int kStepPriority = 4;
+// The LVGL lock also covers the game frame, see GBX_DISPLAY_LOCK_GAME_DRAW.
+#if CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW
+constexpr bool kGameHoldsLvgl = true;
+#else
+constexpr bool kGameHoldsLvgl = false;
+#endif
 constexpr int kMaxRects = 16;        // more changed areas than this are copied as a full screen
 constexpr int kSwapTimeoutMs = 100;
 constexpr int kSlots = 3;
@@ -322,14 +328,19 @@ void present_loop(void*) {
             row1 = std::max(row1, last);
         };
         GBX_IF_PROFILER(times_loops.fetch_add(1); const int64_t present_start = esp_timer_get_time();)
-        if (!now.empty() || !carry.empty()) {
+        const bool ui_due = !now.empty() || !carry.empty();
+        const bool holds_lvgl = ui_due || (kGameHoldsLvgl && game_due);
+        if (holds_lvgl) {
             // Hold the LVGL lock so LVGL is not drawing into the shadow while we read it.
             GBX_IF_PROFILER(present_stage.store(PresentStage::lvgl_lock, std::memory_order_relaxed);
                             const int64_t lock_start = esp_timer_get_time();)
             lvgl_port_lock(0);
+            GBX_IF_PROFILER(const int64_t lock_end = esp_timer_get_time();
+                            times_lock.fetch_add(static_cast<uint32_t>(lock_end - lock_start));
+                            record_max(lock_max_us, static_cast<uint32_t>(lock_end - lock_start));)
+        }
+        if (ui_due) {
             GBX_IF_PROFILER(const int64_t ui_start = esp_timer_get_time();
-                            times_lock.fetch_add(static_cast<uint32_t>(ui_start - lock_start));
-                            record_max(lock_max_us, static_cast<uint32_t>(ui_start - lock_start));
                             present_stage.store(PresentStage::ui_copy, std::memory_order_relaxed);)
             auto apply = [&](const Rect& r) {
                 if (layer.shown) {
@@ -346,7 +357,7 @@ void present_loop(void*) {
                                              {now.rects, static_cast<size_t>(now.count)}, apply);
             }
             GBX_IF_PROFILER(times_ui.fetch_add(static_cast<uint32_t>(esp_timer_get_time() - ui_start));)
-            lvgl_port_unlock();
+            if (!kGameHoldsLvgl) lvgl_port_unlock();
         }
         bool drew_frame = false;
         if (layer.shown) {
@@ -368,6 +379,7 @@ void present_loop(void*) {
                 drew_frame = true;
             }
         }
+        if (kGameHoldsLvgl && holds_lvgl) lvgl_port_unlock();
 
         // The pointer lies inside the frame buffer, so the driver only writes
         // back the cache for these rows and shows this buffer from the next frame.
