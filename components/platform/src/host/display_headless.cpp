@@ -43,7 +43,7 @@ uint16_t* game_frame_buffer() {
     return nullptr;
 }
 
-bool game_frame_due() {
+bool game_frame_due(uint64_t) {
     return true;
 }
 

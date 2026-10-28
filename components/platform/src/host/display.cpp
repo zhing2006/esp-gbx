@@ -411,7 +411,7 @@ uint16_t* game_frame_buffer() {
     return producing.load(std::memory_order_acquire) ? slots[writer].data() : nullptr;
 }
 
-bool game_frame_due() {
+bool game_frame_due(uint64_t) {
     return true;
 }
 

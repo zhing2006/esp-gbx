@@ -66,10 +66,11 @@ void set_game_shades(std::span<const uint16_t, 4> colors);
 // skips older ones. A frame may repeat an id, as a blank screen does.
 uint16_t* game_frame_buffer();
 void publish_game_frame(uint64_t id);
-// Whether the layer would take a frame published now. A display that
-// shows only some frames says no to the others, so the producer need not
-// fill the buffer for them. Producer side.
-bool game_frame_due();
+// Whether the layer would take a frame published in_us from now, after
+// the one published and not taken yet, if any. A display that shows only
+// some frames says no to the others, so the producer need not draw them.
+// Producer side.
+bool game_frame_due(uint64_t in_us);
 
 // Frames with a new id that became the screen's scanout source since
 // show_game(), or -1 where the display cannot tell when a buffer is shown.

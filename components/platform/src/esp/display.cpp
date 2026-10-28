@@ -767,9 +767,13 @@ uint16_t* game_frame_buffer() {
     return producing.load(std::memory_order_acquire) ? slots[writer] : nullptr;
 }
 
-bool game_frame_due() {
-    return kGameFrameGapUs == 0 ||
-           esp_timer_get_time() - taken_us.load(std::memory_order_relaxed) >= kGameFrameGapUs - kDueEarlyUs;
+bool game_frame_due(uint64_t in_us) {
+    if (kGameFrameGapUs == 0) return true;
+    const int64_t now = esp_timer_get_time();
+    int64_t taken = taken_us.load(std::memory_order_relaxed);
+    // A frame not taken yet will be once the gap after the latest is over.
+    if (ready.load(std::memory_order_acquire) & kFresh) taken = std::max(now, taken + kGameFrameGapUs);
+    return now + static_cast<int64_t>(in_us) - taken >= kGameFrameGapUs - kDueEarlyUs;
 }
 
 void publish_game_frame(uint64_t id) {

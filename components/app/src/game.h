@@ -443,6 +443,10 @@ private:
     std::atomic<uint32_t> underruns_at_load_{0};
     uint64_t last_id_ = 0;  // PPU worker: the latest frame delivered
     uint64_t frame_began_us_ = 0;  // emulation task: when the frame under way began
+    // Emulation task: whether the frame under way is drawn, and how long the
+    // latest frame drawn took, which a frame not drawn says nothing about.
+    bool drawing_ = true;
+    uint64_t drawn_us_ = 0;
     struct Start {
         std::atomic<uint64_t> id{0};
         std::atomic<uint64_t> us{0};

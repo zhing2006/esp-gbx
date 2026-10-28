@@ -484,11 +484,9 @@ platform::display::PixelFormat Game::gb_format() const {
                                                                                  : PixelFormat::bgr555;
 }
 
-uint16_t* Game::frame_buffer() {
-    // No buffer for a frame the display would leave out: the PPU's worker
-    // then skips filling it.
-    return platform::display::game_frame_due() ? platform::display::game_frame_buffer() : nullptr;
-}
+// A frame drawn is one the display takes, see step(): one that comes early
+// waits for it.
+uint16_t* Game::frame_buffer() { return platform::display::game_frame_buffer(); }
 
 #ifdef GBX_PROFILER
 #if GBX_HAS_GBA
@@ -782,6 +780,7 @@ void Game::work_done([[maybe_unused]] uint64_t id, uint64_t began, uint64_t now)
         work_base_.store(n, std::memory_order_relaxed);
     }
     work_[n % work_.size()].store(static_cast<uint32_t>(now - began), std::memory_order_relaxed);
+    if (drawing_) drawn_us_ = now - began;
     work_count_.store(n + 1, std::memory_order_release);
 #ifdef GBX_PROFILER
     replay_.work(id, static_cast<uint32_t>(now - began));
@@ -1511,7 +1510,10 @@ void Game::step() {
     // A frame is drawn whole or not at all: one a run stopped inside goes on
     // as it began, or its rows from before would show stale ones.
     if (!system_->in_frame()) {
-        system_->set_drawing(!fast || draw_now(began));
+        // Not drawn either: a frame the display would not take as it ends,
+        // about as long from now as the latest frame drawn took.
+        drawing_ = (!fast || draw_now(began)) && platform::display::game_frame_due(drawn_us_);
+        system_->set_drawing(drawing_);
         frame_began_us_ = began;
     }
     auto& start = starts_[next % starts_.size()];
@@ -1685,7 +1687,8 @@ void Game::step_gba() {
     gba_system_->set_buttons(gba_keys(static_cast<uint16_t>(buttons | (buttons >> 16))));
     const uint64_t next = gba_system_->memory.frames + 1;
     const uint64_t began = platform::monotonic_us();
-    gba_system_->set_drawing(!fast || draw_now(began));
+    drawing_ = (!fast || draw_now(began)) && platform::display::game_frame_due(drawn_us_);
+    gba_system_->set_drawing(drawing_);
     auto& start = starts_[next % starts_.size()];
     start.us.store(began, std::memory_order_relaxed);
     start.speed.store(speed_changes_, std::memory_order_relaxed);

@@ -27,9 +27,10 @@ config GBX_DISPLAY_GAME_HALF_RATE
     help
         The present task takes a new game frame only 25 ms after the last
         one it took, which leaves every other frame of a game running at
-        normal speed out. On the ESP32-C5, which has one core and quad
-        PSRAM, presenting every frame of a GB game on its SPI panel took
-        the time the emulation needed to keep up.
+        normal speed out; the emulator does not draw those. On the
+        ESP32-C5, which has one core and quad PSRAM, presenting every frame
+        of a GB game on its SPI panel took the time the emulation needed to
+        keep up.
 
 config GBX_LVGL_PPA_MIN_PIXELS
     int "Minimum clipped area for the LVGL PPA draw unit"
