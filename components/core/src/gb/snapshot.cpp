@@ -495,7 +495,12 @@ void SnapshotAccess::capture(System& system, SnapshotState& s, uint8_t* ram) {
         auto& d = s.renderer;
         std::copy_n(renderer->vram_.begin(), d.vram.size(), d.vram.begin()); d.oam = renderer->oam_;
         d.window_line = renderer->window_line_; d.frame_id = renderer->id_;
-        d.front = renderer->shades_[renderer->front_]; d.back = renderer->shades_[renderer->front_ ^ 1];
+        // A CGB's frames share their memory with GB mode's, see Renderer.
+        if (renderer->mode_ == Mode::dmg) {
+            d.front = renderer->shades_[renderer->front_]; d.back = renderer->shades_[renderer->front_ ^ 1];
+        } else {
+            d.front.fill(0); d.back.fill(0);
+        }
     }
 
     const auto& apu = m.apu;
@@ -616,7 +621,9 @@ void SnapshotAccess::restore(System& system, const SnapshotState& s, const uint8
         const auto& d = s.renderer;
         std::copy(d.vram.begin(), d.vram.end(), renderer->vram_.begin()); renderer->oam_ = d.oam;
         renderer->window_line_ = d.window_line; renderer->id_ = d.frame_id;
-        renderer->shades_[renderer->front_] = d.front; renderer->shades_[renderer->front_ ^ 1] = d.back;
+        if (s.mode == Mode::dmg) {
+            renderer->shades_[renderer->front_] = d.front; renderer->shades_[renderer->front_ ^ 1] = d.back;
+        }
         ++renderer->frames_;       // pixels() converts the front frame again.
         renderer->palette_ = -1;   // The BGP lookup is built again.
         renderer->mode_ = s.mode;

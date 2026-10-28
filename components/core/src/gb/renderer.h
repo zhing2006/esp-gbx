@@ -228,23 +228,31 @@ private:
     std::array<Row, kCapacity> rows_;
     std::array<uint8_t, 16384> vram_{};
     std::array<uint8_t, 160> oam_{};
-    std::array<std::array<uint8_t, kFramePixels>, 2> shades_{};
-    // A CGB's frames, in either mode, and its palette RAM as 32 BG colors
-    // and 32 OBJ colors; bit 15 is ignored (Pan Docs, LCD Color Palettes).
-    std::array<std::array<uint16_t, kFramePixels>, 2> color_frames_{};
+    // GB mode's frames and their colors, or a CGB's frames in either mode:
+    // the renderer draws in one mode until a clear row sets another, so the
+    // two share their memory.
+    union {
+        struct {
+            std::array<std::array<uint8_t, kFramePixels>, 2> shades_;
+            // Converted on the caller's core: BGR555 colors of the front
+            // buffer when frames_ was converted_.
+            std::array<uint16_t, kFramePixels> pixels_;
+        };
+        std::array<std::array<uint16_t, kFramePixels>, 2> color_frames_{};
+    };
+    static_assert(sizeof(shades_) + sizeof(pixels_) == sizeof(color_frames_));
     // The color frame shown last and the one being drawn, each in one of
     // color_frames_ or in the sink's buffer, see FrameSink::drawing_buffer().
     // back_ is chosen at the frame's first line, see color_line().
     const uint16_t* shown_ = color_frames_[0].data();
     uint16_t* back_ = nullptr;
+    // A CGB's palette RAM as 32 BG colors and 32 OBJ colors; bit 15 is
+    // ignored (Pan Docs, LCD Color Palettes).
     std::array<uint16_t, 64> cgb_colors_{};
     // The colors of two pixels in each BG palette, the left one in the low
     // half, 16 per palette: the left pixel's color number plus 4 times the
     // right one's.
     std::array<uint32_t, 128> cgb_pairs_{};
-    // Converted on the caller's core: BGR555 colors of the front buffer when
-    // frames_ was converted_.
-    std::array<uint16_t, kFramePixels> pixels_{};
     uint32_t converted_ = ~uint32_t{0};
     uint64_t id_ = 0;
     uint8_t window_line_ = 0;
