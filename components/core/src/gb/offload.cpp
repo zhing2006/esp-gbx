@@ -16,14 +16,15 @@ Offload::~Offload() {
     worker_.join();
 }
 bool Offload::start() {
-    if (started_) return true;
+    if (kInline || started_) return true;
     if (!ready_.initialize(1) || !space_.initialize(1)) return false;
     started_ = worker_.start(run, this, platform::current_core() ^ 1, "gbx-render", 4096, priority_);
     return started_;
 }
 void Offload::wait(Queue queue, uint32_t target) {
     auto& q = queues_[queue];
-    if (reached(q.completed.load(std::memory_order_acquire), target)) return;
+    // Inline, submit() has consumed every item.
+    if (kInline || reached(q.completed.load(std::memory_order_acquire), target)) return;
 #ifdef GBX_PROFILER
     const auto start = platform::monotonic_us();
 #endif

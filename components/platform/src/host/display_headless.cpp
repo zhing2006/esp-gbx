@@ -33,8 +33,18 @@ bool show_game(std::span<const int16_t, 4>, int, int, PixelFormat) {
 
 void hide_game() {}
 
+bool game_shades_supported() {
+    return false;
+}
+
+void set_game_shades(std::span<const uint16_t, 4>) {}
+
 uint16_t* game_frame_buffer() {
     return nullptr;
+}
+
+bool game_frame_due() {
+    return true;
 }
 
 void publish_game_frame(uint64_t) {}

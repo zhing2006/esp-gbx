@@ -1,6 +1,18 @@
-# ESP32-C5 has no PPA or DMA2D. Keep the CPU display implementation and
-# nearest-neighbour sampling; board bring-up is still pending.
+# ESP32-C5 has no PPA or DMA2D: the CPU display implementation, with
+# nearest-neighbour sampling only.
 CONFIG_GBX_DISPLAY_ACCEL=n
 CONFIG_LV_USE_PPA=n
 CONFIG_LV_USE_PPA_IMG=n
 CONFIG_LV_DRAW_BUF_ALIGN=32
+
+# One core at 240 MHz and 384 KB of internal RAM: the GB alone, whose
+# execution core takes internal RAM, as on the ESP32-S31. See
+# components/core/Kconfig.
+CONFIG_GBX_SYSTEMS_GB_ONLY=y
+# Every task shares the one core, so the game page draws the shell once and
+# leaves out the VFD, see components/ui/Kconfig.
+CONFIG_GBX_UI_STATIC_SHELL=y
+
+# One core and quad PSRAM: presenting every GB frame on the SPI panel
+# takes the time the emulation needs, see components/platform/Kconfig.
+CONFIG_GBX_DISPLAY_GAME_HALF_RATE=y

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <mutex>
+#include <new>
 #include <utility>
 
 #include "esp_heap_caps.h"
@@ -12,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "gbx/esp/board.h"
+#include "malloc.h"
 #include "rom/cache.h"
 #include "sdkconfig.h"
 
@@ -174,3 +177,21 @@ bool set_wall_time(int64_t us) {
 }
 
 }  // namespace gbx::platform
+
+// The firmware builds without exceptions, and libstdc++'s nothrow operator
+// new calls the throwing one in a try block: a failed allocation aborts in
+// __cxa_allocate_exception instead of returning nullptr. These take their
+// place and call what the throwing ones call, malloc() and memalign(), so
+// the memory comes from where it did and operator delete frees it.
+void* operator new(std::size_t bytes, const std::nothrow_t&) noexcept {
+    return std::malloc(bytes ? bytes : 1);
+}
+void* operator new[](std::size_t bytes, const std::nothrow_t&) noexcept {
+    return std::malloc(bytes ? bytes : 1);
+}
+void* operator new(std::size_t bytes, std::align_val_t alignment, const std::nothrow_t&) noexcept {
+    return memalign(static_cast<std::size_t>(alignment), bytes ? bytes : 1);
+}
+void* operator new[](std::size_t bytes, std::align_val_t alignment, const std::nothrow_t& tag) noexcept {
+    return ::operator new(bytes, alignment, tag);
+}

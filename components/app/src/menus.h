@@ -103,6 +103,8 @@ private:
     // one in color has no PALETTE and takes COLOR FIX.
     bool in_color_game() const;
     bool palette_off(int choice) const;
+    // The rows SETTINGS shows: all, or all but SCALING.
+    int setting_rows() const;
     bool setting_enabled(int row) const;
     // The paused frame for the pause menu, as COLOR FIX shows it.
     void show_paused_frame();

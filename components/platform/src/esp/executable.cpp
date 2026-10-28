@@ -37,6 +37,11 @@ static_assert((kAlignment & (kAlignment - 1)) == 0);
 // restricts it (IDF port/esp32s31/cpu_region_protect.c), and data and
 // instructions share its addresses (SOC_MMU_DI_VADDR_SHARED). Its I- and
 // D-caches lie between the cores and PSRAM only, see publish_executable().
+// On C5, with ESP_SYSTEM_MEMPROT off, PMP entry 6 lets the whole cached
+// range be written and executed with PSRAM, and PMA entry 7 makes it
+// executable (port/esp32c5/cpu_region_protect.c). Its one cache serves
+// instructions and data (SOC_SHARED_IDCACHE_SUPPORTED) at shared addresses,
+// so a fetch finds what a store left in it.
 #if CONFIG_IDF_TARGET_ESP32P4 && CONFIG_SPIRAM
 constexpr bool kExternalCode = true;
 constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_CACHE_LINE_SIZE;
@@ -44,6 +49,9 @@ constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_CACHE_LINE_SIZE;
 constexpr bool kExternalCode = true;
 constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_ICACHE_LINE_SIZE > CONFIG_CACHE_L1_DCACHE_LINE_SIZE
                                           ? CONFIG_CACHE_L1_ICACHE_LINE_SIZE : CONFIG_CACHE_L1_DCACHE_LINE_SIZE;
+#elif CONFIG_IDF_TARGET_ESP32C5 && CONFIG_SPIRAM
+constexpr bool kExternalCode = true;
+constexpr size_t kExternalAlignment = CONFIG_CACHE_L1_CACHE_LINE_SIZE;
 #else
 constexpr bool kExternalCode = false;
 constexpr size_t kExternalAlignment = kAlignment;
@@ -135,7 +143,9 @@ bool publish_executable(const ExecutableMemory& memory, size_t offset, size_t by
         bytes > memory.size_bytes - offset) return false;
     if (!bytes) return true;
     asm volatile("fence iorw, iorw" ::: "memory");
-    // P4 caches internal memory and PSRAM through L1, S31 only PSRAM.
+    // P4 caches internal memory and PSRAM through L1, S31 only PSRAM. C5's
+    // internal memory is not cached, and a fetch from PSRAM reads the cache
+    // the stores went to.
 #if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE || (CONFIG_IDF_TARGET_ESP32S31 && CONFIG_SPIRAM)
 #if SOC_CACHE_INTERNAL_MEM_VIA_L1CACHE
     constexpr bool cached = true;

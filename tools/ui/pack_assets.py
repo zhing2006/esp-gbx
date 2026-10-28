@@ -38,7 +38,8 @@ MIN_HIT_MM = 10  # thin controls get a margin that makes their hit area at least
 
 # Nominal panel diagonals in inches, from docs/boards; Sila's is the "4IN"
 # label on its schematic. They turn MIN_HIT_MM into pixels.
-PANEL_INCHES = {"sila_p4": 4.0, "sila_p4x": 6.2, "jc1060p470": 7.0, "m5stack_tab5": 5.0, "osptek_p4c5": 4.3, "wks_s31_cb": 4.3}
+PANEL_INCHES = {"sila_p4": 4.0, "sila_p4x": 6.2, "jc1060p470": 7.0, "m5stack_tab5": 5.0, "osptek_p4c5": 4.3, "wks_s31_cb": 4.3,
+                "waveshare_c5_lcd28": 2.8}
 
 HEADER = struct.Struct("<8sIIIII HH32s")
 ENTRY = struct.Struct("<32sIII4x")
@@ -163,13 +164,18 @@ def hit_shape(sprite, center, k):
     raise SystemExit(f"no hit shape for {sprite}")
 
 
-def menu_entry():
-    """The "menu" entry: grid, colors in MENU_COLORS order, palettes and 16x16 icons."""
+def menu_entry(window):
+    """The "menu" entry: grid, the scale that fills the game window `window`
+    with it, colors in MENU_COLORS order, palettes and 16x16 icons."""
     theme = json.load(open(ASSETS / "common" / "menu.json"))
     colors = theme["colors"]
     if sorted(colors) != sorted(MENU_COLORS):
         raise SystemExit(f"menu.json colors must be exactly {MENU_COLORS}")
-    out = MENU.pack(*theme["grid"], theme["scale"], len(MENU_COLORS), len(theme["palettes"]), len(theme["icons"]))
+    gw, gh = theme["grid"]
+    scale = window[2] // gw
+    if scale < 1 or window[2:] != [gw * scale, gh * scale]:
+        raise SystemExit(f"the {window[2]}x{window[3]} game window is not the {gw}x{gh} menu grid at a whole scale")
+    out = MENU.pack(gw, gh, scale, len(MENU_COLORS), len(theme["palettes"]), len(theme["icons"]))
     out += b"".join(bytes(colors[name]) + b"\0" for name in MENU_COLORS)
     for name, shades in theme["palettes"].items():
         if len(shades) != 4:
@@ -231,8 +237,10 @@ def build(board):
         names = [cstr(c, 8) for c in colors] + [b""] * (2 - len(colors))
         lamps.append(LAMP.pack(cstr(lid, 8), *names))
 
+    # A board without a VFD gets no VFD font either.
+    vfd = m.get("vfd", {})
     fonts = []
-    for p, a in sorted(font["atlases"].items(), key=lambda kv: int(kv[0])):
+    for p, a in sorted(font["atlases"].items(), key=lambda kv: int(kv[0])) if vfd else []:
         # Glyphs land on varying positions, so the atlas is not dithered.
         pack.add_image(f"font.{p}", Image.open(ASSETS / "common" / a["file"]).convert("RGBA"), dither=False)
         fonts.append(FONT.pack(a["pitch"], a["margin"], a["cell"][0], a["cell"][1], a["columns"], a["advance"]))
@@ -240,7 +248,7 @@ def build(board):
     cells = []
     positions = {None: UNIT_NONE, "right": UNIT_RIGHT, "below": UNIT_BELOW}
     aligns = {"left": 0, "right": 1}
-    for cid, c in m["vfd"].items():
+    for cid, c in vfd.items():
         v, lines = c["value"], c.get("lines", [])
         if len(lines) > MAX_CELL_LINES:
             raise SystemExit(f"VFD cell {cid} has {len(lines)} lines, at most {MAX_CELL_LINES} fit")
@@ -256,7 +264,7 @@ def build(board):
 
     layout = LAYOUT.pack(*m["display"], len(controls), len(lamps), len(fonts), len(cells), cstr(font["chars"], 64))
     pack.add("layout", ENTRY_LAYOUT, layout + b"".join(controls + lamps + fonts + cells))
-    pack.add("menu", ENTRY_MENU, menu_entry())
+    pack.add("menu", ENTRY_MENU, menu_entry(m["display"]))
     pack.add("menu_font", ENTRY_FONT, (ASSETS / "common" / "menu_font.bin").read_bytes())
     for path in sorted((ASSETS / "common" / "sounds").glob("*.wav")):
         with wave.open(str(path), "rb") as w:

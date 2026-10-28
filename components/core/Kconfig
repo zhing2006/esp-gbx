@@ -30,6 +30,21 @@ endchoice
 
 endmenu
 
+menu "GBX internal RAM budget"
+
+config GBX_GB_JIT_POOL_KB
+    int "GB JIT: code pool in internal RAM, KiB"
+    range 32 192
+    default 192
+    help
+        The GB JIT's code pool, one contiguous block of internal RAM with
+        16 KiB of shared code before it, set aside when the app starts. A
+        board whose internal RAM cannot spare it all sets less in
+        boards/<board>/sdkconfig.defaults; blocks the pool evicts run from
+        the second level in PSRAM.
+
+endmenu
+
 menu "GBX PSRAM budgets"
 
 config GBX_GB_JIT_STORE_KB

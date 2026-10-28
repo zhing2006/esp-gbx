@@ -10,7 +10,8 @@
 
 namespace gbx::gb {
 // Synthesizes the four channels from the APU's batches, mixes them as NR50
-// and NR51 select and resamples the result, on the worker of the other core.
+// and NR51 select and resamples the result, on the worker of the other core
+// or, on one core, as each batch is submitted.
 //
 // Each channel's digital output changes only at its own steps and at entries,
 // so the mixed signal is a step function. Every change adds its difference
@@ -45,7 +46,8 @@ public:
 
 private:
     friend struct SnapshotAccess;
-    static constexpr unsigned kBatches = 8;
+    // Inline, each batch is consumed as it is submitted, see Offload.
+    static constexpr unsigned kBatches = Offload::kInline ? 2 : 8;
     static constexpr unsigned kOutputFrames = 8192;
     // Frames still open to changes; a power of two.
     static constexpr unsigned kPending = 1024;

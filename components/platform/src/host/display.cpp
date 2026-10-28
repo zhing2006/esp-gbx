@@ -364,7 +364,7 @@ void set_scaling(Scaling mode) {
 }
 
 bool show_game(std::span<const int16_t, 4> rect, int width, int height, PixelFormat format) {
-    if (width <= 0 || height <= 0) return false;
+    if (width <= 0 || height <= 0 || format == PixelFormat::shades) return false;
     std::lock_guard lock(layer_mutex);
     const size_t pixels = static_cast<size_t>(width) * height;
     if (slots[0].size() < pixels) {
@@ -400,8 +400,19 @@ void hide_game() {
     SDL_PushEvent(&event);
 }
 
+// SDL takes the frames in color.
+bool game_shades_supported() {
+    return false;
+}
+
+void set_game_shades(std::span<const uint16_t, 4>) {}
+
 uint16_t* game_frame_buffer() {
     return producing.load(std::memory_order_acquire) ? slots[writer].data() : nullptr;
+}
+
+bool game_frame_due() {
+    return true;
 }
 
 void publish_game_frame(uint64_t) {

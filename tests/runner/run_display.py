@@ -17,7 +17,7 @@ from single_step import git_state, save_json
 from sm83_suite import ROOT
 from transport import Link
 
-VERSION = 2
+VERSION = 4
 CONTROL = struct.Struct('<HHI')
 RESULT = struct.Struct('<HHII')
 GROUPS = (
@@ -28,6 +28,7 @@ GROUPS = (
     ('Smooth constant images', 20, True),
     ('Bilinear interpolation', 4, True),
     ('Damage containment', 4, False),
+    ('Game bands', 24, False),
 )
 RESULT_COUNT = 1 + len(GROUPS)
 

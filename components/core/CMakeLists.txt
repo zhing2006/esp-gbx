@@ -26,11 +26,23 @@ endif()
 if(gbx_has_gba)
     list(APPEND core_srcs ${core_gba_srcs})
 endif()
+# GBX_SINGLE_CORE: a chip with one core, where the emulation task does the
+# PPU's and APU's work itself, see src/gb/offload.h. The PC build has a
+# worker thread.
+set(gbx_single_core 0)
+if(CONFIG_FREERTOS_UNICORE)
+    set(gbx_single_core 1)
+endif()
 # PSRAM budgets that each board sets for its PSRAM, see Kconfig: the GB
 # JIT's second level and the GBA's ROM cache, in bytes. The PC build takes
 # the defaults.
 set(gbx_gb_jit_store_kb 8192)
 set(gbx_gba_rom_cache_kb 14336)
+# And the GB JIT's code pool in internal RAM.
+set(gbx_gb_jit_pool_kb 192)
+if(CONFIG_GBX_GB_JIT_POOL_KB)
+    set(gbx_gb_jit_pool_kb ${CONFIG_GBX_GB_JIT_POOL_KB})
+endif()
 if(CONFIG_GBX_GB_JIT_STORE_KB)
     set(gbx_gb_jit_store_kb ${CONFIG_GBX_GB_JIT_STORE_KB})
 endif()
@@ -39,8 +51,11 @@ if(CONFIG_GBX_GBA_ROM_CACHE_KB)
 endif()
 math(EXPR gbx_gb_jit_store_bytes "${gbx_gb_jit_store_kb} * 1024")
 math(EXPR gbx_gba_rom_cache_bytes "${gbx_gba_rom_cache_kb} * 1024")
+math(EXPR gbx_gb_jit_pool_bytes "${gbx_gb_jit_pool_kb} * 1024")
 set(core_definitions GBX_HAS_GB=${gbx_has_gb} GBX_HAS_GBA=${gbx_has_gba}
-                     GBX_GB_JIT_STORE_BYTES=${gbx_gb_jit_store_bytes} GBX_GBA_ROM_CACHE_BYTES=${gbx_gba_rom_cache_bytes})
+                     GBX_GB_JIT_STORE_BYTES=${gbx_gb_jit_store_bytes} GBX_GBA_ROM_CACHE_BYTES=${gbx_gba_rom_cache_bytes}
+                     GBX_GB_JIT_POOL_BYTES=${gbx_gb_jit_pool_bytes} GBX_SINGLE_CORE=${gbx_single_core})
+
 if(ESP_PLATFORM)
     idf_component_register(SRCS ${core_srcs} INCLUDE_DIRS "include" REQUIRES jit platform
                            LDFRAGMENTS "linker.lf")

@@ -36,7 +36,7 @@ esp-gbx/
 │   ├── platform/
 │   │   ├── include/gbx/  平台接口
 │   │   └── src/
-│   │       ├── esp/    ESP-IDF 上的实现：显示呈现、触摸、资源分区；P4 和 S31 的差异在这里处理
+│   │       ├── esp/    ESP-IDF 上的实现：显示呈现、触摸、资源分区；P4、S31 和 C5 的差异在这里处理
 │   │       └── host/   PC 上的实现
 │   └── board/          板级接口和各板子共用的步骤，只编进固件
 ├── boards/
@@ -45,6 +45,7 @@ esp-gbx/
 │   ├── osptek_p4c5/
 │   ├── sila_p4/
 │   ├── sila_p4x/
+│   ├── waveshare_c5_lcd28/
 │   └── wks_s31_cb/
 ├── drivers/            板上外设的驱动，可以被多块板子共用
 ├── host/               PC 版的 CMake 工程
@@ -194,6 +195,8 @@ GBA 用同一个工作线程类，也分扫描线任务和声音任务两个队�
 
 平台接口 `gbx/worker.h` 提供工作线程和核间通知。ESP 实现把工作线程固定在 CPU 所在核以外的核上，PC 实现使用普通线程，任务格式、渲染和混音代码共用。
 
+ESP32-C5 只有一个核，固件用 `CONFIG_FREERTOS_UNICORE` 构建，所有任务都在 core 0 上。这时没有工作线程（`GBX_SINGLE_CORE`，见 `gb/offload.h`）：模拟任务交出扫描线任务或声音任务时就地处理掉，PPU 的行队列和 APU 的声音队列各只留 2 项。单核上没有另一个核并行，工作线程只会多出任务切换，它的队列还要占 PSRAM。模拟任务的优先级降到 1，低于 LVGL、呈现任务和读写卡任务，所以模拟跟不上时触摸、屏幕和读卡仍然能运行。优先级和理由写在 `components/app/src/game.h`。
+
 ### PPU 渲染
 
 扫描线任务带着这一行用到的寄存器、变化过的显存页和 OAM，以及这一行里带时刻的修改。渲染只读任务和工作线程自己持有的副本，不能读取 CPU 正在修改的状态。
@@ -216,7 +219,7 @@ GBA 的声音按同样的方式划分（`gba_sound.cpp` 和 `src/gba/mixer.h`）
 
 - 按键：由 CPU 的拥有者提交。
 - 串口：只支持内部时钟、没有对端的传输。
-- 画面：设置了 `FrameSink` 时，工作线程直接交付 BGR555 帧；否则由读取方取最近一帧。
+- 画面：设置了 `FrameSink` 时，工作线程直接交付 BGR555 帧，`FrameSink::shades()` 为真时 GB 模式的帧按灰阶交付；否则由读取方取最近一帧。
 - 声音：按调用者给定的采样率返回 16 位立体声 PCM，每秒生成的帧数可以微调，供按音频水位控制节奏的调用者使用。
 - RTC：取出或写回完整状态，或者加上一段经过的时间。
 - 卡带存档：取出、写回卡带 RAM，并报告上次查询以来可能写过的 bank 和时钟寄存器。
@@ -248,19 +251,19 @@ GBA 的状态在 `gba/snapshot.h`，做法和 GB 的相同。状态包括 CPU �
 
 可执行内存的接口在 `gbx/executable.h`。ESP 实现默认把代码池放在片内 RAM，第二级放在 PSRAM；`CONFIG_GBX_JIT_CODE_PSRAM` 把代码池也放进 PSRAM，腾出的片内 RAM 可以配给更大的 L2 缓存，默认不打开。公共 `sdkconfig.defaults` 关闭了 `CONFIG_ESP_SYSTEM_MEMPROT`，否则 JIT 不能写入并执行片内代码池。这会取消 IDF 默认的代码区、数据区权限划分，依据见 [IDF 配置说明](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_system/Kconfig)和 [P4 保护实现](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_hw_support/port/esp32p4/cpu_region_protect.c)。
 
-P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，并执行本核的 `fence.i`。S31 的片内 SRAM 不经过缓存，只做指令流同步；PSRAM 里的代码和 P4 一样先写回、再失效。S31 没有 L2，取指令在 L1 未命中时直接读 PSRAM，所以写回到 PSRAM 就够了。实现和加锁的约定写在 `components/platform/src/esp/executable.cpp`。代码生成、发布和执行必须由固定在同一核的任务负责，执行期间不能改写指令，发布期间不能并发执行 flash 操作，见 [ESP-IDF 缓存同步接口](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_mm/include/esp_cache.h)。双核之间交接代码还没有实现，不能把缓存失效当成代码生命周期的同步。
+P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，并执行本核的 `fence.i`。S31 的片内 SRAM 不经过缓存，只做指令流同步；PSRAM 里的代码和 P4 一样先写回、再失效。S31 没有 L2，取指令在 L1 未命中时直接读 PSRAM，所以写回到 PSRAM 就够了。C5 的片内 SRAM 也不经过缓存。它只有一个指令和数据共用的缓存，取指令读到的就是写进缓存的内容，所以 PSRAM 里的第二级也能直接执行。实现和加锁的约定写在 `components/platform/src/esp/executable.cpp`。代码生成、发布和执行必须由固定在同一核的任务负责，执行期间不能改写指令，发布期间不能并发执行 flash 操作，见 [ESP-IDF 缓存同步接口](https://github.com/espressif/esp-idf/blob/fff9895c82d744c7237be8847347bdd1b07c6643/components/esp_mm/include/esp_cache.h)。双核之间交接代码还没有实现，不能把缓存失效当成代码生命周期的同步。
 
 ## 板子
 
-添加板子的步骤见[加板指南](adding-a-board.md)。现有板子包括 [JC1060P470](boards/jc1060p470.md)、[M5Stack Tab5](boards/m5stack_tab5.md)、[OSPTEK ESP32-P4C5-Module](boards/osptek_p4c5.md)、[Sila P4](boards/sila_p4.md)、[Sila P4X AIBox](boards/sila_p4x.md) 和 ESP32-S31 的[慧勤智远 ESP32-S31 CB](boards/wks_s31_cb.md)。
+添加板子的步骤见[加板指南](adding-a-board.md)。现有板子包括 [JC1060P470](boards/jc1060p470.md)、[M5Stack Tab5](boards/m5stack_tab5.md)、[OSPTEK ESP32-P4C5-Module](boards/osptek_p4c5.md)、[Sila P4](boards/sila_p4.md)、[Sila P4X AIBox](boards/sila_p4x.md) 、ESP32-S31 的[慧勤智远 ESP32-S31 CB](boards/wks_s31_cb.md)和 ESP32-C5 的 [Waveshare ESP32-C5-Touch-LCD-2.8](boards/waveshare_c5_lcd28.md)。
 
 芯片的差异和板子的差异分开处理。芯片的差异放在 `components/platform/src/esp/`，按 ESP-IDF 的 SOC 能力宏处理，包括可执行内存和缓存同步、双核任务和显示提交。P4 和 S31 都有 PPA 与 2D-DMA，不能用是否有 PPA 区分这两种芯片。
 
-显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。S31 的 RGB 屏一边扫描一边由 DMA 从 PSRAM 读帧缓冲，LVGL 画界面和 PPA 画游戏帧同时进行时，DMA 会取数不及，所以 `sdkconfig.defaults.esp32s31` 打开 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`：present 任务画游戏帧时也拿着 LVGL 锁。
+显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。C5 的 `sdkconfig.defaults.esp32c5` 还打开了 `GBX_UI_STATIC_SHELL`，因为 UI 和模拟在同一个核上：游戏页的控件开机画好以后不再随触摸改变外观，只有速度拨杆会动，也不画 VFD。S31 的 RGB 屏一边扫描一边由 DMA 从 PSRAM 读帧缓冲，LVGL 画界面和 PPA 画游戏帧同时进行时，DMA 会取数不及，所以 `sdkconfig.defaults.esp32s31` 打开 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`：present 任务画游戏帧时也拿着 LVGL 锁。
 
 板子的差异放在 `boards/<板子>/`，描述板上焊了什么：
 
-- 引脚、屏幕和初始化序列、触摸、codec 和 RTC 的型号、按键的接法、电池 ADC 和 LDO 通道。接口声明在 `components/board/include/gbx/esp/board.h`，各板子相同的步骤在 `components/board/src/board_support.cpp`，其中 MIPI DSI 的部分只在有 DSI 的芯片上编译。显示呈现、触摸坐标换算和 SD 挂载由平台实现统一处理。
+- 引脚、屏幕和初始化序列、触摸、codec 和 RTC 的型号、按键的接法、电池 ADC 和 LDO 通道。接口声明在 `components/board/include/gbx/esp/board.h`，各板子相同的步骤在 `components/board/src/board_support.cpp`，其中 MIPI DSI 的部分只在有 DSI 的芯片上编译。显示呈现、触摸坐标换算和 SD 挂载由平台实现统一处理。SD 卡接在 SDMMC 控制器上，或者和 SPI 屏共用一条 SPI 总线，由 `board::sdmmc()` 说明；共用总线时，板子在 `init()` 里初始化总线，平台只在上面加一个设备。
 - `sdkconfig.defaults`，写芯片、芯片修订、PSRAM、flash 和主频。P4 v1.x 和 v3.x 要用不同的芯片修订配置编译，所以这些配置跟着板子走。
 - 用到的乐鑫组件在 `idf_component.yml` 里列出并锁定版本。
 
@@ -272,9 +275,9 @@ PC 版也按一块板子处理，平台实现是 `components/platform/src/host/`
 
 界面用 LVGL 绘制，游戏画面不经过 LVGL，两者分开刷新。
 
-屏幕的帧缓冲由 `components/platform/src/esp/` 的呈现任务独占，其他代码不能直接写帧缓冲或调用 `esp_lcd_panel_draw_bitmap()`。LVGL 在 PSRAM 里画整屏的 UI，呈现任务只把变化的区域复制进后台缓冲，需要时同时旋转，再在帧之间切换缓冲，所以画面不撕裂，也不用每次重传整屏。MIPI DSI 屏用 ESP-IDF 的 DPI 驱动，RGB 并口屏用 RGB 驱动，`board::display_init()` 返回的 `PanelDriver` 告诉呈现任务从哪个驱动取帧缓冲和换帧事件，两种屏的呈现流程相同。
+屏幕的帧缓冲由 `components/platform/src/esp/` 的呈现任务独占，其他代码不能直接写帧缓冲或调用 `esp_lcd_panel_draw_bitmap()`。LVGL 在 PSRAM 里画整屏的 UI，呈现任务只把变化的区域复制进后台缓冲，需要时同时旋转，再在帧之间切换缓冲，所以画面不撕裂，也不用每次重传整屏。MIPI DSI 屏用 ESP-IDF 的 DPI 驱动，RGB 并口屏用 RGB 驱动，`board::display_init()` 返回的 `PanelDriver` 告诉呈现任务从哪个驱动取帧缓冲和换帧事件，两种屏的呈现流程相同。SPI 屏自己的显存保存画面，所以呈现任务在 PSRAM 里只留一个帧缓冲，照样更新变化的区域，再把变化的行发给面板，等传输读完这些行才继续改帧缓冲。面板没有接 TE 信号时，可能显示更新到一半的画面。不旋转的 SPI 屏上，游戏画面不经过帧缓冲：呈现任务在片内 RAM 的两段缓冲里逐段转换画面的行，一段在发送时转换另一段。因为 ESP32-C5 的 PSRAM 是四线的，画面先写进 PSRAM 里的帧缓冲、写回缓存，再由 DMA 读出来，会多占很多 PSRAM 带宽。整幅画面的行先用 CASET 和 RASET 定好窗口，第一段用 RAMWR 发送，后面的段用 RAMWRC 接着写（ST7789V2 数据手册 9.1.33），每段只有一次传输。所以面板控制器要支持 MIPI DCS 的 write_memory_continue，板子也不能给面板设偏移（gap）。`GBX_DISPLAY_GAME_HALF_RATE` 让呈现任务每 25ms 最多取一帧游戏画面，原速时只显示一半的帧；`game_frame_due()` 告诉生产者哪些帧不会被取走，GB 的渲染器就不填这些帧。C5 打开了这一项，理由写在 `components/platform/Kconfig`。
 
-游戏画面通过 `display.h` 的游戏层交给呈现任务。生产者发布最新的一帧，呈现任务只取最新的，旧帧跳过。游戏层的三个帧缓冲在显示启动时按最大的 GBA 画面（240×160）分配，以后不再释放，因为生产者随时可能拿着其中一个；如果等到第一个游戏才分配，它们会落在这个游戏的块中间，游戏退出以后把 PSRAM 切开。呈现任务把 BGR555 转成面板格式，按整数倍放大写进游戏窗口；`NEAREST` 和 `SMOOTH` 的窗口、尺寸和黑边相同。这一步转换可以借用模拟所在核的空闲时间，由 `Game` 决定，理由写在 `components/app/src/game.h`。
+游戏画面通过 `display.h` 的游戏层交给呈现任务。生产者发布最新的一帧，呈现任务只取最新的，旧帧跳过。游戏层的三个帧缓冲在显示启动时按编入的系统里最大的画面分配，有 GBA 时是 240×160，只编入 GB 时是 160×144，以后不再释放，因为生产者随时可能拿着其中一个；如果等到第一个游戏才分配，它们会落在这个游戏的块中间，游戏退出以后把 PSRAM 切开。呈现任务把 BGR555 转成面板格式，按整数倍放大写进游戏窗口。不旋转的 SPI 屏分段发送时也接受 GB 模式的灰阶（`PixelFormat::shades`，每像素一字节），呈现任务按当前调色板的四种颜色转换，渲染器就不用先把灰阶转成 BGR555 写进 PSRAM；其他显示不接受，`game_shades_supported()` 返回 false。`NEAREST` 和 `SMOOTH` 的窗口、尺寸和黑边相同。这一步转换可以借用模拟所在核的空闲时间，由 `Game` 决定，理由写在 `components/app/src/game.h`。
 
 颜色校正也在这一步转换里查表，把 BGR555 直接换成面板的 RGB565，两个显示后端和 PC 版共用这张表。表由 `components/app/src/color_fix.cpp` 生成，参数由 `tools/lcd_colors.py` 从一台 GBC 屏幕的实测光谱算出。校正只在呈现时进行，所以测试比对的帧和即时存档的缩略图都是未经校正的颜色。
 
@@ -289,8 +292,8 @@ PC 版的游戏层由 `components/platform/src/host/display.cpp` 实现，见 [P
 `components/app/` 的 `Game`（`src/game.h`）一次运行一个游戏，固件和 PC 版用同一套代码。各任务所在的核和优先级写在 `src/game.h`。
 
 - 模拟任务独占当前游戏的 `gb::System` 或 `gba::System`，固件上固定在 core 1。退出游戏和载入另一个游戏之前，`Game` 释放上一个游戏的系统、ROM、ROM 缓存和 BIOS，所以两种系统不会同时存在。如果留下这些块，新游戏的分配会被它们切开，因为 ROM 缓存要一整块连续的 PSRAM。JIT 代码池用的片内 RAM 一直留着，见“代码规则”。模拟任务负责读卡、检查卡带头、加载 ROM 和选后端，按键、暂停和切换后端都在帧边界处理。启动 GBA 游戏之前，`Game` 核对卡上 BIOS 的 SHA-256，没有 BIOS 或者校验不符时不启动。
-- 画面：`Game` 实现两种系统的 `FrameSink`，PPU 的工作线程直接把帧写进显示的游戏层，模拟任务不转换也不复制画面。
-- 声音：混音器在工作线程上生成 PCM，core 0 上的音频任务把它交给平台的 `gbx/audio.h`。ESP 实现写 I2S，PC 实现用 SDL3 的音频流，欠载由平台实现计数。
+- 画面：`Game` 实现两种系统的 `FrameSink`，PPU 的工作线程直接把帧写进显示的游戏层，模拟任务不转换也不复制画面。单核上没有工作线程，由模拟任务写。
+- 声音：混音器在工作线程上生成 PCM，单核上在模拟任务上生成，core 0 上的音频任务把它交给平台的 `gbx/audio.h`。ESP 实现写 I2S，PC 实现用 SDL3 的音频流，欠载由平台实现计数。
 - 节奏：已提交但还没有播放的音频总量低于目标水位时，模拟任务运行一帧。水位持续偏低时，略微调高每秒生成的 PCM 帧数，所以小的速度不足不会马上变成断音。没有声音输出时按墙钟的帧周期运行。节奏只决定模拟什么时候运行，不改变模拟的时间线和结果。
 - 2 倍速：在帧边界切换。2X 关闭声音，按墙钟控制节奏，屏幕显示不了的帧不渲染。不画的帧不改变模拟结果。GB 是因为 mode 3 的时序由 CPU 所在的核自己计算；GBA 不画的帧不交出扫描线任务，这期间写过的 VRAM、调色板和 OAM 的页以及寄存器，随下一个要画的行一起交出。回到 1X 时，GBA 把 2X 期间 FIFO 的当前样本补交给混音器。
 - 指标：模拟任务和工作线程在帧边界记下计数，界面所在的任务每秒算一次游戏页的指标，口径见[调试设计](debug-design.md)。
@@ -372,7 +375,7 @@ PC 版只有解释器，用于开发和调试，不代替板上验收。图形�
 
 代码使用 gnu++23，具体约束如下：
 
-- 固件和 PC 版都用 `-fno-exceptions -fno-rtti` 编译。
+- 固件和 PC 版都用 `-fno-exceptions -fno-rtti` 编译。固件上 libstdc++ 的 nothrow `operator new` 分配失败时会在抛异常的地方 abort，不返回 nullptr，所以 `components/platform/src/esp/platform.cpp` 用 `malloc()` 和 `memalign()` 替换了它的 nothrow 版本。
 - 模拟循环里不分配堆内存，需要的内存在加载 ROM 时分配好。
 - 每条指令、每个周期都会走到的路径上不用虚函数。系统接口这种每帧才调用一次的地方可以用。
 - 不用 iostream，日志经过平台接口输出。
@@ -381,7 +384,7 @@ PC 版只有解释器，用于开发和调试，不代替板上验收。图形�
 
 热代码的位置由链接配置固定，固件和测试固件共用同一套规则。`components/core/linker.lf` 和 `components/jit/linker.lf` 把 GBA 的解释器、设备执行代码和 JIT 运行时 helper，以及两个系统共用的块查找和工作线程队列映射到片内 RAM，其中只在载入、复位或单步测试时运行的函数逐个列出，留在 flash。`tools/link_core_layout.py` 再按固定顺序排列这些对象：共用的代码在前，GBA 的执行代码在后。这样测试、应用和 JIT 编译器的改动不会移动热代码。GBA 比 GB 难跑到原速，所以两个系统争片内 RAM 或位置时 GBA 优先：GB 的整个执行核心都留在 flash，从 PSRAM 运行。
 
-固件编入哪些系统由 `components/core/Kconfig` 的 `GBX_SYSTEMS` 选择，代码按 `gbx/systems.h` 的 `GBX_HAS_GB` 和 `GBX_HAS_GBA` 区分。S31 的片内 RAM 放不下 GBA 的执行核心和运行时数据，所以 `sdkconfig.defaults.esp32s31` 只编入 GB（`GBX_SYSTEMS_GB_ONLY`），不编入 GBA 的核心和 JIT，GB 的解释器、设备执行代码、运行循环、JIT 的派发和运行时 helper 放进片内 RAM。只有应用或测试调用、每帧最多调用一次的入口也留在 flash，因为链接器会删掉一种构建没有引用的函数，热代码的位置就会随之改变。JIT 的编译、安装和块的撤销放在 `Sm83Jit::install()` 和 `retire_containing()` 里，和编译器一起留在 flash，编译器的改动就不会改变 `Sm83Jit::execute()` 的大小。热代码查的表放在全局指针的寻址范围下面。链接器会把范围里的表的寻址缩成一条指令，表在不在范围里取决于应用和测试的数据，所以留在范围里，代码的大小就会跟着它们变。只编入 GBA（`GBX_SYSTEMS_GBA_ONLY`）时，菜单只列 GBA 游戏，GB 的核心仍然编入，留在 flash。GB JIT 第二级和 GBA ROM cache 在 PSRAM 里的预算由 `GBX_GB_JIT_STORE_KB` 和 `GBX_GBA_ROM_CACHE_KB` 设定，各板在 `boards/<板子>/sdkconfig.defaults` 里按自己的 PSRAM 设值。P4 v3 以前的芯片把片内 RAM 分成两段，IDF 链接的代码和数据只能放在前一段，装不下 GBA 全部的执行代码。所以跑在 CPU 所在核上的执行代码放在后一段的数据区，和 JIT 代码池所在的堆共用这一段。另一个核上的渲染器和混音器放得进前一段，就留在前一段，这样后一段的堆能多出这部分空间给代码池。P4 上不在片内的代码都从 PSRAM 经两个核共用的 L2 缓存读取，热代码放在片内，另一个核上的任务对模拟速度的影响就小一些。函数改名或删除以后，要同步改 linker.lf 和脚本里的名单；执行代码改动以后，检查 map 里的地址，并上板测量布局对性能的影响。
+固件编入哪些系统由 `components/core/Kconfig` 的 `GBX_SYSTEMS` 选择，代码按 `gbx/systems.h` 的 `GBX_HAS_GB` 和 `GBX_HAS_GBA` 区分。S31 的片内 RAM 放不下 GBA 的执行核心和运行时数据，所以 `sdkconfig.defaults.esp32s31` 只编入 GB（`GBX_SYSTEMS_GB_ONLY`），不编入 GBA 的核心和 JIT，GB 的解释器、设备执行代码、运行循环、JIT 的派发和运行时 helper 放进片内 RAM。只有应用或测试调用、每帧最多调用一次的入口也留在 flash，因为链接器会删掉一种构建没有引用的函数，热代码的位置就会随之改变。JIT 的编译、安装和块的撤销放在 `Sm83Jit::install()` 和 `retire_containing()` 里，和编译器一起留在 flash，编译器的改动就不会改变 `Sm83Jit::execute()` 的大小。热代码查的表放在全局指针的寻址范围下面。链接器会把范围里的表的寻址缩成一条指令，表在不在范围里取决于应用和测试的数据，所以留在范围里，代码的大小就会跟着它们变。只编入 GB 时，即时存档的缩略图、菜单和显示里放游戏画面的缓冲都按 GB 的 160×144 分配。只编入 GBA（`GBX_SYSTEMS_GBA_ONLY`）时，菜单只列 GBA 游戏，GB 的核心仍然编入，留在 flash。GB JIT 第二级和 GBA ROM cache 在 PSRAM 里的预算由 `GBX_GB_JIT_STORE_KB` 和 `GBX_GBA_ROM_CACHE_KB` 设定，各板在 `boards/<板子>/sdkconfig.defaults` 里按自己的 PSRAM 设值。GB JIT 代码池在片内 RAM 里的大小由 `GBX_GB_JIT_POOL_KB` 设定，片内 RAM 不够的板子调小它，比如 C5。P4 v3 以前的芯片把片内 RAM 分成两段，IDF 链接的代码和数据只能放在前一段，装不下 GBA 全部的执行代码。所以跑在 CPU 所在核上的执行代码放在后一段的数据区，和 JIT 代码池所在的堆共用这一段。另一个核上的渲染器和混音器放得进前一段，就留在前一段，这样后一段的堆能多出这部分空间给代码池。P4 上不在片内的代码都从 PSRAM 经两个核共用的 L2 缓存读取，热代码放在片内，另一个核上的任务对模拟速度的影响就小一些。函数改名或删除以后，要同步改 linker.lf 和脚本里的名单；执行代码改动以后，检查 map 里的地址，并上板测量布局对性能的影响。
 
 片内 RAM 还留给每次访存都要用的 `gb::System` 和 `gba::System`、JIT 的代码池和块索引，模拟、渲染、音频和呈现任务的栈，中断处理函数和驱动要求的 DMA 缓冲。JIT 代码池要一整块连续的片内空间，所以访问不频繁的代码和数据放进 PSRAM：app 的全局对象由 `components/app/linker.lf` 放置，冷的静态缓冲用 `EXT_RAM_BSS_ATTR`，只处理文件、菜单或串口命令的任务和 LVGL 任务把栈放在 PSRAM，LVGL 的堆优先分配在 PSRAM。GBA 的 BIOS 也由 `Game` 分配在 PSRAM：JIT 只在编译 BIOS 的代码时整段读它，运行时只读 BIOS 里的数据和设 latch 用的字，但是解释器执行 BIOS 时每次取指令都要读。P4 v3 以前的芯片上，片内的堆分成高低两块。IDF 先从高的一块分配片内内存，JIT 的代码池也要从这块里出；低的一块是 IDF 的 retention 内存，只有指明要它的分配，或者高的一块已经放不下的分配，才会用到它。所以留在片内的任务栈申请 retention 内存，放在低的一块，见 `components/platform/src/esp/task_stack.h`。IDF 默认在开机时从最大的空闲块里切 32KB，留给 DMA 和必须在片内的分配，这块正好落在高的一块里，所以公共 `sdkconfig.defaults` 关掉了这项预留。`Game` 初始化时就占住 JIT 代码池要的一块片内 RAM，大小取 GB 和 GBA 两种 JIT 里大的一种，以后每个游戏的 JIT 都把 gateway 和代码池放在这块里面，退出游戏也不释放。游戏运行时高的一块只剩下零碎的空间，任务这时第一次创建、以后一直保留的小对象会落进这些空隙，比如 IDF 第一次初始化函数内的静态变量时建的两个信号量；如果退出游戏时释放了这块，这些对象就会把下一个游戏要的连续空间切开。公共 `sdkconfig.defaults` 还把 IDF 的一部分中断函数和锁放回 flash，前提和依据写在那个文件里。
 

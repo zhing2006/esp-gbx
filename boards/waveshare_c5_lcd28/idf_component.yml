@@ -1,0 +1,4 @@
+## The ST7789 panel driver is part of esp_lcd and the CST3530 reader is
+## cst3530_touch.cpp, see docs/boards/waveshare_c5_lcd28.md.
+dependencies:
+  espressif/esp_lcd_touch: "==1.2.1"

@@ -56,12 +56,13 @@ public:
     };
     // The frame a state was taken on: in GB mode shades, four a byte, the
     // leftmost pixel in bits 1:0; in the CGB's modes BGR555 colors, as the
-    // game set them, 160x144; on the GBA its BGR555 colors, 240x160.
+    // game set them, 160x144; on the GBA its BGR555 colors, 240x160. A
+    // build without the GBA lists a GBA's states without one.
     struct Thumbnail {
         gb::Mode mode = gb::Mode::dmg;
         bool gba = false;
         std::array<uint8_t, gb::kPackedFrameBytes> shades{};
-        std::array<uint16_t, gba::kFramePixels> colors{};
+        std::array<uint16_t, GBX_HAS_GBA ? gba::kFramePixels : gb::kFramePixels> colors{};
     };
     enum class Work : uint8_t { none, listing, writing, reading };
 

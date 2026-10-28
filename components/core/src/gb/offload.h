@@ -22,10 +22,18 @@ namespace gbx::gb {
 // it waits for is free again. The seq_cst stores and loads of a counter and
 // the other side's flag make a missed wakeup impossible; a spurious one
 // only repeats the check.
+//
+// With GBX_SINGLE_CORE there is no worker: the CPU owner consumes each item
+// as it submits it. On one core a worker only adds task switches, and its
+// queues take PSRAM.
 class Offload {
 public:
     enum Queue : unsigned { rows, sound, kQueues };
-    // Consumes item `index`, counting from zero, on the worker thread.
+    // submit() consumes the item, so a queue needs room only for the one
+    // being filled.
+    static constexpr bool kInline = GBX_SINGLE_CORE;
+    // Consumes item `index`, counting from zero, on the worker thread, or
+    // in submit() when inline.
     using Consume = void (*)(void* context, uint32_t index);
     Offload() = default;
     Offload(const Offload&) = delete;
@@ -46,12 +54,16 @@ public:
     // next item to fill once its slot is free; submit() hands it over.
     uint32_t acquire(Queue queue) {
         auto& q = queues_[queue];
-        if (q.submitted - q.completed.load(std::memory_order_acquire) == q.capacity)
+        if (!kInline && q.submitted - q.completed.load(std::memory_order_acquire) == q.capacity)
             wait(queue, q.submitted - q.capacity / 2);
         return q.submitted;
     }
     void submit(Queue queue, bool now = false) {
         auto& q = queues_[queue];
+        if constexpr (kInline) {
+            q.consume(q.context, q.submitted++);
+            return;
+        }
         ++q.submitted;
         q.published.store(q.submitted, std::memory_order_seq_cst);
         if ((now || q.submitted - q.completed.load(std::memory_order_relaxed) >= q.capacity / 2) &&

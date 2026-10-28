@@ -306,7 +306,9 @@ bool open_codec(const Codec& codec, i2s_chan_handle_t tx, uint32_t rate) {
         config.gpio_if = gpio;
         config.codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC;
         config.pa_pin = GPIO_NUM_NC;
-        config.use_mclk = true;
+        config.use_mclk = codec.mclk;
+        // Without MCLK the clock coefficients are looked up for BCLK.
+        if (!codec.mclk) config.mclk_div = 32;
         config.hw_gain = gain;
         chip = es8311_codec_new(&config);
     } else if (codec.chip == CodecChip::es8388) {

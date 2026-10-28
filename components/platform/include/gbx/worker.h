@@ -32,8 +32,9 @@ public:
     ~Worker();
     Worker(const Worker&) = delete;
     Worker& operator=(const Worker&) = delete;
-    // Firmware pins to core. Hosts use an ordinary worker thread. The task
-    // name, stack size, priority and stack memory apply to the firmware.
+    // Firmware pins to core; on a chip with one core every core number is
+    // that one. Hosts use an ordinary worker thread. The task name, stack
+    // size, priority and stack memory apply to the firmware.
     bool start(void (*entry)(void*), void* context, unsigned core, const char* name = "gbx-render",
                unsigned stack_bytes = 4096, unsigned priority = 5, StackMemory stack = StackMemory::internal);
     void join();

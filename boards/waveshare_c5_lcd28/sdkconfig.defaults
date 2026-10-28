@@ -1,0 +1,37 @@
+CONFIG_IDF_TARGET="esp32c5"
+
+# ESP32-C5HR8 v1.2 in the ESP32-C5-WROOM-1-N32R8 module, 240 MHz as the
+# vendor's examples. The minimum revision stays at v1.0, IDF's default.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# The module has 32 MB of flash (JEDEC ID 20 40 19). The shared partition
+# table uses the first 16 MB, so the flash is read with 3-byte addresses.
+# Flash and PSRAM share the MSPI core clock, which
+# the PSRAM's 120 MHz sets; the flash can then only run at 20 MHz or at
+# 120 MHz, which needs its high-performance mode (IDF's ESP32-C5
+# mspi_timing_tuning_configs.h). Code and read-only data are copied to
+# PSRAM at startup, so at run time the flash mostly serves the UI assets.
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_20M=y
+
+# 8 MB quad PSRAM in the chip's package, at 120 MHz instead of the vendor
+# examples' 80 MHz: code, data and frames all go through it.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_120M=y
+
+# The USB-C port is the chip's USB-Serial/JTAG; there is no USB-to-UART
+# bridge, UART0 only reaches the header.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# PSRAM budget for 8 MB, see components/core/Kconfig: the smallest second
+# level of the GB JIT, so that a 1 MB game with the JIT still has PSRAM for
+# its instant saves.
+CONFIG_GBX_GB_JIT_STORE_KB=1024
+# Internal RAM budget, see components/core/Kconfig: 384 KB of SRAM leave
+# about 220 KB of heap at startup, which also holds the tasks' stacks, the
+# drivers' buffers and the JIT's block tables, which grow with the pool. A
+# 64 KiB pool keeps the tables in internal RAM with the game loaded.
+CONFIG_GBX_GB_JIT_POOL_KB=64

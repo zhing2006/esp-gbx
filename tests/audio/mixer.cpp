@@ -23,13 +23,15 @@ bool check(std::array<uint32_t, kCheckCount>& values) {
     gb::Offload offload;
     std::unique_ptr<gb::Mixer> mixer(new (std::nothrow) gb::Mixer(offload));
     if (!mixer || !gate.entered.initialize(1) || !gate.release.initialize(1)) return false;
-    offload.attach(gb::Offload::rows, 2, Gate::consume, &gate);
     if (!offload.start()) return false;
-    // Hold the real worker on its other queue. No sound batch can have run
-    // when the producer reads the first three values below.
-    offload.acquire(gb::Offload::rows);
-    offload.submit(gb::Offload::rows, true);
-    gate.entered.wait();
+    if constexpr (!gb::Offload::kInline) {
+        // Hold the real worker on its other queue. No sound batch can have
+        // run when the producer reads the first three values below.
+        offload.attach(gb::Offload::rows, 2, Gate::consume, &gate);
+        offload.acquire(gb::Offload::rows);
+        offload.submit(gb::Offload::rows, true);
+        gate.entered.wait();
+    }
 
     constexpr Tick interval = kTicksPerSecond / 64;
     const auto setting = [](gb::sound::Event event, uint32_t value) {
@@ -56,7 +58,7 @@ bool check(std::array<uint32_t, kCheckCount>& values) {
     // 750 + floor(2 * 44100 * 1.005 / 64) = 2135. Rounding each batch
     // separately would lose a frame, so this checks fractional carry too.
     values[2] = mixer->buffered();
-    gate.release.signal();
+    if constexpr (!gb::Offload::kInline) gate.release.signal();
     mixer->finish();
     values[3] = mixer->buffered();
     values[4] = mixer->queued();
@@ -91,18 +93,18 @@ bool run(uint32_t request_id) {
         return transport::send(protocol::Kind::error,
                                {reinterpret_cast<const uint8_t*>(message.data()), message.size()});
     }
-    for (uint16_t i = 0; i < values.size(); ++i) {
+    for (uint16_t i = 0; i < kResultCount; ++i) {
         uint8_t data[12];
         protocol::store16(data, kVersion);
         protocol::store16(data + 2, i);
         protocol::store32(data + 4, request_id);
-        protocol::store32(data + 8, values[i]);
+        protocol::store32(data + 8, i ? values[i - 1] : !gb::Offload::kInline);
         if (!transport::send_data(data)) return false;
     }
     if (!transport::finish()) return false;
     uint8_t done[8];
     protocol::store16(done, kVersion);
-    protocol::store16(done + 2, kCheckCount);
+    protocol::store16(done + 2, kResultCount);
     protocol::store32(done + 4, request_id);
     return transport::send(protocol::Kind::done, done);
 }

@@ -43,7 +43,9 @@ bool Worker::start(void (*entry)(void*), void* context, unsigned core, const cha
     // A stack in PSRAM needs the cache on. With CONFIG_SPIRAM_XIP_FROM_PSRAM
     // flash reads leave it on; only erasing or writing flash while a region
     // is mapped turns it off, and the firmware does neither while it runs.
-    // The TCB stays internal. Without PSRAM the stack goes internal.
+    // The TCB stays internal. Without PSRAM the stack goes internal. A
+    // single core takes every worker.
+    core %= portNUM_PROCESSORS;
     task->with_caps = stack == StackMemory::external &&
         xTaskCreatePinnedToCoreWithCaps(trampoline, name, stack_bytes, task, priority, &task->handle, core,
                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;

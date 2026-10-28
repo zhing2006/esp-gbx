@@ -9,6 +9,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_private/esp_clk.h"
+#include "esp_task_wdt.h"
 #include "gbx/esp/board.h"
 #include "gbx/esp/storage.h"
 #include "gbx/platform.h"
@@ -89,6 +90,14 @@ bool hello(const protocol::Frame& request, bool board_ready, bool mounted, bool 
 }  // namespace
 
 extern "C" void app_main(void) {
+#if CONFIG_FREERTOS_UNICORE
+    // One core runs the cases, the transport and the idle task. A check that
+    // runs for seconds leaves the idle task no time, and the task watchdog's
+    // report would arrive as text inside the binary session.
+    const esp_task_wdt_config_t watchdog{
+        .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000, .idle_core_mask = 0, .trigger_panic = false};
+    esp_task_wdt_reconfigure(&watchdog);
+#endif
     const bool board_ready = gbx::board::init();
     // Buffer HELLO retries while mounting and hashing the SD data. The UART's
     // hardware FIFO alone cannot retain requests throughout initialization.

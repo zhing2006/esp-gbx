@@ -54,6 +54,11 @@ struct GameLayer {
     Scaling scaling = Scaling::nearest;
     const uint16_t* colors = nullptr;  // see set_color_table()
     bool rgb565 = false;               // see PixelFormat
+    // PixelFormat::shades, drawn by game_band() only: two pixels' RGB565
+    // colors a word, the first in the low half, at the first's shade | the
+    // second's << 2, see set_shade_pairs().
+    bool shades = false;
+    uint32_t shade_pairs[16] = {};
 };
 
 struct Config {

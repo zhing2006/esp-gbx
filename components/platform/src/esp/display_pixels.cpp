@@ -1,5 +1,7 @@
 #include "display_pixels.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 
 namespace gbx::platform::display::detail {
@@ -121,6 +123,91 @@ void draw_nearest(uint16_t* fb, const Config& config, const GameLayer& layer, co
         }
         for (int k = 0; k < s; ++k) {
             put_row(fb, config, layer.image.x0, layer.image.y0 + y * s + k, line, layer.width * s);
+        }
+    }
+}
+
+void set_shade_pairs(GameLayer& layer, std::span<const uint16_t, 4> colors) {
+    for (unsigned i = 0; i < 16; ++i) {
+        layer.shade_pairs[i] = game_rgb565(colors[i & 3], layer) | uint32_t{game_rgb565(colors[i >> 2], layer)} << 16;
+    }
+}
+
+namespace {
+
+// One row of the image from a row of shades, see game_band().
+void shade_row(uint16_t* pixel, const GameLayer& layer, const uint8_t* source) {
+    const int s = layer.scale;
+    if (s == 1 && !(layer.width & 3) &&
+        !((reinterpret_cast<uintptr_t>(source) | reinterpret_cast<uintptr_t>(pixel)) & 3)) {
+        // Four shades a word from PSRAM, two pixels a word out.
+        const auto* quads = reinterpret_cast<const uint32_t*>(source);
+        auto* pairs = reinterpret_cast<uint32_t*>(pixel);
+        for (int i = 0; i < layer.width / 4; ++i) {
+            const uint32_t q = quads[i];
+            pairs[2 * i] = layer.shade_pairs[(q & 3) | (q >> 6 & 12)];
+            pairs[2 * i + 1] = layer.shade_pairs[(q >> 16 & 3) | (q >> 22 & 12)];
+        }
+        return;
+    }
+    for (int x = 0; x < layer.width; ++x) {
+        const auto color = static_cast<uint16_t>(layer.shade_pairs[source[x] & 3]);
+        for (int k = 0; k < s; ++k) *pixel++ = color;
+    }
+}
+
+}  // namespace
+
+void game_band(uint16_t* out, int x0, int x1, const uint16_t* fb, const Config& config, const GameLayer& layer,
+               const uint16_t* frame, int first, int count) {
+    const int pw = config.panel.width;
+    const int width = x1 - x0;
+    const Rect& w = layer.window;
+    const Rect& image = layer.image;
+    const int s = layer.scale;
+    for (int y = first; y < first + count; ++y) {
+        uint16_t* row = out + (y - first) * width;
+        // Panel column x is row[x - x0].
+        uint16_t* const at = row - x0;
+        if (x0 < w.x0) std::memcpy(at + x0, fb + y * pw + x0, (w.x0 - x0) * sizeof(uint16_t));
+        if (x0 < image.x0) std::fill(at + std::max(x0, w.x0), at + image.x0, uint16_t{0});
+        if (x1 > image.x1) std::fill(at + image.x1, at + std::min(x1, w.x1), uint16_t{0});
+        if (x1 > w.x1) std::memcpy(at + w.x1, fb + y * pw + w.x1, (x1 - w.x1) * sizeof(uint16_t));
+        const uint16_t* source = frame + (y - image.y0) / s * layer.width;
+        uint16_t* pixel = at + image.x0;
+        if (y > first && (y - image.y0) % s) {
+            // The same source row as the one above.
+            std::memcpy(pixel, pixel - width, (image.x1 - image.x0) * sizeof(uint16_t));
+        } else if (layer.shades) {
+            shade_row(pixel, layer, reinterpret_cast<const uint8_t*>(frame) + (y - image.y0) / s * layer.width);
+        } else if (s == 1 && !(layer.width & 1) &&
+                   !((reinterpret_cast<uintptr_t>(source) | reinterpret_cast<uintptr_t>(pixel)) & 3)) {
+            // Two pixels a word, converted when the pair changes: runs of one
+            // color are common, and the source is in PSRAM.
+            const auto* pairs = reinterpret_cast<const uint32_t*>(source);
+            auto* out_pairs = reinterpret_cast<uint32_t*>(pixel);
+            uint32_t last = ~pairs[0];
+            uint32_t converted = 0;
+            for (int i = 0; i < layer.width / 2; ++i) {
+                const uint32_t pair = pairs[i];
+                if (pair != last) {
+                    last = pair;
+                    converted = game_rgb565(static_cast<uint16_t>(pair), layer) |
+                                uint32_t{game_rgb565(static_cast<uint16_t>(pair >> 16), layer)} << 16;
+                }
+                out_pairs[i] = converted;
+            }
+        } else {
+            // Runs of one color are common, so convert only on a change.
+            uint16_t last = static_cast<uint16_t>(source[0] ^ 1);
+            uint16_t color = 0;
+            for (int x = 0; x < layer.width; ++x) {
+                if (source[x] != last) {
+                    last = source[x];
+                    color = game_rgb565(last, layer);
+                }
+                for (int k = 0; k < s; ++k) *pixel++ = color;
+            }
         }
     }
 }

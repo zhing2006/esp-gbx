@@ -49,6 +49,8 @@ def sample(P, box):
 
 
 def feather_rect(size, f):
+    # A part scaled down below twice the feather keeps a solid middle line.
+    f = min(f, (min(size) - 1) // 2)
     m = Image.new("L", size, 0)
     ImageDraw.Draw(m).rectangle((f, f, size[0] - 1 - f, size[1] - 1 - f), fill=255)
     return m.filter(ImageFilter.GaussianBlur(f / 2)) if f else m
@@ -107,12 +109,12 @@ def build(board):
     lc = pu["logo"]
     paste_part(im, P.crop(PARTS["logo"]), (lc["center"][0] * S, lc["center"][1] * S), lc["scale"], feather=10)
 
-    # VFD windows, with each label at its cell's top-left.
-    for win in pu["windows"]:
+    # VFD windows, with each label at its cell's top-left, on boards with a VFD.
+    for win in pu.get("windows", []):
         fill(im, win["rect"], (8, 8, 8, 8), vfd)
         for line in win.get("dividers", []):
             d.line([v * S for v in line], fill=(34, 70, 62), width=S)
-    for cid, (cx, cy, cw, ch) in spec["vfd"]["cells"].items():
+    for cid, (cx, cy, cw, ch) in spec.get("vfd", {}).get("cells", {}).items():
         part = P.crop(VFD_LABELS[cid])
         paste_part(im, part, ((cx + 6) * S + part.width * s / 2, (cy + 6) * S + part.height * s / 2), s, feather=4)
 

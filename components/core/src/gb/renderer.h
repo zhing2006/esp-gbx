@@ -162,8 +162,9 @@ template<class Reg> void make_timeline(Timeline& t, const uint8_t* oam, const st
 }
 }  // namespace
 
-// Rows travel to the worker on the other core through the Offload queue;
-// see offload.h for the handoff and who waits when the ring is full.
+// Rows travel to the worker on the other core through the Offload queue,
+// or on one core are drawn as they are submitted; see offload.h for the
+// handoff and who waits when the ring is full.
 class Renderer {
 public:
     explicit Renderer(Offload& offload) : offload_(offload) {
@@ -201,7 +202,8 @@ public:
     void set_palette(uint64_t packed) { palette_colors_.store(packed, std::memory_order_relaxed); }
 private:
     friend struct SnapshotAccess;
-    static constexpr unsigned kCapacity = 16;
+    // Inline, each row is consumed as it is submitted, see Offload.
+    static constexpr unsigned kCapacity = Offload::kInline ? 2 : 16;
     Offload& offload_;
     // Renderer side.
     unsigned front_ = 0;
@@ -264,6 +266,11 @@ private:
         if (!out) return;
         if (mode_ != Mode::dmg) {
             std::memcpy(out, color_frames_[front_].data(), sizeof(color_frames_[front_]));
+            sink_->frame_ready(id_);
+            return;
+        }
+        if (sink_->shades()) {
+            std::memcpy(out, shades_[front_].data(), sizeof(shades_[front_]));
             sink_->frame_ready(id_);
             return;
         }

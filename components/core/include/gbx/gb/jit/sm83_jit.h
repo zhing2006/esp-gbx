@@ -45,11 +45,11 @@ extern Sm83JitCounters sm83_jit_counters;
 #endif
 
 // The code pool and the second level behind it, see Sm83Jit::initialize().
-// The second level's size comes from the board's PSRAM, see
-// components/core/Kconfig: 8 MiB and 32768 records unless the board sets
-// less.
+// Their sizes come from the board's internal RAM and PSRAM, see
+// components/core/Kconfig: a 192 KiB pool with a block for every 96 bytes,
+// and 8 MiB and 32768 records, unless the board sets less.
 struct Sm83JitCapacity {
-    size_t pool_bytes = 192 * 1024, pool_blocks = 2048;
+    size_t pool_bytes = GBX_GB_JIT_POOL_BYTES, pool_blocks = GBX_GB_JIT_POOL_BYTES / 96;
     size_t store_bytes = GBX_GB_JIT_STORE_BYTES, store_records = GBX_GB_JIT_STORE_BYTES / 256;
 };
 

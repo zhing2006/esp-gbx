@@ -86,6 +86,9 @@ struct Codec {
     uint8_t address;  // 7-bit I2C address
     gpio_num_t amplifier = GPIO_NUM_NC;  // enable pin, high on; an output the board drives low from init()
     float amplifier_volts;  // the amplifier's supply, which limits the codec's level
+    // False when the board has no MCLK line: the ES8311 then takes its clock
+    // from BCLK, 32 times the rate with 16-bit slots.
+    bool mclk = true;
 };
 
 // Sets the codec up through esp_codec_dev and opens it for 16-bit stereo

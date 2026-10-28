@@ -49,6 +49,8 @@ constexpr const char* kTag = "profile";
 //   cacheprobe        reads memory at known strides on core 1 and logs the
 //                     cycles a read and those counters, which tells what
 //                     they count
+//                     (cache and cacheprobe only on chips with the P4's L1
+//                     and L2 counters; the C5 has an L1 alone)
 //   pstat <ms>        time the present task spends per second, by part
 //   pstat reset|read  delimit a window without blocking console input;
 //                     read without a reset first includes startup drawing
@@ -148,6 +150,7 @@ void stall_task(void* argument) {
     vTaskDelete(nullptr);
 }
 
+#ifdef CACHE_L2_CACHE_ACS_CNT_CTRL_REG
 void log_cache(uint32_t ms) {
     // Per bus: core 0 and 1's instruction (IBUS0, IBUS1) and data (DBUS0,
     // DBUS1) buses, as enable bits; their clear bits are 16 higher.
@@ -249,6 +252,7 @@ void cache_probe() {
     heap_caps_free(psram);
     ESP_LOGW(kTag, "cacheprobe done");
 }
+#endif
 
 // The method of tests/device/profiler.cpp: the timer's interrupt runs on the
 // core that set it up and reads the interrupted program counter.
@@ -530,10 +534,12 @@ bool profile_command(char* line) {
         heap_caps_print_heap_info(MALLOC_CAP_INTERNAL);
     } else if (std::strcmp(line, "heap dump") == 0) {
         heap_caps_dump(MALLOC_CAP_INTERNAL | MALLOC_CAP_EXEC);
+#ifdef CACHE_L2_CACHE_ACS_CNT_CTRL_REG
     } else if (std::strcmp(line, "cacheprobe") == 0) {
         cache_probe();
     } else if (std::strncmp(line, "cache ", 6) == 0) {
         log_cache(static_cast<uint32_t>(std::strtoul(line + 6, nullptr, 10)));
+#endif
     } else if (std::strcmp(line, "pstat reset") == 0) {
         reset_present();
         ESP_LOGW(kTag, "pstat reset");

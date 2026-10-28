@@ -39,25 +39,37 @@ void set_scaling(Scaling mode);
 // window, using the selected sampling mode, and centered; the rest of the
 // window is black. The UI is not drawn in the window while the layer shows.
 
-// The pixels of game frames: BGR555, or RGB565 as the panel takes them,
-// which the display shows without converting them and without the color
-// table.
-enum class PixelFormat : uint8_t { bgr555, rgb565 };
+// The pixels of game frames: BGR555; RGB565 as the panel takes them, which
+// the display shows without converting them and without the color table;
+// or a GB's shades, a byte a pixel from 0, the lightest, to 3, shown in the
+// colors of set_game_shades(), where game_shades_supported() says so.
+enum class PixelFormat : uint8_t { bgr555, rgb565, shades };
 
 // Shows the layer in `window`, logical UI pixels {x, y, width, height}, for
-// frames of width x height pixels, at most the GBA's 240 x 160. The window
-// stays black until the first frame is published. Call from the task that
-// drives the app.
+// frames of width x height pixels, at most the GBA's 240 x 160, or the GB's
+// 160 x 144 in a build without the GBA. The window stays black until the
+// first frame is published. Call from the task that drives the app.
 bool show_game(std::span<const int16_t, 4> window, int width, int height,
                PixelFormat format = PixelFormat::bgr555);
 void hide_game();
+// Whether show_game() takes PixelFormat::shades: on an SPI panel whose
+// present task converts the frame as it sends it, where a GB's frame then
+// needs no conversion to colors before it is published.
+bool game_shades_supported();
+// The BGR555 colors of shades 0 to 3, which go through the color table as
+// a BGR555 frame's pixels do. Frames shown from now on use them. Any task.
+void set_game_shades(std::span<const uint16_t, 4> colors);
 
 // Producer side, one task at a time while the layer shows: fill the buffer,
-// then publish it. The buffer is the producer's until publish_game_frame();
-// the layer shows the newest frame published and skips older ones. A frame
-// may repeat an id, as a blank screen does.
+// a byte a pixel for shades, then publish it. The buffer is the producer's
+// until publish_game_frame(); the layer shows the newest frame published and
+// skips older ones. A frame may repeat an id, as a blank screen does.
 uint16_t* game_frame_buffer();
 void publish_game_frame(uint64_t id);
+// Whether the layer would take a frame published now. A display that
+// shows only some frames says no to the others, so the producer need not
+// fill the buffer for them. Producer side.
+bool game_frame_due();
 
 // Frames with a new id that became the screen's scanout source since
 // show_game(), or -1 where the display cannot tell when a buffer is shown.

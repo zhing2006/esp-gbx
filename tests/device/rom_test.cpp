@@ -24,6 +24,9 @@
 namespace gbx::test::rom_test {
 namespace {
 namespace p = protocol;
+// The emulation's core, away from the transport's, where the chip has two;
+// a single core runs both.
+constexpr uint8_t kRunCore = portNUM_PROCESSORS > 1 ? 1 : 0;
 using gb::System;
 bool error(const char* message);
 bool fail(const char* message) { error(message); return false; }
@@ -583,11 +586,11 @@ bool run_states(std::span<const uint8_t> rom, Tick limit, const Script& script, 
         for (const uint8_t target : {save, static_cast<uint8_t>(save ^ 1)}) {
             if (!(loads & (1u << target))) continue;
             auto& out = job->loads[job->load_count++];
-            out.backend = target; out.result.backend = target; out.result.core = 1;
+            out.backend = target; out.result.backend = target; out.result.core = kRunCore;
             out.result.capture_frame = criterion != 1; out.result.frame_rows = script.frame_rows;
         }
         xEventGroupClearBits(events, kStateDone | kRequest | kReply);
-        if (xTaskCreatePinnedToCore(state_worker, "rom-state", 8192, job.get(), 5, nullptr, 1) != pdPASS)
+        if (xTaskCreatePinnedToCore(state_worker, "rom-state", 8192, job.get(), 5, nullptr, kRunCore) != pdPASS)
             return fail("Cannot start a save point");
         bool ok = true;
         uint32_t last_progress = 0;
@@ -648,7 +651,7 @@ void diagnostic_worker(void* context) {
         d.systems[i] = systems[i].get();
         d.initialized &= systems[i] && systems[i]->load_rom(d.rom, true, d.script->mode) &&
             systems[i]->select_backend(i ? gb::Backend::jit : gb::Backend::interpreter, &reserved);
-        d.results[i].backend = i; d.results[i].core = 1;
+        d.results[i].backend = i; d.results[i].core = kRunCore;
     }
     if (d.initialized) {
         for (unsigned i = 0; i < 2; ++i) {
@@ -711,7 +714,7 @@ bool diagnose(std::span<const uint8_t> rom, Tick limit, const Script& script, ui
         if (d->resume) vSemaphoreDelete(d->resume);
         return fail("Cannot allocate diagnostic synchronization");
     }
-    if (xTaskCreatePinnedToCore(diagnostic_worker, "rom-lockstep", 8192, d.get(), 5, nullptr, 1) != pdPASS) {
+    if (xTaskCreatePinnedToCore(diagnostic_worker, "rom-lockstep", 8192, d.get(), 5, nullptr, kRunCore) != pdPASS) {
         vSemaphoreDelete(d->ready); vSemaphoreDelete(d->resume);
         return fail("Cannot start diagnostic worker");
     }
@@ -859,7 +862,7 @@ bool run(std::span<const uint8_t> request) {
                 job.criterion = criterion; job.result.capture_frame = criterion != 1;
                 job.result.frame_rows = script->frame_rows;
                 job.events = events; job.done = 2u << i; job.result.backend = backend;
-                job.result.core = mode == 0 ? i : 1;
+                job.result.core = mode == 0 ? i % portNUM_PROCESSORS : kRunCore;
                 if (xTaskCreatePinnedToCore(worker, backend ? "rom-jit" : "rom-int", 8192, &job, 5, nullptr, job.result.core) != pdPASS) break;
                 ++created; mask |= job.done;
             }

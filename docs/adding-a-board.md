@@ -81,13 +81,15 @@ boards/example_board/
 
 ### board.cpp
 
-板级接口声明在 `components/board/include/gbx/esp/board.h`，正式固件使用名称、初始化、显示和触摸接口，测试固件使用 `name()`、`init()` 和 `sdmmc()`。各函数的职责写在头文件的注释里。可以参照 `boards/sila_p4/board.cpp`：它的屏幕和触摸都直接接在 GPIO 上，不经过 IO 扩展器，是现有板子里最简单的。MIPI DSI 的公共步骤用 `components/board/include/gbx/esp/board_support.h` 里的函数，它们只在有 MIPI DSI 的芯片上编译。RGB 并口屏由板子自己创建 RGB 面板，`display_init()` 返回 `PanelDriver::rgb`，可以参照 `boards/wks_s31_cb/board.cpp`。
+板级接口声明在 `components/board/include/gbx/esp/board.h`，正式固件使用名称、初始化、显示和触摸接口，测试固件使用 `name()`、`init()` 和 `sdmmc()`。各函数的职责写在头文件的注释里。可以参照 `boards/sila_p4/board.cpp`：它的屏幕和触摸都直接接在 GPIO 上，不经过 IO 扩展器，是现有板子里最简单的。MIPI DSI 的公共步骤用 `components/board/include/gbx/esp/board_support.h` 里的函数，它们只在有 MIPI DSI 的芯片上编译。RGB 并口屏由板子自己创建 RGB 面板，`display_init()` 返回 `PanelDriver::rgb`，可以参照 `boards/wks_s31_cb/board.cpp`。SPI 屏由板子创建 esp_lcd 的 SPI IO 和面板，`display_init()` 返回 `PanelDriver::spi` 和这个 IO，平台从 IO 的传输完成事件知道什么时候可以再改帧缓冲。平台按低字节在前的 RGB565 发送像素，面板要设成同样的字节序，可以参照 `boards/waveshare_c5_lcd28/board.cpp`。面板不旋转时，平台在片内 RAM 里另外分配两段缓冲，游戏画面从这里发送，不经过帧缓冲；分配不到时退回帧缓冲。分段发送直接发 CASET、RASET、RAMWR 和 RAMWRC，所以面板控制器要支持 MIPI DCS 的 write_memory_continue（3Ch），板子也不能用 `esp_lcd_panel_set_gap()` 给面板设偏移。
 
 如果 UI 的方向和面板的扫描方向不同，在 `display_init()` 返回的旋转方向里写明，由 `components/platform/src/esp/` 旋转画面并换算触摸坐标。触摸坐标范围和面板分辨率不同时，`touch_init()` 返回控制器的坐标范围，平台按比例换算。这两项都要上板确认。
 
 `name()` 返回日志里显示的板子名。正式固件和测试固件都会在启动时调用一次 `init()`，它只打开电源和共用的总线，初始化失败时返回 `false`，调用方不能继续访问依赖它们的外设。还没有驱动的外设在文档里说明现状，代码里用 TODO 标出，不要让占位代码看起来像已经完成了初始化。
 
 `sdmmc()` 提供 SDMMC slot、CLK、CMD 和四根数据线。如果 IO 电压域由片内 LDO 供电，由 `board::init()` 打开，不依赖 SD 挂载；平台以固定 3.3V 挂载，不启用 UHS。需要确认 LDO 给卡本身还是只给 IO 供电，以及同一电压域还有哪些引脚。还要核对 CMD 和 DAT 线上的外部上拉，不能以内部上拉或一次读卡成功代替硬件确认。
+
+芯片没有 SDMMC 控制器、TF 卡和屏共用 SPI 总线时，`sdmmc()` 返回 `Sdmmc::Bus::spi`、SPI host 和卡的片选，由 `init()` 初始化总线。卡上电以后处于 SD 模式，会把总线上发给屏的数据当成命令，所以 `init()` 要先发 CMD0 让卡进入 SPI 模式，再让屏使用总线，做法见 `boards/waveshare_c5_lcd28/board.cpp`。
 
 板子的引脚、外设型号、供电和复位要求放在板级实现中；芯片共用的能力放在 `components/platform/src/esp/`，可复用的外设驱动放在 `drivers/`。`drivers/` 目前还没有建立，新增组件时还需要让根 CMake 能发现它，并声明实际依赖。不要在 `components/` 下的 `app/`、`ui/`、`core/` 或 `jit/` 里加入板子型号判断或 ESP-IDF 头文件。
 
@@ -99,7 +101,7 @@ boards/example_board/
 
 这个文件只放板子相关配置，例如 target、芯片修订、CPU 主频、flash、PSRAM 和控制台通道。可以从最接近的板子开始，但必须逐项核对硬件。
 
-P4 v1.x 与 v3.x 必须使用对应的芯片修订配置，主频和存储频率以硬件能力为准。控制台需匹配实际连接的 UART 或 USB-Serial/JTAG。不要把一块板子的配置当作 P4 或 S31 的通用模板。
+P4 v1.x 与 v3.x 必须使用对应的芯片修订配置，主频和存储频率以硬件能力为准。控制台需匹配实际连接的 UART 或 USB-Serial/JTAG。不要把一块板子的配置当作 P4 或 S31 的通用模板。片内 RAM 少的芯片，比如 C5，要在这里用 `GBX_GB_JIT_POOL_KB` 调小 GB JIT 的代码池，否则测试固件的 JIT 后端检查会因为片内放不下代码池而失败。
 
 默认配置按以下顺序合并，后面的覆盖前面的：
 

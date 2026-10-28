@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-在 ESP32-P4 / ESP32-S31 上运行的 GB / GBC / GBA 模拟器，从零自研解释器与 RISC-V JIT。
+在 ESP32-P4 / ESP32-S31 / ESP32-C5 上运行的 GB / GBC / GBA 模拟器，从零自研解释器与 RISC-V JIT。ESP32-S31 和 ESP32-C5 只运行 GB 和 GBC 游戏。
 
 ## 许可证
 

@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "board": "waveshare_c5_lcd28",
+  "size": [
+    240,
+    320
+  ],
+  "background": "background.png",
+  "sprites": "../common/sprites.json",
+  "font": "../common/vfd_font.json",
+  "sprite_scale": 0.15,
+  "display": [
+    0,
+    32,
+    240,
+    160
+  ],
+  "controls": {
+    "dpad": {
+      "sprite": "dpad",
+      "center": [
+        63.4,
+        250
+      ]
+    },
+    "a": {
+      "sprite": "button_round",
+      "center": [
+        187.28,
+        238.26
+      ]
+    },
+    "b": {
+      "sprite": "button_round",
+      "center": [
+        150.53,
+        269.11
+      ]
+    },
+    "select": {
+      "sprite": "button_pill",
+      "center": [
+        100.3,
+        302.77
+      ]
+    },
+    "start": {
+      "sprite": "button_pill",
+      "center": [
+        136.13,
+        302.89
+      ]
+    },
+    "menu": {
+      "sprite": "menu",
+      "center": [
+        215,
+        11
+      ]
+    }
+  },
+  "speed_switch": {
+    "slot": [
+      9.0,
+      8.0,
+      43.0,
+      10.0
+    ],
+    "1x": [
+      19.65,
+      13.0
+    ],
+    "2x": [
+      41.35,
+      13.0
+    ]
+  },
+  "lamps": {
+    "gb": {
+      "center": [
+        16.83,
+        196.88
+      ]
+    },
+    "gbc": {
+      "center": [
+        35.83,
+        196.88
+      ]
+    },
+    "gba": {
+      "center": [
+        54.97,
+        196.84
+      ]
+    },
+    "int": {
+      "center": [
+        168.11,
+        197.09
+      ]
+    },
+    "jit": {
+      "center": [
+        186.78,
+        196.82
+      ]
+    },
+    "save": {
+      "center": [
+        205.81,
+        196.81
+      ]
+    },
+    "err": {
+      "center": [
+        224.81,
+        196.81
+      ]
+    }
+  }
+}

@@ -17,14 +17,21 @@ const char* name();
 // supplies or shared buses could not be initialized.
 bool init();
 
-// SDMMC wiring. The card's IO runs at a fixed 3.3 V; where an on-chip LDO
+// SD card wiring. The card's IO runs at a fixed 3.3 V; where an on-chip LDO
 // feeds its IO domain, board::init() powers it before the platform accesses
 // the card. No board here requests 1.8 V signaling.
+//
+// Bus::sdmmc: an SDMMC slot, its clock, command and four data lines.
+// Bus::spi: the card in SPI mode on an SPI host that board::init() has set
+// up, possibly shared with the panel; `slot` is the host and `cs` the card's
+// chip select, the other pins are the bus's.
 struct Sdmmc {
     int slot;
     int clk;
     int cmd;
     int data[4];
+    enum class Bus : uint8_t { sdmmc, spi } bus = Bus::sdmmc;
+    int cs = -1;
 };
 
 Sdmmc sdmmc();
@@ -35,9 +42,11 @@ Sdmmc sdmmc();
 enum class Rotation : uint8_t { none, cw90, cw180, cw270 };
 
 // The esp_lcd driver behind Display::panel: the DPI panel of a MIPI DSI
-// screen, or an RGB panel on the LCD_CAM parallel interface. The platform
-// takes the frame buffers and the buffer-switch event from the same driver.
-enum class PanelDriver : uint8_t { dpi, rgb };
+// screen, or an RGB panel on the LCD_CAM parallel interface, whose frame
+// buffers and buffer-switch event the platform takes from the same driver;
+// or a panel with RAM of its own on an SPI bus, which takes the changed rows
+// with esp_lcd_panel_draw_bitmap() from one frame buffer the platform keeps.
+enum class PanelDriver : uint8_t { dpi, rgb, spi };
 
 struct Display {
     esp_lcd_panel_handle_t panel = nullptr;  // initialized and switched on
@@ -45,11 +54,15 @@ struct Display {
     int width = 0;                           // panel resolution as scanned out
     int height = 0;
     Rotation rotation = Rotation::none;
+    // PanelDriver::spi: the panel's IO, whose color transfers report their
+    // end on on_color_trans_done. The panel takes little-endian RGB565.
+    esp_lcd_panel_io_handle_t io = nullptr;
 };
 
 // Creates the panel with `frame_buffers` RGB565 frame buffers in PSRAM, sends
-// the panel's init sequence if it has one and starts the scanout. The
-// backlight stays off. Returns a display with a null panel on failure.
+// the panel's init sequence if it has one and starts the scanout; an SPI
+// panel has no frame buffers of its own. The backlight stays off. Returns a
+// display with a null panel on failure.
 Display display_init(int frame_buffers);
 
 // Backlight brightness, 0 (off) to 100. The backlight driver's enable pin is

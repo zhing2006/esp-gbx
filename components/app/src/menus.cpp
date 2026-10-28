@@ -621,7 +621,7 @@ void Menus::press_roms(uint16_t keys) {
 
 void Menus::press_settings(uint16_t keys) {
     if (keys & kUp) settings_selected_ = std::max(settings_selected_ - 1, 0);
-    if (keys & kDown) settings_selected_ = std::min(settings_selected_ + 1, kSettingRows - 1);
+    if (keys & kDown) settings_selected_ = std::min(settings_selected_ + 1, setting_rows() - 1);
     const int row = settings_selected_;
     if (setting_enabled(row)) {
         const int step = keys & kLeft ? -1 : keys & kRight ? 1 : 0;
@@ -890,6 +890,18 @@ void Menus::tap(const ui::MenuHit& hit) {
         case Page::loading:
         case Page::game: break;
     }
+}
+
+int Menus::setting_rows() const {
+    // SCALING samples a frame scaled up. A window that holds no system's
+    // frame at twice its size shows them one pixel a screen pixel, and the
+    // row is left out; it is the last one.
+    const auto window = parts_.pack->layout().display;
+    const auto fits = [&](unsigned width, unsigned height) {
+        return window[2] >= static_cast<int>(2 * width) && window[3] >= static_cast<int>(2 * height);
+    };
+    const bool scaled = (GBX_HAS_GB && fits(160, 144)) || (GBX_HAS_GBA && fits(gba::kScreenWidth, gba::kScreenHeight));
+    return scaled ? kSettingRows : kScaling;
 }
 
 bool Menus::setting_enabled(int row) const {
@@ -1277,7 +1289,7 @@ void Menus::build_settings(Screen& s) {
     s.kind = Screen::Kind::settings;
     put(s.title, "SETTINGS");
     if (in_game_) put(s.status, "IN GAME");
-    s.row_count = kSettingRows;
+    s.row_count = setting_rows();
     auto& volume = s.rows[kVolume];
     put(volume.label, "VOLUME");
     volume.setting = Screen::Setting::level;
@@ -1500,6 +1512,7 @@ void Menus::send_thumbnail(int slot, uint32_t generation) {
     if (!parts_.game->slots().thumbnail(slot, *thumbnail_)) return;
     thumbnail_key_ = key;
     const Slots::Thumbnail& t = *thumbnail_;
+#if GBX_HAS_GBA
     if (t.gba) {
         // A GBA's colors as the game set them, at full size.
         std::copy_n(t.colors.begin(), gba::kFramePixels, thumbnail_pixels_);
@@ -1507,6 +1520,7 @@ void Menus::send_thumbnail(int slot, uint32_t generation) {
         ++thumbnail_id_;
         return;
     }
+#endif
     if (t.mode == gb::Mode::dmg) {
         // GB mode's shades in the current palette.
         for (size_t i = 0; i < gb::kFramePixels; ++i)

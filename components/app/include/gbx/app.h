@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <span>
 
+#include "gbx/systems.h"
+
 namespace gbx::app {
 
 // The platform must be ready before init(). Keep its display and asset pack
@@ -47,9 +49,9 @@ void load_slot(int slot);
 // runs; 0 logs it once.
 void log_status(uint32_t period_ms);
 // Copies the next frame, BGR555, into `out`, which takes kMaxFramePixels: a
-// GB game's 160x144 or a GBA game's 240x160, as `width` and `height` say.
-// False on timeout.
-inline constexpr size_t kMaxFramePixels = 240 * 160;
+// GB game's 160x144 or a GBA game's 240x160, as `width` and `height` say;
+// a build without the GBA has only the GB's. False on timeout.
+inline constexpr size_t kMaxFramePixels = GBX_HAS_GBA ? 240 * 160 : 160 * 144;
 bool capture_frame(uint16_t* out, uint32_t timeout_ms, int& width, int& height);
 // Copies what the menu canvas shows, RGB565 pixels of the menu grid, into
 // `out`, whether or not a game frame covers it. Sets width and height also

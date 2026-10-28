@@ -456,7 +456,8 @@ Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
     if (!gba && mode == gb::Mode::dmg) {
         std::copy_n(h + kHeader, thumbnail.shades.size(), thumbnail.shades.begin());
     } else {
-        const size_t pixels = gba ? gba::kFramePixels : gb::kFramePixels;
+        // Only the slots of a GBA game take a GBA's states, see above.
+        const size_t pixels = GBX_HAS_GBA && gba ? gba::kFramePixels : gb::kFramePixels;
         for (size_t i = 0; i < pixels; ++i) thumbnail.colors[i] = static_cast<uint16_t>(get16(h + kHeader + 2 * i));
     }
     return info.kind;

@@ -186,6 +186,12 @@ def screens():
     return out
 
 
+def small_window_screens():
+    """(name, image) for the screens only a window too small for 2x frames
+    shows: SETTINGS without SCALING."""
+    return [("settings-no-scaling", settings(setting_items(False)[:-1], 0, False))]
+
+
 def slot_screens():
     """SAVE / LOAD from the pause menu, for Pokemon Yellow, which has a battery."""
     out = []

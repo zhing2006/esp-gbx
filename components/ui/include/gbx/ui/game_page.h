@@ -63,11 +63,13 @@ public:
     void destroy();
 
     // Sets how every control looks: `hits` from hit_test(), in pack order, and
-    // the speed switch position. Thread safe; the page picks it up in the LVGL task.
+    // the speed switch position. With GBX_UI_STATIC_SHELL only the switch
+    // follows. Thread safe; the page picks it up in the LVGL task.
     void show_controls(std::span<const ControlHit> hits, bool double_speed);
 
-    // Sets what the lamps and the VFD show. Thread safe; the page redraws
-    // what changed in the LVGL task.
+    // Sets what the lamps and the VFD show; there is no VFD with
+    // GBX_UI_STATIC_SHELL. Thread safe; the page redraws what changed in the
+    // LVGL task.
     void show_status(const Status& status);
 
 private:

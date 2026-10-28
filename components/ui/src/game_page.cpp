@@ -20,6 +20,9 @@ namespace {
 using pack_format::ControlKind;
 
 constexpr const char* kTag = "ui.page";
+// GBX_UI_STATIC_SHELL: the controls keep their unpressed images, the speed
+// switch alone moves, and the VFD is not drawn.
+constexpr bool kStaticShell = GBX_UI_STATIC_SHELL;
 constexpr uint32_t kApplyPeriodMs = 10;
 constexpr uint64_t kBlinkUs = 250'000;  // the SAVE lamp's period while WRITING
 // Between two cells drawn again: drawing one and LVGL rendering it take the
@@ -104,7 +107,9 @@ lv_image_dsc_t to_lvgl(const ImageView& view) {
 bool GamePage::create(const Pack& pack) {
     pack_ = &pack;
     auto bg = pack.image("bg");
-    if (!bg || !font_.load(pack)) {
+    // A pack without VFD cells has no VFD font.
+    const bool vfd = !kStaticShell && !pack.cells().empty();
+    if (!bg || (vfd && !font_.load(pack))) {
         platform::log(platform::LogLevel::error, kTag, "the asset pack has no background or VFD font");
         return false;
     }
@@ -154,7 +159,7 @@ bool GamePage::create(const Pack& pack) {
     }
 
     int cell = 0;
-    for (const auto& c : pack.cells()) {
+    for (const auto& c : vfd ? pack.cells() : std::span<const pack_format::VfdCell>{}) {
         if (cell == kMaxCells || !add_cell(c)) {
             return false;
         }
@@ -361,8 +366,8 @@ void GamePage::show_controls(std::span<const ControlHit> hits, bool double_speed
     for (int i = 0; i < control_count_ && i < static_cast<int>(hits.size()); ++i) {
         uint8_t state = 0;
         switch (pack_->controls()[i].kind) {
-            case ControlKind::button: state = hits[i].touched ? 1 : 0; break;
-            case ControlKind::dpad: state = static_cast<uint8_t>(hits[i].direction); break;
+            case ControlKind::button: state = hits[i].touched && !kStaticShell ? 1 : 0; break;
+            case ControlKind::dpad: state = kStaticShell ? 0 : static_cast<uint8_t>(hits[i].direction); break;
             case ControlKind::speed_switch: state = double_speed ? 1 : 0; break;
         }
         if (wanted_[i] != state) {
@@ -392,7 +397,7 @@ void GamePage::apply() {
     if (shell) {
         show_lamps(status);
         cell_status_ = status;
-        pending_cells_ = (1u << std::min<size_t>(kMaxCells, pack_->cells().size())) - 1;
+        pending_cells_ = kStaticShell ? 0 : (1u << std::min<size_t>(kMaxCells, pack_->cells().size())) - 1;
     }
     // At most one cell drawn again a pass, kCellGapUs after the last.
     if (pending_cells_ && platform::monotonic_us() - cell_drawn_us_ >= kCellGapUs) {

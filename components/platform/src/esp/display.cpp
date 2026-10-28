@@ -4,9 +4,12 @@
 #include <atomic>
 
 #include "display_backend.h"
+#include "display_pixels.h"
 #include "esp_attr.h"
 #include "esp_private/esp_cache_private.h"
 #include "esp_heap_caps.h"
+#include "esp_lcd_panel_commands.h"
+#include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -15,6 +18,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gbx/esp/board.h"
+#include "gbx/platform.h"
 #include "lvgl.h"
 #include "soc/soc_caps.h"
 #include "task_stack.h"
@@ -33,6 +37,13 @@
 // the next frame and waits until the switch has happened. A buffer that missed a change gets
 // it at the next present, so both stay complete and nothing tears.
 //
+// A panel on SPI keeps the image in its own RAM. The present task keeps one
+// frame buffer in PSRAM, updates it the same way and sends the panel the
+// rows it changed, then waits until the transfer has read them; without a
+// tearing signal the panel can show a frame half updated. On an unrotated
+// SPI panel the game's rows skip the frame buffer: the present task builds
+// them in bands in internal RAM and sends those, see game_band().
+//
 // While a game shows, the present task also writes the newest game frame,
 // scaled, into the game window of that buffer, and leaves the window out of
 // the UI copies. Frames reach it through three slots: the producer fills
@@ -48,7 +59,7 @@ using detail::kMaxLine;
 using detail::Rect;
 
 constexpr const char* kTag = "display";
-constexpr int kFrameBuffers = 2;
+constexpr int kFrameBuffers = 2;  // one on an SPI panel, see buffer_count
 constexpr int kUiCore = 0;  // the emulator gets the other core
 // Both below the emulator's PPU and APU worker (5): while presenting takes
 // a few milliseconds a frame, the worker still takes the scanlines the CPU
@@ -58,6 +69,16 @@ constexpr int kPresentPriority = 4;  // above LVGL, below the PPU/APU worker
 // The frame step on the emulator's core, see run_frame_step(): below the
 // emulation task (5), so it only takes the time the emulation leaves.
 constexpr int kStepPriority = 4;
+// The least time between two game frames taken, see GBX_DISPLAY_GAME_HALF_RATE:
+// one and a half frame periods of a game at normal speed.
+#if CONFIG_GBX_DISPLAY_GAME_HALF_RATE
+constexpr int64_t kGameFrameGapUs = 25'000;
+#else
+constexpr int64_t kGameFrameGapUs = 0;
+#endif
+// game_frame_due() says yes this much before kGameFrameGapUs, as the present
+// task takes a frame some time after it is published.
+constexpr int64_t kDueEarlyUs = 4'000;
 // The LVGL lock also covers the game frame, see GBX_DISPLAY_LOCK_GAME_DRAW.
 #if CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW
 constexpr bool kGameHoldsLvgl = true;
@@ -67,7 +88,13 @@ constexpr bool kGameHoldsLvgl = false;
 constexpr int kMaxRects = 16;        // more changed areas than this are copied as a full screen
 constexpr int kSwapTimeoutMs = 100;
 constexpr int kSlots = 3;
-constexpr size_t kSlotPixels = 240 * 160;  // the largest game frame, the GBA's
+// The largest game frame: the GBA's, or the GB's in a build without the GBA
+// (components/core/Kconfig).
+#if CONFIG_GBX_SYSTEMS_GB_ONLY
+constexpr size_t kSlotPixels = 160 * 144;
+#else
+constexpr size_t kSlotPixels = 240 * 160;
+#endif
 constexpr uint32_t kFresh = 4;  // in ready: a frame the present task has not taken
 
 struct Damage {
@@ -90,7 +117,14 @@ Size ui{0, 0};
 uint16_t* shadow = nullptr;
 detail::Config backend_config;
 uint16_t* frame_buffers[kFrameBuffers] = {};
+int buffer_count = kFrameBuffers;
 int back = 1;  // the DPI and RGB drivers start by scanning out buffer 0
+// An unrotated SPI panel's two bands of whole rows, in internal RAM: one is
+// built while the other is sent. Writing the game into the frame buffer in
+// PSRAM, writing it back and having the DMA read it again took most of the
+// present task's time on ESP32-C5, whose PSRAM is quad SPI.
+constexpr int kBandRows = 8;
+uint16_t* bands[2] = {};
 
 TaskHandle_t present_task = nullptr;
 TaskHandle_t step_task = nullptr;  // on the emulator's core
@@ -109,6 +143,7 @@ Damage pending;  // filled by the LVGL task, taken by the present task
 // in both buffers; hide_game() has it copy the UI back into the window.
 GameLayer layer_config;
 std::atomic<const uint16_t*> color_table{nullptr};
+std::atomic<uint64_t> shade_colors{0};  // see set_game_shades(), shade 0 in the low bits
 uint32_t layer_generation = 0;
 bool restore_window = false;
 
@@ -119,6 +154,7 @@ int writer = 2;                  // the producer's slot
 std::atomic<bool> producing{false};
 std::atomic<Scaling> requested_scaling{Scaling::nearest};
 std::atomic<int64_t> shown_frames{0};
+std::atomic<int64_t> taken_us{0};  // when the present task took the latest game frame
 // See set_brightness(). backlight_on is set by the present task with the
 // first frame shown.
 std::atomic<int> brightness{100};
@@ -203,8 +239,9 @@ void copy_around(uint16_t* fb, const Rect& r, const Rect& hole) {
 }
 
 // The DPI driver reports every frame it has sent, the RGB driver only the
-// switch to a new buffer (the GDMA link switch event); present_loop() waits
-// for either after esp_lcd_panel_draw_bitmap().
+// switch to a new buffer (the GDMA link switch event), an SPI panel's IO the
+// end of the rows' transfer; present_loop() waits for one after
+// esp_lcd_panel_draw_bitmap().
 IRAM_ATTR bool frame_buffer_complete() {
     frames_done.fetch_add(1, std::memory_order_relaxed);
     BaseType_t woken = pdFALSE;
@@ -224,8 +261,13 @@ IRAM_ATTR bool on_rgb_frame_buffer_complete(esp_lcd_panel_handle_t, const esp_lc
 }
 #endif
 
+IRAM_ATTR bool on_spi_transfer_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void*) {
+    return frame_buffer_complete();
+}
+
 // The panel's frame buffers, and its buffer-complete event on
-// frame_buffer_complete().
+// frame_buffer_complete(). An SPI panel's buffer is ours, in PSRAM, which its
+// DMA reads row by row.
 bool attach_frame_buffers() {
     void* fb0 = nullptr;
     void* fb1 = nullptr;
@@ -251,6 +293,33 @@ bool attach_frame_buffers() {
             }
 #endif
             break;
+        case board::PanelDriver::spi: {
+            size_t alignment = 0;
+            esp_cache_get_alignment(MALLOC_CAP_SPIRAM, &alignment);
+            const size_t bytes = static_cast<size_t>(panel.width) * panel.height * sizeof(uint16_t);
+            fb0 = heap_caps_aligned_calloc(std::max<size_t>(alignment, 4), 1, bytes, MALLOC_CAP_SPIRAM);
+            buffer_count = 1;
+            err = fb0 ? ESP_OK : ESP_ERR_NO_MEM;
+            if (err == ESP_OK && panel.rotation == Rotation::none) {
+                // Without them the game goes through the frame buffer.
+                const size_t band_bytes = static_cast<size_t>(panel.width) * kBandRows * sizeof(uint16_t);
+                for (auto*& band : bands) {
+                    band = static_cast<uint16_t*>(heap_caps_malloc(band_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+                }
+                if (!bands[0] || !bands[1]) {
+                    for (auto*& band : bands) {
+                        heap_caps_free(band);
+                        band = nullptr;
+                    }
+                }
+            }
+            if (err == ESP_OK) {
+                esp_lcd_panel_io_callbacks_t callbacks{};
+                callbacks.on_color_trans_done = on_spi_transfer_done;
+                err = esp_lcd_panel_io_register_event_callbacks(panel.io, &callbacks, nullptr);
+            }
+            break;
+        }
     }
     if (err != ESP_OK) {
         ESP_LOGE(kTag, "panel frame buffers: %s", esp_err_to_name(err));
@@ -261,12 +330,43 @@ bool attach_frame_buffers() {
     return true;
 }
 
+#if !CONFIG_FREERTOS_UNICORE
 void step_loop(void*) {
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         step_function(step_argument);
         xSemaphoreGive(step_done);
     }
+}
+#endif
+
+// Sends the rows of the image from the bands, see game_band(): whole rows
+// when the rest of them changed, otherwise only the image's columns. The
+// window covers all of them, and the bands after the first continue the
+// write with RAMWRC (ST7789V2 datasheet 9.1.33, MIPI DCS
+// write_memory_continue), a transfer each. The board sets the panel no gap.
+// Returns the transfers started. A transfer waits for those queued before
+// it, so the band built next has been sent.
+int send_game_rows(const GameLayer& layer, const uint16_t* frame, const uint16_t* fb, bool whole) {
+    const int x0 = whole ? 0 : layer.image.x0;
+    const int x1 = whole ? panel.width : layer.image.x1;
+    const int y0 = layer.image.y0, y1 = layer.image.y1;
+    const uint8_t columns[] = {static_cast<uint8_t>(x0 >> 8), static_cast<uint8_t>(x0),
+                               static_cast<uint8_t>((x1 - 1) >> 8), static_cast<uint8_t>(x1 - 1)};
+    const uint8_t rows[] = {static_cast<uint8_t>(y0 >> 8), static_cast<uint8_t>(y0),
+                            static_cast<uint8_t>((y1 - 1) >> 8), static_cast<uint8_t>(y1 - 1)};
+    esp_lcd_panel_io_tx_param(panel.io, LCD_CMD_CASET, columns, sizeof columns);
+    esp_lcd_panel_io_tx_param(panel.io, LCD_CMD_RASET, rows, sizeof rows);
+    const int band_rows = kBandRows * panel.width / (x1 - x0);
+    int sent = 0;
+    for (int y = y0; y < y1; y += band_rows, ++sent) {
+        const int count = std::min(band_rows, y1 - y);
+        uint16_t* band = bands[sent & 1];
+        detail::game_band(band, x0, x1, fb, backend_config, layer, frame, y, count);
+        esp_lcd_panel_io_tx_color(panel.io, sent ? LCD_CMD_RAMWRC : LCD_CMD_RAMWR, band,
+                                  static_cast<size_t>(x1 - x0) * count * sizeof(uint16_t));
+    }
+    return sent;
 }
 
 void present_loop(void*) {
@@ -279,9 +379,10 @@ void present_loop(void*) {
     uint32_t frames_taken = 0;                 // frames read since the latest show_game()
     int reader = 0;
     uint64_t counted_id = ~uint64_t{0};
+    bool deferred = false;  // a fresh frame waits for kGameFrameGapUs
     for (;;) {
         GBX_IF_PROFILER(present_stage.store(PresentStage::notify, std::memory_order_relaxed);)
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ulTaskNotifyTake(pdTRUE, deferred ? pdMS_TO_TICKS(kGameFrameGapUs / 1000 + 1) : portMAX_DELAY);
         GBX_IF_PROFILER(present_stage.store(PresentStage::dispatch, std::memory_order_relaxed);
                         const int64_t busy_start = esp_timer_get_time();
                         const uint32_t scans_start = frames_done.load(std::memory_order_relaxed);)
@@ -295,6 +396,12 @@ void present_loop(void*) {
         restore_window = false;
         layer = layer_config;
         layer.colors = layer.rgb565 ? nullptr : color_table.load(std::memory_order_acquire);
+        if (layer.shades) {
+            const uint64_t c = shade_colors.load(std::memory_order_relaxed);
+            const uint16_t colors[4] = {static_cast<uint16_t>(c), static_cast<uint16_t>(c >> 16),
+                                        static_cast<uint16_t>(c >> 32), static_cast<uint16_t>(c >> 48)};
+            detail::set_shade_pairs(layer, colors);
+        }
         const bool shown_again = generation != layer_generation;
         generation = layer_generation;
         portEXIT_CRITICAL(&damage_lock);
@@ -302,11 +409,15 @@ void present_loop(void*) {
             window_ready[0] = window_ready[1] = false;
             frame_drawn[0] = frame_drawn[1] = 0;
             frames_taken = 0;
+            taken_us.store(0, std::memory_order_relaxed);
         }
         if (restore) {
             now.add(old_window);
         }
-        if (layer.shown && (ready.load(std::memory_order_acquire) & kFresh)) {
+        const bool fresh = layer.shown && (ready.load(std::memory_order_acquire) & kFresh);
+        deferred = fresh && esp_timer_get_time() - taken_us.load(std::memory_order_relaxed) < kGameFrameGapUs;
+        if (fresh && !deferred) {
+            taken_us.store(esp_timer_get_time(), std::memory_order_relaxed);
             reader = static_cast<int>(ready.exchange(reader, std::memory_order_acq_rel) & 3);
             GBX_IF_PROFILER(flow_taken.fetch_add(1, std::memory_order_relaxed);
                             const uint32_t age = static_cast<uint32_t>(esp_timer_get_time()) - published_at[reader];
@@ -360,6 +471,7 @@ void present_loop(void*) {
             if (!kGameHoldsLvgl) lvgl_port_unlock();
         }
         bool drew_frame = false;
+        bool send_game = false;
         if (layer.shown) {
             if (!window_ready[back]) {
                 GBX_IF_PROFILER(present_stage.store(PresentStage::fill, std::memory_order_relaxed);
@@ -372,26 +484,58 @@ void present_loop(void*) {
             if (frames_taken && frame_drawn[back] != frames_taken) {
                 GBX_IF_PROFILER(present_stage.store(PresentStage::nearest, std::memory_order_relaxed);
                                 const int64_t game_start = esp_timer_get_time();)
-                detail::draw_game(fb, backend_config, layer, slots[reader]);
+                if (bands[0]) {
+                    send_game = true;
+                } else {
+                    detail::draw_game(fb, backend_config, layer, slots[reader]);
+                    touched(layer.image);
+                }
                 GBX_IF_PROFILER(times_game.fetch_add(static_cast<uint32_t>(esp_timer_get_time() - game_start)); times_games.fetch_add(1);)
-                touched(layer.image);
                 frame_drawn[back] = frames_taken;
                 drew_frame = true;
             }
         }
         if (kGameHoldsLvgl && holds_lvgl) lvgl_port_unlock();
+        // With bands, the frame buffer holds no game: once a frame shows, its
+        // rows under the image are not sent, and the image's rows are sent
+        // again when the UI beside them changed.
+        const bool banded = bands[0] && layer.shown && frames_taken;
+        const bool around_image = banded && row0 < layer.image.y1 && row1 > layer.image.y0;
+        send_game |= around_image;
 
         // The pointer lies inside the frame buffer, so the driver only writes
         // back the cache for these rows and shows this buffer from the next frame.
         // The RGB driver reports this switch once, maybe before draw_bitmap
-        // returns, so its count is taken before the request. The DPI driver
-        // reports every frame, and only a frame ending after the request has
-        // switched, so its count is taken after.
-        const bool counts_switches = panel.driver == board::PanelDriver::rgb;
+        // returns, so its count is taken before the request, as is the end of
+        // an SPI panel's transfer. The DPI driver reports every frame, and
+        // only a frame ending after the request has switched, so its count is
+        // taken after. An SPI panel takes the rows themselves.
+        const bool counts_switches = panel.driver != board::PanelDriver::dpi;
         uint32_t seen = counts_switches ? frames_done.load(std::memory_order_relaxed) : 0;
         GBX_IF_PROFILER(present_stage.store(PresentStage::submit, std::memory_order_relaxed);
                         const int64_t flush_start = esp_timer_get_time();)
-        esp_lcd_panel_draw_bitmap(panel.panel, 0, row0, panel.width, row1, fb);
+        int transfers = 1;  // that the wait below counts
+        if (panel.driver == board::PanelDriver::spi) {
+            transfers = 0;
+            const auto send_rows = [&](int first, int last) {
+                if (first >= last) return;
+                esp_lcd_panel_draw_bitmap(panel.panel, 0, first, panel.width, last, fb + first * panel.width);
+                ++transfers;
+            };
+            if (banded) {
+                send_rows(row0, std::min(row1, layer.image.y0));
+                send_rows(std::max(row0, layer.image.y1), row1);
+                if (send_game) {
+                    GBX_IF_PROFILER(const int64_t game_start = esp_timer_get_time();)
+                    transfers += send_game_rows(layer, slots[reader], fb, around_image);
+                    GBX_IF_PROFILER(times_game.fetch_add(static_cast<uint32_t>(esp_timer_get_time() - game_start));)
+                }
+            } else {
+                send_rows(row0, row1);
+            }
+        } else {
+            esp_lcd_panel_draw_bitmap(panel.panel, 0, row0, panel.width, row1, fb);
+        }
         GBX_IF_PROFILER(times_flush.fetch_add(static_cast<uint32_t>(esp_timer_get_time() - flush_start));)
         GBX_IF_PROFILER(const int64_t scanout_start = esp_timer_get_time();
                         times_present.fetch_add(static_cast<uint32_t>(scanout_start - present_start));
@@ -400,7 +544,7 @@ void present_loop(void*) {
             seen = frames_done.load(std::memory_order_relaxed);
         }
         bool switched = true;
-        while (frames_done.load(std::memory_order_relaxed) == seen) {
+        while (frames_done.load(std::memory_order_relaxed) - seen < static_cast<uint32_t>(transfers)) {
             if (xSemaphoreTake(frame_done, pdMS_TO_TICKS(kSwapTimeoutMs)) != pdTRUE) {
                 ESP_LOGW(kTag, "no frame completed within %d ms", kSwapTimeoutMs);
                 switched = false;
@@ -418,8 +562,11 @@ void present_loop(void*) {
             counted_id = slot_ids[reader];
             shown_frames.fetch_add(1, std::memory_order_relaxed);
         }
-        back ^= 1;
-        carry = now;
+        // One buffer has every change already.
+        if (buffer_count == kFrameBuffers) {
+            back ^= 1;
+            carry = now;
+        }
         if (!backlight_on.load(std::memory_order_relaxed)) {
             board::set_backlight(brightness.load());
             backlight_on.store(true);
@@ -466,6 +613,7 @@ bool start() {
     if (!attach_frame_buffers()) {
         return false;
     }
+    back = buffer_count - 1;
 
     size_t shadow_bytes = static_cast<size_t>(ui.width) * ui.height * sizeof(uint16_t);
     size_t alignment = 0;
@@ -493,7 +641,7 @@ bool start() {
     }
 
     GBX_IF_PROFILER(
-        profile_buffer_bytes.store(shadow_bytes * (1 + kFrameBuffers) + kSlots * kSlotPixels * sizeof(uint16_t));)
+        profile_buffer_bytes.store(shadow_bytes * (1 + buffer_count) + kSlots * kSlotPixels * sizeof(uint16_t));)
     lvgl_port_cfg_t lvgl_config{
         .task_priority = kLvglPriority,
         .task_stack = 8192,
@@ -535,7 +683,7 @@ bool start() {
     lvgl_port_unlock();
 
     ESP_LOGI(kTag, "panel %dx%d, UI %dx%d, %d frame buffers", panel.width, panel.height, ui.width, ui.height,
-             kFrameBuffers);
+             buffer_count);
     return true;
 }
 
@@ -553,7 +701,8 @@ bool show_game(std::span<const int16_t, 4> window, int width, int height, PixelF
         window[0] + window[2] > ui.width || window[1] + window[3] > ui.height) {
         return false;
     }
-    if (static_cast<size_t>(width) * height > kSlotPixels) {
+    if (static_cast<size_t>(width) * height > kSlotPixels ||
+        (format == PixelFormat::shades && !game_shades_supported())) {
         return false;
     }
     GameLayer layer;
@@ -564,6 +713,7 @@ bool show_game(std::span<const int16_t, 4> window, int width, int height, PixelF
     layer.scale = scale;
     layer.scaling = scaling;
     layer.rgb565 = format == PixelFormat::rgb565;
+    layer.shades = format == PixelFormat::shades;
     layer.image.x0 = layer.window.x0 + (window[2] - width * scale) / 2;
     layer.image.y0 = layer.window.y0 + (window[3] - height * scale) / 2;
     layer.image.x1 = layer.image.x0 + width * scale;
@@ -595,8 +745,24 @@ void hide_game() {
     xTaskNotifyGive(present_task);
 }
 
+bool game_shades_supported() {
+    // Only game_band() reads shades.
+    return bands[0] != nullptr;
+}
+
+void set_game_shades(std::span<const uint16_t, 4> colors) {
+    uint64_t packed = 0;
+    for (int i = 0; i < 4; ++i) packed |= uint64_t{colors[i]} << (16 * i);
+    shade_colors.store(packed, std::memory_order_relaxed);
+}
+
 uint16_t* game_frame_buffer() {
     return producing.load(std::memory_order_acquire) ? slots[writer] : nullptr;
+}
+
+bool game_frame_due() {
+    return kGameFrameGapUs == 0 ||
+           esp_timer_get_time() - taken_us.load(std::memory_order_relaxed) >= kGameFrameGapUs - kDueEarlyUs;
 }
 
 void publish_game_frame(uint64_t id) {

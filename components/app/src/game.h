@@ -9,6 +9,7 @@
 
 #include "faults.h"
 #include "gbx/app.h"
+#include "gbx/display.h"
 #include "gbx/files.h"
 #include "gbx/gb/system.h"
 #include "gbx/gba/system.h"
@@ -49,6 +50,12 @@ namespace gbx::app {
 // JIT: core 1 idle 0 %, core 0 idle 23 to 39 %), and a core 1 lent for
 // conversion never leaves its idle task a tick when the game falls behind.
 // In these cases the present task converts the frames on core 0.
+//
+// A chip with one core, the ESP32-C5, runs every task on it. There the
+// emulation task runs at priority 1, with the main task's input loop and
+// below LVGL, the present task and the app's file tasks, so that the touch,
+// the screen and the cards keep up when the emulation falls behind. It
+// draws the lines and mixes the sound itself, see gb::Offload.
 class Game final : public gb::FrameSink {
 public:
     // Output frames per second. 48 kHz is what the codecs and SDL use without
@@ -110,7 +117,7 @@ public:
     // palette, in color as the game set it, or `fixed` by COLOR FIX while
     // that is on; a GBA's 240x160 as the game set it. `out` takes
     // kMaxFramePixels; returns the frame's width, its height following.
-    static constexpr size_t kMaxFramePixels = gba::kFramePixels;
+    static constexpr size_t kMaxFramePixels = app::kMaxFramePixels;
     int paused_pixels(std::span<uint16_t> out, bool fixed = false) const;
     // Takes the backend at the next frame boundary or while paused. A
     // backend that cannot start is reported as a fault and the old one stays.
@@ -232,6 +239,9 @@ public:
 #endif
 
 private:
+    static constexpr unsigned kEmulationPriority = 5;
+    static constexpr unsigned kSingleCorePriority = 1;
+
     // A count and the wall time it was reached at, written by one task at a
     // time and read as a pair by another.
     class Mark {
@@ -243,9 +253,14 @@ private:
         std::atomic<uint64_t> count_{0}, us_{0};
     };
 
-    // FrameSink, on the PPU's worker.
+    // FrameSink, on the PPU's worker, or on the emulation task where the
+    // chip has one core.
     uint16_t* frame_buffer() override;
+    bool shades() const override { return shades_.load(std::memory_order_relaxed); }
     void frame_ready(uint64_t id) override;
+    // The game layer's pixels for the GB game loaded: GB mode's shades
+    // where the display takes them, see platform::display::PixelFormat.
+    platform::display::PixelFormat gb_format() const;
 #if GBX_HAS_GBA
     // The GBA's frames and sound go the same way.
     class GbaSink final : public gba::FrameSink {
@@ -441,6 +456,8 @@ private:
     // worker.
     uint32_t speed_changes_ = 0, work_speed_ = 0, gap_speed_ = 0;
 
+    // The game layer takes shades, see gb_format(); set before it shows.
+    std::atomic<bool> shades_{false};
     // Where the PPU's worker copies the next frame, see capture().
     std::atomic<uint16_t*> capture_{nullptr};
     std::atomic<bool> captured_{false};

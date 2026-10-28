@@ -23,7 +23,7 @@ if(ESP_PLATFORM)
         # espcoredump loads the core dump Kconfig, so a crash is saved to the
         # coredump partition; reading it back at startup is still a TODO.
         PRIV_REQUIRES board esp_lcd esp_timer esp_partition espcoredump esp_driver_i2s
-                      fatfs sdmmc esp_driver_sdmmc esp_hw_support esp_mm)
+                      fatfs sdmmc esp_driver_sdmmc esp_driver_sdspi esp_hw_support esp_mm)
     # CONFIG values are unavailable during IDF's early dependency expansion.
     # The pinned LVGL port includes the target-supported drivers in the graph;
     # only the selected accelerated implementation links them from here.

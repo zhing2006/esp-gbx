@@ -2,11 +2,15 @@
 
 #include <cinttypes>
 
-#include "driver/sdmmc_host.h"
+#include "driver/sdspi_host.h"
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
 #include "gbx/esp/board.h"
 #include "sdmmc_cmd.h"
+#include "soc/soc_caps.h"
+#if SOC_SDMMC_HOST_SUPPORTED
+#include "driver/sdmmc_host.h"
+#endif
 
 namespace gbx::platform::storage {
 namespace {
@@ -14,13 +18,8 @@ namespace {
 constexpr const char* kTag = "storage";
 sdmmc_card_t* card = nullptr;
 
-}  // namespace
-
-bool mount_sd() {
-    if (card != nullptr) {
-        return true;
-    }
-    const auto wiring = board::sdmmc();
+#if SOC_SDMMC_HOST_SUPPORTED
+esp_err_t mount_sdmmc(const board::Sdmmc& wiring, const esp_vfs_fat_mount_config_t& mount) {
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.slot = wiring.slot;
     // 40 MHz high-speed at 3.3 V, not UHS. Keep DEINIT_ARG from the default.
@@ -41,10 +40,41 @@ bool mount_sd() {
     // Assist the lines, but do not assume these replace external pull-ups.
     // Sila's schematic does not establish the external resistor population.
     slot.flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP;  // No UHS/1.8 V signaling.
+    return esp_vfs_fat_sdmmc_mount(kSdMountPath, &host, &slot, &mount, &card);
+}
+#endif
+
+// The board has set up the bus; unmounting leaves it to the other devices.
+esp_err_t mount_sdspi(const board::Sdmmc& wiring, const esp_vfs_fat_mount_config_t& mount) {
+    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    host.slot = wiring.slot;
+    // Default speed, 20 MHz: high speed in SPI mode needs CMD6, which the
+    // driver does not send.
+    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    sdspi_device_config_t slot = SDSPI_DEVICE_CONFIG_DEFAULT();
+    slot.host_id = static_cast<spi_host_device_t>(wiring.slot);
+    slot.gpio_cs = static_cast<gpio_num_t>(wiring.cs);
+    return esp_vfs_fat_sdspi_mount(kSdMountPath, &host, &slot, &mount, &card);
+}
+
+}  // namespace
+
+bool mount_sd() {
+    if (card != nullptr) {
+        return true;
+    }
+    const auto wiring = board::sdmmc();
     esp_vfs_fat_mount_config_t mount = VFS_FAT_MOUNT_DEFAULT_CONFIG();
     mount.format_if_mount_failed = false;
     mount.max_files = 4;
-    esp_err_t err = esp_vfs_fat_sdmmc_mount(kSdMountPath, &host, &slot, &mount, &card);
+    esp_err_t err = ESP_ERR_NOT_SUPPORTED;
+    if (wiring.bus == board::Sdmmc::Bus::spi) {
+        err = mount_sdspi(wiring, mount);
+    } else {
+#if SOC_SDMMC_HOST_SUPPORTED
+        err = mount_sdmmc(wiring, mount);
+#endif
+    }
     if (err != ESP_OK) {
         ESP_LOGE(kTag, "SD mount failed: %s; check card and FAT32 filesystem; no formatting attempted",
                  esp_err_to_name(err));

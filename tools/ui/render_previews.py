@@ -6,8 +6,10 @@
 
 Each board gets idle.png (no ROM loaded), gb.png and gbc.png (a GB and a GBC
 game in their black border) and gba.png, with the lamps a running game would light, and home.png
-and pause.png with a menu in the game window. menus/ holds every menu screen
-and dialog at window size, from menu_scenes.py. states.png lists every
+and pause.png with a menu in the game window. Games and menus are at the
+largest whole scale the window holds; a board whose window is too small for
+2x also gets settings.png, which then has no SCALING. menus/ holds every menu
+screen and dialog at 2x, from menu_scenes.py. states.png lists every
 control, switch and lamp state on the Tab5. The game scene comes from
 preview_scene.py and VFD values are shown as uncollected; neither is
 emulator output. --check compares instead of writing.
@@ -21,7 +23,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from menu_scenes import screens
+import menu_kit
+from menu_scenes import screens, small_window_screens
 from preview_scene import scene
 from uikit import ASSETS, DOCS, boards, place
 from vfd_font import VfdFont, draw_cell, placeholder
@@ -64,7 +67,7 @@ class Board:
         for lid, color in lamps.items():
             place(base, self.image(sp["lamps"]["colors"][color]), m["lamps"][lid]["center"],
                   sp["lamps"]["anchor"], k)
-        for cid, cell in m["vfd"].items():
+        for cid, cell in m.get("vfd", {}).items():
             lines = [placeholder(line["text"]) for line in cell.get("lines", [])]
             if cid == "speed" and run_state:
                 draw_cell(base, self.font, cell, run_state, unit_text="", lines=lines)
@@ -73,7 +76,8 @@ class Board:
         if system:
             x, y, w, h = m["display"]
             g = scene(system)
-            g = g.resize((g.width * 2, g.height * 2), Image.NEAREST)
+            k = min(w // g.width, h // g.height)
+            g = g.resize((g.width * k, g.height * k), Image.NEAREST)
             base.paste((0, 0, 0, 255), (x, y, x + w, y + h))
             base.paste(g, (x + (w - g.width) // 2, y + (h - g.height) // 2))
         if window:
@@ -124,9 +128,17 @@ def outputs():
     menus = dict(screens())
     for name in boards():
         b = Board(name)
-        for key, p in PREVIEWS.items():
+        previews, windows = PREVIEWS, menus
+        _, _, w, h = b.m["display"]
+        if w < 2 * menu_kit.W or h < 2 * menu_kit.H:
+            # The menus at 1x; SETTINGS has no SCALING, as frames are not scaled.
+            menu_kit.use_scale(1)
+            windows = dict(screens() + small_window_screens())
+            menu_kit.use_scale(2)
+            previews = PREVIEWS | {"settings": dict(PREVIEWS["home"], window="settings-no-scaling")}
+        for key, p in previews.items():
             im = b.render(lamps=p["lamps"], speed=p["speed"], system=p.get("system"), run_state=p.get("run_state"),
-                          window=menus.get(p.get("window")))
+                          window=windows.get(p.get("window")))
             result.append((f"{name}/{key}.png", im))
     result += [(f"menus/{key}.png", im) for key, im in menus.items()]
     result.append(("states.png", states_sheet(Board("m5stack_tab5"))))

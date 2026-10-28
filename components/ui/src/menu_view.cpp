@@ -17,6 +17,11 @@ constexpr uint32_t kApplyPeriodMs = 20;
 // The selected ROM's name waits, scrolls to its end, waits and starts over.
 constexpr uint64_t kMarqueeWaitUs = 1'000'000;
 constexpr int kMarqueePixelsPerSecond = 24;
+// The largest game frame and thumbnail: the GBA's, or the GB's in a build
+// without the GBA.
+constexpr size_t kMaxFramePixels =
+    GBX_UI_GBA_FRAMES ? size_t{MenuPainter::kWideThumbnailWidth} * MenuPainter::kWideThumbnailHeight
+                      : size_t{MenuPainter::kThumbnailWidth} * MenuPainter::kThumbnailHeight;
 
 }  // namespace
 
@@ -38,7 +43,7 @@ struct MenuView::State {
     std::mutex mutex;  // guards the wanted_ fields
     MenuScreen wanted;
     bool wanted_changed = false;
-    std::array<uint16_t, MenuPainter::kWideThumbnailWidth * MenuPainter::kWideThumbnailHeight> frame{};
+    std::array<uint16_t, kMaxFramePixels> frame{};
     int frame_width = 0, frame_height = 0;
     bool frame_changed = false;
     bool has_frame = false;
@@ -89,7 +94,7 @@ bool MenuView::create(const Pack& pack, std::span<const int16_t, 4> window) {
     st.drawn = static_cast<uint16_t*>(platform::allocate_external(bytes));
     st.next = static_cast<uint16_t*>(platform::allocate_external(bytes));
     st.backdrop = static_cast<uint16_t*>(platform::allocate_external(bytes));
-    constexpr size_t kThumbnailBytes = size_t{2} * MenuPainter::kWideThumbnailWidth * MenuPainter::kWideThumbnailHeight;
+    constexpr size_t kThumbnailBytes = 2 * kMaxFramePixels;
     st.thumbnail = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
     st.thumbnail_next = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
     st.source = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
@@ -155,8 +160,7 @@ void MenuView::set_frame(std::span<const uint16_t> pixels, int width, int height
 
 void MenuView::set_thumbnail(std::span<const uint16_t> pixels, int width, int height) {
     const size_t n = static_cast<size_t>(width) * height;
-    constexpr size_t kMax = size_t{MenuPainter::kWideThumbnailWidth} * MenuPainter::kWideThumbnailHeight;
-    if (!state_ || !state_->source || n > kMax || pixels.size() < n) return;
+    if (!state_ || !state_->source || n > kMaxFramePixels || pixels.size() < n) return;
     std::lock_guard lock(state_->mutex);
     std::copy_n(pixels.begin(), n, state_->source);
     state_->source_width = width;

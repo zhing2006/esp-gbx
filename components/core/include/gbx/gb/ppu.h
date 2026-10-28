@@ -21,8 +21,10 @@ inline constexpr unsigned kPackedFrameBytes = kFramePixels / 4;
 class FrameSink {
 public:
     // Where the frame goes: kFramePixels BGR555 pixels, row by row, or
-    // nullptr to skip it.
+    // nullptr to skip it. In GB mode, with shades(), kFramePixels bytes of
+    // shades instead, 0 the lightest, which the sink colors itself.
     virtual uint16_t* frame_buffer() = 0;
+    virtual bool shades() const = 0;
     // frame_buffer() now holds frame `id`; a blank screen repeats the id.
     virtual void frame_ready(uint64_t id) = 0;
 protected:

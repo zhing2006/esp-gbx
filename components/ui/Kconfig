@@ -1,0 +1,14 @@
+menu "GBX UI"
+
+config GBX_UI_STATIC_SHELL
+    bool "Draw the shell once"
+    default n
+    help
+        The game page draws the on-screen controls once, as they look
+        unpressed, and does not show presses; only the speed switch follows
+        its position. It shows no VFD readings either, so the board's layout
+        has no VFD cells. The shared sdkconfig.defaults.<target> file of a
+        chip with one core enables it, where each redraw takes time from
+        the emulation.
+
+endmenu

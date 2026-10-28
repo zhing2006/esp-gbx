@@ -1,4 +1,5 @@
 #include "display_backend.h"
+#include "display_pixels.h"
 #include "display_test.h"
 #include "transport.h"
 
@@ -34,9 +35,9 @@ void logical(const Config& c, int x, int y, int& ux, int& uy) {
 
 }  // namespace
 
-bool run_pattern_checks(std::array<uint32_t, 7>& masks) {
+bool run_pattern_checks(std::array<uint32_t, 8>& masks) {
     Config config{};
-    std::array<unsigned, 7> counts{};
+    std::array<unsigned, 8> counts{};
     size_t alignment = 0;
     ESP_ERROR_CHECK(esp_cache_get_alignment(MALLOC_CAP_SPIRAM, &alignment));
     auto* source = static_cast<uint16_t*>(heap_caps_aligned_alloc(alignment, kBytes, MALLOC_CAP_SPIRAM));
@@ -94,7 +95,7 @@ bool run_pattern_checks(std::array<uint32_t, 7>& masks) {
     // Primary colors independently encode the BGR555-to-RGB565 contract.
     constexpr uint16_t bgr[] = {0x001f, 0x03e0, 0x7c00, 0x7fff, 0};
     constexpr uint16_t rgb[] = {0xf800, 0x07e0, 0x001f, 0xffff, 0};
-    std::array<uint16_t, 35> frame;
+    std::array<uint16_t, 40> frame;
     for (size_t i = 0; i < frame.size(); ++i) frame[i] = bgr[i % 5];
     for (const auto turn : {board::Rotation::none, board::Rotation::cw90,
                            board::Rotation::cw180, board::Rotation::cw270}) {
@@ -156,6 +157,75 @@ bool run_pattern_checks(std::array<uint32_t, 7>& masks) {
         if (copies != 3) {
             masks[6] &= ~bit;
             ESP_LOGE(kTag, "damage containment copied %u rectangles, expected 3", copies);
+        }
+    }
+    // Bands of an SPI panel's rows, unrotated: the image at each scale, an
+    // odd width and an even one with runs of one color, whole rows and the
+    // image's columns, from BGR555 pixels and from shades. Black fills the
+    // rest of the window, the UI shows beside it, and nothing is written
+    // past the band.
+    config.panel.rotation = board::Rotation::none;
+    config.panel.width = kWidth;
+    config.panel.height = kHeight;
+    for (const bool shaded : {false, true}) {
+        for (int scale = 1; scale <= 3; ++scale) {
+            for (const int width : {7, 8}) {
+                for (const bool whole : {true, false}) {
+                    GameLayer layer{};
+                    layer.width = width;
+                    layer.height = 5;
+                    layer.scale = scale;
+                    layer.window = {10, 4, 90, 60};
+                    layer.image = {width == 7 ? 21 : 20, 9, 0, 9 + scale * 5};
+                    layer.image.x1 = layer.image.x0 + scale * width;
+                    // The index into bgr and rgb of each source pixel; shades
+                    // take the first four colors.
+                    const int colors = shaded ? 4 : 5;
+                    std::array<uint8_t, 40> index;
+                    for (size_t i = 0; i < index.size(); ++i) index[i] = (width == 7 ? i : i / 3) % colors;
+                    std::array<uint16_t, 40> pixels;
+                    for (size_t i = 0; i < pixels.size(); ++i) pixels[i] = bgr[index[i]];
+                    alignas(4) std::array<uint8_t, 40> shades = index;
+                    if (shaded) {
+                        layer.shades = true;
+                        set_shade_pairs(layer, std::span<const uint16_t, 4>(bgr, 4));
+                    }
+                    const int x0 = whole ? 0 : layer.image.x0, x1 = whole ? kWidth : layer.image.x1;
+                    // From inside the first run of rows, so a band can start on a repeated row.
+                    const int first = layer.image.y0 + 1, count = layer.image.y1 - first;
+                    alignas(4) static uint16_t band[kWidth * 15 + 8];
+                    std::fill(std::begin(band), std::end(band), uint16_t{0x73e1});
+                    const auto* frame = shaded ? reinterpret_cast<const uint16_t*>(shades.data()) : pixels.data();
+                    game_band(band, x0, x1, source, config, layer, frame, first, count);
+                    bool ok = true;
+                    for (int y = first; y < first + count && ok; ++y) {
+                        for (int x = x0; x < x1 && ok; ++x) {
+                            uint16_t want = pattern(x, y);
+                            if (contains(layer.image, x, y)) {
+                                const int sx = (x - layer.image.x0) / scale, sy = (y - layer.image.y0) / scale;
+                                want = rgb[index[sy * width + sx]];
+                            } else if (contains(layer.window, x, y)) {
+                                want = 0;
+                            }
+                            const uint16_t got = band[(y - first) * (x1 - x0) + x - x0];
+                            if (got != want) {
+                                ESP_LOGE(kTag, "band shades %d scale %d width %d whole %d (%d,%d): got %04x expected "
+                                         "%04x", shaded, scale, width, whole, x, y, got, want);
+                                ok = false;
+                            }
+                        }
+                    }
+                    for (size_t i = static_cast<size_t>(count) * (x1 - x0); ok && i < std::size(band); ++i) {
+                        if (band[i] != 0x73e1) {
+                            ESP_LOGE(kTag, "band shades %d scale %d width %d whole %d wrote past its rows", shaded,
+                                     scale, width, whole);
+                            ok = false;
+                        }
+                    }
+                    const uint32_t bit = 1u << counts[7]++;
+                    if (ok) masks[7] |= bit;
+                }
+            }
         }
     }
 #if CONFIG_GBX_DISPLAY_ACCEL
@@ -227,7 +297,7 @@ bool run_pattern_checks(std::array<uint32_t, 7>& masks) {
 
 namespace gbx::test::display_test {
 bool run(uint32_t request_id) {
-    std::array<uint32_t, 7> masks{};
+    std::array<uint32_t, 8> masks{};
     if (!platform::display::detail::run_pattern_checks(masks)) {
         constexpr std::string_view error = "Cannot initialize display pattern checks";
         return transport::send(protocol::Kind::error,

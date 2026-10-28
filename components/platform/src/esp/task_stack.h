@@ -14,10 +14,12 @@ namespace gbx::platform {
 // IDF's retention memory, holds only what a retention request names
 // (components/heap/port/esp32p4/memory_layout.c). A full lower block leaves
 // the stack where IDF puts it. `with_caps`, when given, tells whether the
-// task is to be deleted with vTaskDeleteWithCaps().
+// task is to be deleted with vTaskDeleteWithCaps(). On a single core every
+// task runs on core 0, whichever core it asks for.
 inline bool create_internal_task(TaskFunction_t entry, const char* name, uint32_t stack_bytes, void* context,
                                  UBaseType_t priority, TaskHandle_t* handle, BaseType_t core,
                                  bool* with_caps = nullptr) {
+    core %= portNUM_PROCESSORS;
     bool created = false;
 #if CONFIG_ESP32P4_SELECTS_REV_LESS_V3
     created = xTaskCreatePinnedToCoreWithCaps(entry, name, stack_bytes, context, priority, handle, core,

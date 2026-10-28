@@ -3,6 +3,8 @@
 
 Expected counts follow the sample rates, durations and speed adjustments in
 one fixture, not an emulator recording. Uses regular device test firmware.
+A firmware for one core mixes each batch as it is submitted; it has no
+worker to hold, and the check of pending sound is skipped.
 """
 import argparse
 from datetime import datetime, timezone
@@ -16,12 +18,13 @@ from single_step import git_state, save_json
 from sm83_suite import ROOT
 from transport import Link
 
-VERSION = 1
+VERSION = 2
 CONTROL = struct.Struct('<HHI')
 RESULT = struct.Struct('<HHII')
+# Name, expected count, and whether the check needs the worker.
 CHECKS = (
     ('Submitted sound counts before the worker runs', 750),
-    ('Pending sound is not readable PCM', 0),
+    ('Pending sound is not readable PCM', 0, True),
     ('Rate changes and fractional frames carry across batches', 2135),
     ('Mixing preserves the committed count', 2135),
     ('All committed frames become readable', 2135),
@@ -43,7 +46,8 @@ def run(args):
     report.mkdir(parents=True, exist_ok=False)
     summary = {'format_version': 1, 'operation': 'audio_accounting', 'status': 'PREPARING',
                'started_utc': stamp, 'runner': git_state(), 'command': sys.argv,
-               'test_version': VERSION, 'received': 0, 'failed': 0}
+               'test_version': VERSION, 'received': 0, 'failed': 0, 'skipped': 0}
+    worker = None
     link = None
     try:
         link = Link.open(args.port, args.baud, args.reset, write_timeout=min(1, args.timeout / 2))
@@ -57,24 +61,35 @@ def run(args):
             while True:
                 frame = link.receive(args.timeout)
                 if frame.kind == Kind.DONE:
-                    if (frame.payload != CONTROL.pack(VERSION, len(CHECKS), 1) or
+                    if (frame.payload != CONTROL.pack(VERSION, 1 + len(CHECKS), 1) or
                             summary['received'] != len(CHECKS)):
                         raise ProtocolError('Incomplete or invalid audio completion')
                     break
                 if frame.kind != Kind.DATA or len(frame.payload) != RESULT.size:
                     raise ProtocolError('Invalid audio result frame')
-                version, check_id, request, actual = RESULT.unpack(frame.payload)
-                if (version != VERSION or request != 1 or check_id != summary['received'] or
-                        check_id >= len(CHECKS)):
+                version, result_id, request, actual = RESULT.unpack(frame.payload)
+                received = summary['received'] + (worker is not None)
+                if version != VERSION or request != 1 or result_id != received or result_id > len(CHECKS):
                     raise ProtocolError('Wrong audio test version, request or check order')
-                name, expected = CHECKS[check_id]
-                status = 'PASS' if actual == expected else 'FAIL'
-                results.write(json.dumps({'id': check_id, 'name': name, 'expected': expected,
+                link.acknowledge(frame)
+                if result_id == 0:
+                    if actual not in (0, 1):
+                        raise ProtocolError('Invalid mixer worker result')
+                    worker = actual == 1
+                    summary['worker'] = worker
+                    print(f'Mixer worker: {"other core" if worker else "none, one core"}', flush=True)
+                    continue
+                name, expected, *needs = CHECKS[result_id - 1]
+                if needs and not worker:
+                    status = 'SKIP'
+                else:
+                    status = 'PASS' if actual == expected else 'FAIL'
+                results.write(json.dumps({'id': result_id - 1, 'name': name, 'expected': expected,
                                           'actual': actual, 'status': status}) + '\n')
                 results.flush()
-                link.acknowledge(frame)
                 summary['received'] += 1
-                summary['failed'] += actual != expected
+                summary['failed'] += status == 'FAIL'
+                summary['skipped'] += status == 'SKIP'
                 print(f'{status}: {name}; expected={expected} actual={actual}', flush=True)
         summary['status'] = 'FAIL' if summary['failed'] else 'PASS'
         return 1 if summary['failed'] else 0

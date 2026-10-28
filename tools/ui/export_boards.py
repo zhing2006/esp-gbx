@@ -47,17 +47,19 @@ def lamp_centers(plate, approx, search=14):
     return out
 
 
-def slot_extent(plate, approx):
+def slot_extent(plate, approx, scale):
     """Measure the slot opening around the approximate rect.
 
     Horizontally it is the dark run through the slot centre, because the
     printed text beside the slot is dark too. Vertically it lies between the
     steepest light-to-dark and dark-to-light edges, because the harmonized
-    plates have a lighter sheen in the lower half of the slot.
+    plates have a lighter sheen in the lower half of the slot. The search
+    reaches 10 px around the rect, less where the controls are scaled below
+    0.6, as the groove and the lens below the slot come closer.
     """
     a = np.asarray(plate.convert("L"), dtype=np.int16)
     x, y, w, h = [round(v * S) for v in approx]
-    pad = 10 * S
+    pad = round(10 * S * min(1, scale / 0.6))
     left = max(0, x - pad)
     row = a[y + h // 2, left:x + w + pad] < 75
     lab, _ = ndi.label(ndi.binary_closing(row, iterations=2))
@@ -145,7 +147,7 @@ def export(board):
     sprites = json.load(open(ASSETS / "common" / "sprites.json"))
     scale = 0.5 * spec["control_scale"]
     knob_w = (sprites["sprites"]["knob"]["size"][0] - 2 * SPRITE_MARGIN) * scale
-    sx, sy, sw, sh = slot_extent(plate, spec["slot"])
+    sx, sy, sw, sh = slot_extent(plate, spec["slot"], spec["control_scale"])
     inset = KNOB_INSET * scale
     cy = round(sy + sh / 2, 2)
     manifest = {
@@ -162,8 +164,10 @@ def export(board):
                          "1x": [round(sx + inset + knob_w / 2, 2), cy],
                          "2x": [round(sx + sw - inset - knob_w / 2, 2), cy]},
         "lamps": {k: {"center": c} for k, c in lamp_centers(plate, spec["lamps"]).items()},
-        "vfd": vfd_layout(plate, spec),
     }
+    # A board without a VFD leaves "vfd" out of its spec.
+    if "vfd" in spec:
+        manifest["vfd"] = vfd_layout(plate, spec)
     json.dump(manifest, open(d / "board.json", "w"), indent=2)
 
 

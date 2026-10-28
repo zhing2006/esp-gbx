@@ -1,0 +1,171 @@
+{
+  "sources": [
+    {
+      "source": "ESP32-C5-Touch-LCD-2.8.pdf",
+      "sha256": "22e6ff67d7a5892789acbc362cc3cd4c8d8ddae29fabac16d753ccb83ed501ae",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "01-esp32c5-module.png",
+          "page": 1,
+          "rect_points": [
+            317.1,
+            419.9,
+            533.4,
+            570.8
+          ]
+        },
+        {
+          "file": "02-gpio-table.png",
+          "page": 1,
+          "rect_points": [
+            475.8,
+            19.5,
+            824.2,
+            274.5
+          ]
+        },
+        {
+          "file": "03-usb-c.png",
+          "page": 1,
+          "rect_points": [
+            18.2,
+            19.1,
+            183.9,
+            123.8
+          ]
+        },
+        {
+          "file": "04-battery-charger-power-key.png",
+          "page": 1,
+          "rect_points": [
+            194.1,
+            20.8,
+            460.7,
+            134.8
+          ]
+        },
+        {
+          "file": "05-power-3v3.png",
+          "page": 1,
+          "rect_points": [
+            159.3,
+            304.0,
+            411.8,
+            411.5
+          ]
+        },
+        {
+          "file": "06-io-expander.png",
+          "page": 1,
+          "rect_points": [
+            16.0,
+            498.8,
+            135.0,
+            576.6
+          ]
+        },
+        {
+          "file": "07-lcd-touch.png",
+          "page": 1,
+          "rect_points": [
+            661.0,
+            419.9,
+            822.7,
+            565.5
+          ]
+        },
+        {
+          "file": "08-tf-card.png",
+          "page": 1,
+          "rect_points": [
+            16.0,
+            306.6,
+            138.0,
+            407.7
+          ]
+        },
+        {
+          "file": "09-codec-amplifier.png",
+          "page": 1,
+          "rect_points": [
+            18.2,
+            139.6,
+            474.7,
+            301.9
+          ]
+        },
+        {
+          "file": "10-microphone.png",
+          "page": 1,
+          "rect_points": [
+            18.2,
+            414.8,
+            144.9,
+            494.9
+          ]
+        },
+        {
+          "file": "11-rtc.png",
+          "page": 1,
+          "rect_points": [
+            657.3,
+            304.9,
+            822.7,
+            405.8
+          ]
+        },
+        {
+          "file": "12-keys.png",
+          "page": 1,
+          "rect_points": [
+            553.1,
+            304.9,
+            633.5,
+            392.9
+          ]
+        },
+        {
+          "file": "13-pin-headers.png",
+          "page": 1,
+          "rect_points": [
+            151.9,
+            497.1,
+            299.6,
+            576.6
+          ]
+        },
+        {
+          "file": "14-imu.png",
+          "page": 1,
+          "rect_points": [
+            549.5,
+            419.9,
+            649.2,
+            541.4
+          ]
+        },
+        {
+          "file": "15-shtc3.png",
+          "page": 1,
+          "rect_points": [
+            153.8,
+            416.1,
+            293.9,
+            487.5
+          ]
+        },
+        {
+          "file": "16-title.png",
+          "page": 1,
+          "rect_points": [
+            432.5,
+            344.3,
+            541.8,
+            385.5
+          ]
+        }
+      ]
+    }
+  ]
+}

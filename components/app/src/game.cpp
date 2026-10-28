@@ -152,8 +152,11 @@ bool Game::initialize(std::span<const int16_t, 4> window, Saves& saves, Faults& 
         // whose gaps are underruns.
         platform::audio::pause();
     }
+    // On one core the emulation takes the time the other tasks leave, see
+    // game.h.
+    const unsigned priority = GBX_SINGLE_CORE ? kSingleCorePriority : kEmulationPriority;
     return wake_.initialize(1) && slots_.start(faults, wake_) &&
-           emulation_.start(emulate_entry, this, 1, "gbx-emulate", 8192, 5) &&
+           emulation_.start(emulate_entry, this, 1, "gbx-emulate", 8192, priority) &&
            audio_task_.start(play_entry, this, 0, "gbx-audio", 4096, 7);
 }
 
@@ -214,6 +217,7 @@ void Game::set_palette(const std::array<uint16_t, 4>& palette) {
     uint64_t packed = 0;
     for (int i = 0; i < 4; ++i) packed |= static_cast<uint64_t>(palette[i]) << (16 * i);
     palette_.store(packed, std::memory_order_relaxed);
+    platform::display::set_game_shades(palette);
     const Reader reader(*this);
     if (reader.gb) reader.gb->set_palette(palette);
 }
@@ -451,8 +455,16 @@ size_t Game::level() const {
 #endif
 }
 
+platform::display::PixelFormat Game::gb_format() const {
+    using platform::display::PixelFormat;
+    return mode() == gb::Mode::dmg && platform::display::game_shades_supported() ? PixelFormat::shades
+                                                                                 : PixelFormat::bgr555;
+}
+
 uint16_t* Game::frame_buffer() {
-    return platform::display::game_frame_buffer();
+    // No buffer for a frame the display would leave out: the PPU's worker
+    // then skips filling it.
+    return platform::display::game_frame_due() ? platform::display::game_frame_buffer() : nullptr;
 }
 
 #ifdef GBX_PROFILER
@@ -707,8 +719,13 @@ void Game::frame_ready(uint64_t id) {
     // See capture().
     if (auto* out = capture_.exchange(nullptr, std::memory_order_acquire)) {
         const size_t pixels = gba() ? gba::kFramePixels : gb::kFramePixels;
-        if (const auto* frame = frame_buffer()) {
-            if (gba()) {
+        if (const auto* frame = platform::display::game_frame_buffer()) {
+            if (shades()) {
+                // GB mode's shades in the current palette.
+                const auto palette = this->palette();
+                const auto* shades = reinterpret_cast<const uint8_t*>(frame);
+                for (size_t i = 0; i < pixels; ++i) out[i] = palette[shades[i] & 3];
+            } else if (gba()) {
                 // The GBA's frames are in RGB565: back to BGR555.
                 for (size_t i = 0; i < pixels; ++i) {
                     const unsigned c = frame[i];
@@ -961,9 +978,9 @@ void Game::leave_pause() {
     const bool on_gba = gba();
     const int width = on_gba ? gba::kScreenWidth : 160, height = on_gba ? gba::kScreenHeight : 144;
     // Keep the paused machine and its clock bookkeeping intact on failure.
-    if (!platform::display::show_game(window_, width, height,
-                                      on_gba ? platform::display::PixelFormat::rgb565
-                                             : platform::display::PixelFormat::bgr555)) {
+    const auto format = on_gba ? platform::display::PixelFormat::rgb565 : gb_format();
+    shades_.store(format == platform::display::PixelFormat::shades, std::memory_order_relaxed);
+    if (!platform::display::show_game(window_, width, height, format)) {
         faults_->add("Can't resume: game display unavailable.");
         return;
     }
@@ -972,7 +989,8 @@ void Game::leave_pause() {
     // The paused frame goes up with the layer, so the window is never black.
     // The PPU's worker is idle until the next frame runs.
     if (uint16_t* frame = platform::display::game_frame_buffer()) {
-        paused_pixels({frame, on_gba ? gba::kFramePixels : gb::kFramePixels});
+        if (shades()) std::copy(paused_shades_.begin(), paused_shades_.end(), reinterpret_cast<uint8_t*>(frame));
+        else paused_pixels({frame, on_gba ? gba::kFramePixels : gb::kFramePixels});
         // The GBA's layer takes the renderer's RGB565, the kept frame is
         // BGR555; green's new low bit repeats its top bit, as the renderer's.
         if (on_gba) {
@@ -1392,7 +1410,9 @@ void Game::load(const char* path, Backend backend, bool cgb) {
 #ifdef GBX_PROFILER
     replay_.started(*system_);
 #endif
-    if (!platform::display::show_game(window_, 160, 144)) {
+    const auto format = gb_format();
+    shades_.store(format == platform::display::PixelFormat::shades, std::memory_order_relaxed);
+    if (!platform::display::show_game(window_, 160, 144, format)) {
         saves_->close();
         battery_.store(false);
         fail("Game display unavailable.");
@@ -1582,6 +1602,7 @@ void Game::load_gba(const char* path, Backend backend, int64_t size, const char*
         return;
     }
     if (!slots_.open(path, *gba_system_)) faults_->add("No memory for the instant saves of %s.", file_name(path));
+    shades_.store(false, std::memory_order_relaxed);
     if (!platform::display::show_game(window_, gba::kScreenWidth, gba::kScreenHeight,
                                       platform::display::PixelFormat::rgb565)) {
         saves_->close();

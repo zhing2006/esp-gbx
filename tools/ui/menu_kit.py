@@ -1,10 +1,11 @@
-"""Draw the menus in the 480x320 game window, for the design previews.
+"""Draw the menus in the game window, for the design previews.
 
-The menus are pixel art on a 240x160 grid, shown at 2x: the 12 px font, lines
+The menus are pixel art on a 240x160 grid, shown at 2x in a 480x320 window
+and at 1x in a 240x160 one, as SCALE says: the 12 px font, lines
 and corners all keep the same pixel size. Colors, palettes and icons come from
 assets/ui/common/menu.json and glyphs from menu_font.bin, the same data the
 firmware packs. Each screen function takes a plain description of what the
-screen shows and returns the window as a 480x320 RGB image.
+screen shows and returns the window as an RGB image at SCALE.
 """
 
 import json
@@ -17,7 +18,9 @@ from uikit import ASSETS
 
 THEME = json.load(open(ASSETS / "common" / "menu.json"))
 W, H = THEME["grid"]
-SCALE = THEME["scale"]
+# The menus' scale in the window; use_scale() sets it for the screens drawn
+# after it.
+SCALE = 2
 C = {k: tuple(v) for k, v in THEME["colors"].items()}
 
 LINE = 16      # font line box
@@ -30,6 +33,12 @@ ELLIPSIS = "..."
 CORNERS = {0: [], 1: [1], 2: [2, 1], 3: [3, 1, 1], 4: [4, 2, 1, 1]}
 
 
+def use_scale(scale):
+    """Draw the screens from now on at `scale`, 1 or 2."""
+    global SCALE
+    SCALE = scale
+
+
 class Canvas:
     def __init__(self, fill=C["paper"]):
         self.a = np.zeros((H, W, 3), dtype=np.uint8)
@@ -38,6 +47,13 @@ class Canvas:
         self.pictures = []
 
     def image(self):
+        if SCALE == 1:
+            # The grid takes a picture at half size, from the top left pixel
+            # of each 2x2, as the firmware draws it.
+            for x, y, picture in self.pictures:
+                half = np.asarray(picture)[::2, ::2]
+                self.a[y:y + half.shape[0], x:x + half.shape[1]] = half
+            return Image.fromarray(self.a)
         im = Image.fromarray(self.a).resize((W * SCALE, H * SCALE), Image.NEAREST)
         for x, y, picture in self.pictures:
             im.paste(picture, (x * SCALE, y * SCALE))
@@ -45,7 +61,7 @@ class Canvas:
 
     def picture(self, x, y, im):
         """Place `im` at one screen pixel per pixel, its top left on cell (x, y),
-        over whatever the grid draws."""
+        over whatever the grid draws. At 1x the grid holds it at half size."""
         self.pictures.append((x, y, im.convert("RGB")))
 
     def fill(self, x, y, w, h, color):

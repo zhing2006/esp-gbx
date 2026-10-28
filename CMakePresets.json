@@ -361,6 +361,68 @@
                 "GBX_APP": "device",
                 "GBX_PROFILER": "ON"
             }
+        },
+        {
+            "name": "waveshare_c5_lcd28-debug",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, debug",
+            "binaryDir": "build/waveshare_c5_lcd28-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "waveshare_c5_lcd28-release",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, release",
+            "binaryDir": "build/waveshare_c5_lcd28-release",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "waveshare_c5_lcd28-profile",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, release, profiler",
+            "binaryDir": "build/waveshare_c5_lcd28-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "waveshare_c5_lcd28-test-debug",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, test firmware, debug",
+            "binaryDir": "build/waveshare_c5_lcd28-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "waveshare_c5_lcd28-test-release",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, test firmware, release",
+            "binaryDir": "build/waveshare_c5_lcd28-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "waveshare_c5_lcd28-test-profile",
+            "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, test firmware, release, profiler",
+            "binaryDir": "build/waveshare_c5_lcd28-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "waveshare_c5_lcd28",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
         }
     ]
 }
