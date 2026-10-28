@@ -417,6 +417,9 @@ bool init() {
     if (!platform::touch::start()) {
         platform::log(platform::LogLevel::warn, kTag, "no touch controller, the controls cannot be pressed");
     }
+    if (!platform::keys::start()) {
+        platform::log(platform::LogLevel::warn, kTag, "the physical controls could not start");
+    }
     if (!platform::files::mount()) {
         platform::log(platform::LogLevel::warn, kTag, "no card, no ROM can be loaded");
     }

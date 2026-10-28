@@ -478,6 +478,10 @@ int read(std::span<Point> points) {
 
 namespace keys {
 
+bool start() {
+    return true;
+}
+
 uint16_t read() {
     const uint16_t buttons = held_buttons | pressed_buttons;
     pressed_buttons = 0;

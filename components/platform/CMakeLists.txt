@@ -14,8 +14,13 @@ if(ESP_PLATFORM)
     if(CONFIG_LV_USE_CUSTOM_MALLOC)
         list(APPEND display_sources "src/esp/lvgl_memory.cpp")
     endif()
+    # The USB components come from idf_component.yml only with the option.
+    set(input_sources "")
+    if(CONFIG_GBX_USB_GAMEPAD)
+        list(APPEND input_sources "src/esp/usb_gamepad.cpp")
+    endif()
     idf_component_register(
-        SRCS "src/esp/platform.cpp" ${display_sources}
+        SRCS "src/esp/platform.cpp" ${display_sources} ${input_sources}
              "src/esp/assets.cpp" "src/esp/storage.cpp"
              "src/esp/files.cpp" "src/esp/audio.cpp" "src/esp/executable.cpp" "src/esp/worker.cpp"
         INCLUDE_DIRS "include"

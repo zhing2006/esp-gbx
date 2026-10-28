@@ -57,3 +57,18 @@ config GBX_JIT_CODE_PSRAM
         (CACHE_L2_CACHE_SIZE).
 
 endmenu
+
+menu "GBX input"
+
+config GBX_USB_GAMEPAD
+    bool "Read a HID gamepad on the USB host port"
+    depends on SOC_USB_OTG_SUPPORTED
+    default n
+    help
+        A HID gamepad on the board's USB host port presses the keys of
+        platform::keys::read(), see src/esp/usb_gamepad.cpp. The USB Host
+        Library is in the build only with this option. A board turns it on
+        in boards/<board>/sdkconfig.defaults once a gamepad has worked on
+        its port: not every board's port gives a gamepad 5 V.
+
+endmenu

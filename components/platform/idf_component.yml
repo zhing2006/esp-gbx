@@ -2,3 +2,11 @@
 dependencies:
   lvgl/lvgl: "==9.6.0~1"
   espressif/esp_lvgl_port: "==2.9.0"
+  ## USB gamepads, see GBX_USB_GAMEPAD in Kconfig. The rules stop at the
+  ## first false one: on the chips without USB OTG the option does not
+  ## exist, and reading it would warn.
+  espressif/usb:
+    version: "==1.6.0"
+    rules:
+      - if: "target in [esp32p4, esp32s31]"
+      - if: "$CONFIG{GBX_USB_GAMEPAD} == True"

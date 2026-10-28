@@ -79,6 +79,10 @@ int read(std::span<Point>) {
 
 namespace gbx::platform::keys {
 
+bool start() {
+    return true;
+}
+
 uint16_t read() {
     return 0;
 }
