@@ -256,6 +256,8 @@ private:
     // FrameSink, on the PPU's worker, or on the emulation task where the
     // chip has one core.
     uint16_t* frame_buffer() override;
+    // The buffer the display takes the next frame from, due or not.
+    uint16_t* drawing_buffer() override { return platform::display::game_frame_buffer(); }
     bool shades() const override { return shades_.load(std::memory_order_relaxed); }
     void frame_ready(uint64_t id) override;
     // The game layer's pixels for the GB game loaded: GB mode's shades

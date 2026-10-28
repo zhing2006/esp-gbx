@@ -24,6 +24,11 @@ public:
     // nullptr to skip it. In GB mode, with shades(), kFramePixels bytes of
     // shades instead, 0 the lightest, which the sink colors itself.
     virtual uint16_t* frame_buffer() = 0;
+    // A buffer the renderer may draw a CGB's next frame into, asked at the
+    // frame's first line, or nullptr: frame_buffer()'s buffer, so that the
+    // frame needs no copy when frame_buffer() takes it. It stays the
+    // renderer's until frame_ready(), or until the sink is set again.
+    virtual uint16_t* drawing_buffer() = 0;
     virtual bool shades() const = 0;
     // frame_buffer() now holds frame `id`; a blank screen repeats the id.
     virtual void frame_ready(uint64_t id) = 0;

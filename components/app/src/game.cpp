@@ -987,7 +987,9 @@ void Game::leave_pause() {
     count_pause();
     paused_ = false;
     // The paused frame goes up with the layer, so the window is never black.
-    // The PPU's worker is idle until the next frame runs.
+    // The PPU's worker is idle until the next frame runs. Set again, the sink
+    // has the GB's renderer give back the buffer it may still draw into.
+    if (!on_gba) system_->set_frame_sink(this);
     if (uint16_t* frame = platform::display::game_frame_buffer()) {
         if (shades()) std::copy(paused_shades_.begin(), paused_shades_.end(), reinterpret_cast<uint8_t*>(frame));
         else paused_pixels({frame, on_gba ? gba::kFramePixels : gb::kFramePixels});

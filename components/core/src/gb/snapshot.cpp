@@ -541,7 +541,8 @@ void SnapshotAccess::capture_cgb(System& system, SnapshotState& s) {
     if (const auto* renderer = p.renderer_.get()) {
         std::copy_n(renderer->vram_.begin() + 8192, 8192, g.renderer_vram.begin());
         g.colors = renderer->cgb_colors_;
-        g.front = renderer->color_frames_[renderer->front_]; g.back = renderer->color_frames_[renderer->front_ ^ 1];
+        std::copy_n(renderer->shown_, kFramePixels, g.front.begin());
+        std::copy_n(renderer->back_frame(), kFramePixels, g.back.begin());
     }
     if (p.job_) {
         const auto& row = *static_cast<const Row*>(p.job_);
@@ -707,8 +708,11 @@ void SnapshotAccess::restore_cgb(System& system, const SnapshotState& s) {
             const auto* c = g.colors.data() + palette * 4;
             for (unsigned i = 0; i < 16; ++i) renderer->cgb_pairs_[palette * 16 + i] = c[i & 3] | uint32_t{c[i >> 2]} << 16;
         }
-        renderer->color_frames_[renderer->front_] = g.front;
-        renderer->color_frames_[renderer->front_ ^ 1] = g.back;
+        // A frame under way goes on in the back one.
+        renderer->color_frames_[0] = g.front;
+        renderer->color_frames_[1] = g.back;
+        renderer->shown_ = renderer->color_frames_[0].data();
+        renderer->back_ = renderer->color_frames_[1].data();
         if (s.row.present) {
             auto& row = *static_cast<Row*>(p.job_);
             // A row does not span a speed switch, so the speed restored is

@@ -186,7 +186,7 @@ public:
     // no longer writes. Shades are converted once per requested frame; a
     // CGB's frames are in color already.
     std::span<const uint16_t> pixels() {
-        if (mode_ != Mode::dmg) return color_frames_[front_];
+        if (mode_ != Mode::dmg) return {shown_, kFramePixels};
         if (converted_ != frames_) {
             const auto& shades = shades_[front_];
             for (unsigned i = 0; i < kFramePixels; ++i) pixels_[i] = kGrays[shades[i]];
@@ -197,8 +197,22 @@ public:
     std::span<const uint8_t> shades() const { return shades_[front_]; }
     uint64_t id() const { return id_; }
     // The caller has finished the renderer, which reads sink_ only while it
-    // consumes a row submitted after this.
-    void set_sink(FrameSink* sink) { sink_ = sink; }
+    // consumes a row submitted after this. The color frames it keeps in the
+    // sink's buffer, the frame being drawn and the one shown last, move into
+    // its own, as the buffer is the sink's again.
+    void set_sink(FrameSink* sink) {
+        if (!owns(shown_)) {
+            auto* keep = spare(back_);
+            std::memcpy(keep, shown_, sizeof(color_frames_[0]));
+            shown_ = keep;
+        }
+        if (back_ && !owns(back_)) {
+            auto* keep = spare(shown_);
+            std::memcpy(keep, back_, sizeof(color_frames_[0]));
+            back_ = keep;
+        }
+        sink_ = sink;
+    }
     void set_palette(uint64_t packed) { palette_colors_.store(packed, std::memory_order_relaxed); }
 private:
     friend struct SnapshotAccess;
@@ -218,6 +232,11 @@ private:
     // A CGB's frames, in either mode, and its palette RAM as 32 BG colors
     // and 32 OBJ colors; bit 15 is ignored (Pan Docs, LCD Color Palettes).
     std::array<std::array<uint16_t, kFramePixels>, 2> color_frames_{};
+    // The color frame shown last and the one being drawn, each in one of
+    // color_frames_ or in the sink's buffer, see FrameSink::drawing_buffer().
+    // back_ is chosen at the frame's first line, see color_line().
+    const uint16_t* shown_ = color_frames_[0].data();
+    uint16_t* back_ = nullptr;
     std::array<uint16_t, 64> cgb_colors_{};
     // The colors of two pixels in each BG palette, the left one in the low
     // half, 16 per palette: the left pixel's color number plus 4 times the
@@ -247,8 +266,12 @@ private:
         auto& r = self.rows_[index % kCapacity];
         if (r.kind == Row::Kind::line) { self.render(r); return; }
         self.mode_ = r.mode;
-        if (r.kind == Row::Kind::frame) { self.front_ ^= 1; ++self.frames_; self.id_ = r.id; }
-        else {
+        if (r.kind == Row::Kind::frame) {
+            self.front_ ^= 1; ++self.frames_; self.id_ = r.id;
+            // A frame that drew no line shows the spare frame.
+            if (r.mode != Mode::dmg) self.shown_ = self.back_ ? self.back_ : self.spare(self.shown_);
+            self.back_ = nullptr;
+        } else {
             // The LCD turned off: the screen is white.
             if (r.mode == Mode::dmg) for (auto& frame : self.shades_) frame.fill(0);
             else
@@ -257,6 +280,8 @@ private:
                     std::fill_n(frame.data(), 160, kWhite);
                     for (unsigned y = 1; y < 144; ++y) std::memcpy(frame.data() + y * 160, frame.data(), 320);
                 }
+            self.shown_ = self.color_frames_[self.front_].data();
+            self.back_ = nullptr;
             ++self.frames_; self.id_ = r.id;
         }
         if (self.sink_) self.deliver();
@@ -265,7 +290,8 @@ private:
         auto* out = sink_->frame_buffer();
         if (!out) return;
         if (mode_ != Mode::dmg) {
-            std::memcpy(out, color_frames_[front_].data(), sizeof(color_frames_[front_]));
+            // A frame drawn into the sink's buffer is there already.
+            if (out != shown_) std::memcpy(out, shown_, sizeof(color_frames_[0]));
             sink_->frame_ready(id_);
             return;
         }
@@ -281,6 +307,25 @@ private:
         for (unsigned i = 0; i < kFramePixels; ++i) out[i] = palette[shades[i]];
         sink_->frame_ready(id_);
     }
+    bool owns(const uint16_t* frame) const {
+        return frame == color_frames_[0].data() || frame == color_frames_[1].data();
+    }
+    // The renderer's color frame that is not `frame`.
+    uint16_t* spare(const uint16_t* frame) { return color_frames_[frame == color_frames_[0].data()].data(); }
+    // The back frame of a state: the frame being drawn, or the spare one.
+    const uint16_t* back_frame() const {
+        return back_ ? back_ : color_frames_[shown_ == color_frames_[0].data()].data();
+    }
+    // Line y of the color frame being drawn. Its first line chooses the
+    // sink's buffer, unless that holds the frame shown last, which stays
+    // until this one ends; otherwise the spare frame.
+    uint16_t* color_line(unsigned y) {
+        if (!back_) {
+            uint16_t* out = sink_ ? sink_->drawing_buffer() : nullptr;
+            back_ = out && out != shown_ ? out : spare(shown_);
+        }
+        return back_ + y * 160;
+    }
     // The BGR555 colors of a compatibility-mode line: BGP's shades index BG
     // palette 0, OBP0's and OBP1's OBJ palettes 0 and 1 (Pan Docs, Power Up
     // Sequence, Compatibility palettes). shade holds the shade, plus 4 for
@@ -289,7 +334,7 @@ private:
         std::array<uint16_t, 12> lookup;
         std::copy_n(cgb_colors_.begin(), 4, lookup.begin());
         std::copy_n(cgb_colors_.begin() + 32, 8, lookup.begin() + 4);
-        auto* out = color_frames_[front_ ^ 1].data() + r.y * 160;
+        auto* out = color_line(r.y);
         for (unsigned x = 0; x < 160; ++x) out[x] = lookup[shade[x]];
     }
     // Rows without changes in mode 3 decode whole tile rows: kNibbleColors
@@ -300,7 +345,7 @@ private:
         const bool compat = mode_ == Mode::compat;
         if (r.blank) {
             if (!compat) std::memset(shades_[front_ ^ 1].data() + r.y * 160, 0, 160);
-            else std::fill_n(color_frames_[front_ ^ 1].data() + r.y * 160, 160, kWhite);
+            else std::fill_n(color_line(r.y), 160, kWhite);
             return;
         }
         const auto* regs = r.registers.data();
@@ -382,7 +427,7 @@ private:
     // and palette, and resolve among themselves by OAM index (Object Priority
     // and Conflicts).
     void segment_cgb(Row& r) {
-        auto* out = color_frames_[front_ ^ 1].data() + r.y * 160;
+        auto* out = color_line(r.y);
         if (r.blank) { std::fill_n(out, 160, kWhite); return; }
         const auto* regs = r.registers.data();
         const auto lcdc = regs[0];
@@ -667,7 +712,7 @@ private:
             }
         }
         if constexpr (cgb) {
-            auto* out = color_frames_[front_ ^ 1].data() + r.y * 160;
+            auto* out = color_line(r.y);
             for (unsigned x = 0; x < 160; ++x) {
                 const int dot = delayed(18 + r.fine + x);
                 const auto lcdc = reg(0, dot + (x == 0));
@@ -704,7 +749,7 @@ private:
                 if (compat) out[x] |= static_cast<uint8_t>((palette - 7) * 4);
             }
             if (compat) {
-                if (r.blank) std::fill_n(color_frames_[front_ ^ 1].data() + r.y * 160, 160, kWhite);
+                if (r.blank) std::fill_n(color_line(r.y), 160, kWhite);
                 else compatible(r, shade);
             }
         }

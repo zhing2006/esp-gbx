@@ -219,7 +219,7 @@ GBA 的声音按同样的方式划分（`gba_sound.cpp` 和 `src/gba/mixer.h`）
 
 - 按键：由 CPU 的拥有者提交。
 - 串口：只支持内部时钟、没有对端的传输。
-- 画面：设置了 `FrameSink` 时，工作线程直接交付 BGR555 帧，`FrameSink::shades()` 为真时 GB 模式的帧按灰阶交付；否则由读取方取最近一帧。
+- 画面：设置了 `FrameSink` 时，工作线程直接交付 BGR555 帧，`FrameSink::shades()` 为真时 GB 模式的帧按灰阶交付；否则由读取方取最近一帧。CGB 的帧直接画进 `FrameSink::drawing_buffer()` 给的显示缓冲，交付时不用再复制一遍。那块缓冲里还放着最近完成、没有交出去的一帧时，渲染器就画进自己的缓冲，交付时再复制。即时存档和暂停画面读的都是最近完成的一帧，不管它在哪块缓冲里。
 - 声音：按调用者给定的采样率返回 16 位立体声 PCM，每秒生成的帧数可以微调，供按音频水位控制节奏的调用者使用。
 - RTC：取出或写回完整状态，或者加上一段经过的时间。
 - 卡带存档：取出、写回卡带 RAM，并报告上次查询以来可能写过的 bank 和时钟寄存器。
@@ -275,7 +275,7 @@ PC 版也按一块板子处理，平台实现是 `components/platform/src/host/`
 
 界面用 LVGL 绘制，游戏画面不经过 LVGL，两者分开刷新。
 
-屏幕的帧缓冲由 `components/platform/src/esp/` 的呈现任务独占，其他代码不能直接写帧缓冲或调用 `esp_lcd_panel_draw_bitmap()`。LVGL 在 PSRAM 里画整屏的 UI，呈现任务只把变化的区域复制进后台缓冲，需要时同时旋转，再在帧之间切换缓冲，所以画面不撕裂，也不用每次重传整屏。MIPI DSI 屏用 ESP-IDF 的 DPI 驱动，RGB 并口屏用 RGB 驱动，`board::display_init()` 返回的 `PanelDriver` 告诉呈现任务从哪个驱动取帧缓冲和换帧事件，两种屏的呈现流程相同。SPI 屏自己的显存保存画面，所以呈现任务在 PSRAM 里只留一个帧缓冲，照样更新变化的区域，再把变化的行发给面板，等传输读完这些行才继续改帧缓冲。面板没有接 TE 信号时，可能显示更新到一半的画面。不旋转的 SPI 屏上，游戏画面不经过帧缓冲：呈现任务在片内 RAM 的两段缓冲里逐段转换画面的行，一段在发送时转换另一段。因为 ESP32-C5 的 PSRAM 是四线的，画面先写进 PSRAM 里的帧缓冲、写回缓存，再由 DMA 读出来，会多占很多 PSRAM 带宽。整幅画面的行先用 CASET 和 RASET 定好窗口，第一段用 RAMWR 发送，后面的段用 RAMWRC 接着写（ST7789V2 数据手册 9.1.33），每段只有一次传输。所以面板控制器要支持 MIPI DCS 的 write_memory_continue，板子也不能给面板设偏移（gap）。`GBX_DISPLAY_GAME_HALF_RATE` 让呈现任务每 25ms 最多取一帧游戏画面，原速时只显示一半的帧；`game_frame_due()` 告诉生产者哪些帧不会被取走，GB 的渲染器就不填这些帧。C5 打开了这一项，理由写在 `components/platform/Kconfig`。
+屏幕的帧缓冲由 `components/platform/src/esp/` 的呈现任务独占，其他代码不能直接写帧缓冲或调用 `esp_lcd_panel_draw_bitmap()`。LVGL 在 PSRAM 里画整屏的 UI，呈现任务只把变化的区域复制进后台缓冲，需要时同时旋转，再在帧之间切换缓冲，所以画面不撕裂，也不用每次重传整屏。MIPI DSI 屏用 ESP-IDF 的 DPI 驱动，RGB 并口屏用 RGB 驱动，`board::display_init()` 返回的 `PanelDriver` 告诉呈现任务从哪个驱动取帧缓冲和换帧事件，两种屏的呈现流程相同。SPI 屏自己的显存保存画面，所以呈现任务在 PSRAM 里只留一个帧缓冲，照样更新变化的区域，再把变化的行发给面板，等传输读完这些行才继续改帧缓冲。面板没有接 TE 信号时，可能显示更新到一半的画面。不旋转的 SPI 屏上，游戏画面不经过帧缓冲：呈现任务在片内 RAM 的两段缓冲里逐段转换画面的行，一段在发送时转换另一段。因为 ESP32-C5 的 PSRAM 是四线的，画面先写进 PSRAM 里的帧缓冲、写回缓存，再由 DMA 读出来，会多占很多 PSRAM 带宽。整幅画面的行先用 CASET 和 RASET 定好窗口，第一段用 RAMWR 发送，后面的段用 RAMWRC 接着写（ST7789V2 数据手册 9.1.33），每段只有一次传输。所以面板控制器要支持 MIPI DCS 的 write_memory_continue，板子也不能给面板设偏移（gap）。`GBX_DISPLAY_GAME_HALF_RATE` 让呈现任务每 25ms 最多取一帧游戏画面，原速时只显示一半的帧；`game_frame_due()` 告诉生产者哪些帧不会被取走，GB 的渲染器就不交出这些帧。C5 打开了这一项，理由写在 `components/platform/Kconfig`。
 
 游戏画面通过 `display.h` 的游戏层交给呈现任务。生产者发布最新的一帧，呈现任务只取最新的，旧帧跳过。游戏层的三个帧缓冲在显示启动时按编入的系统里最大的画面分配，有 GBA 时是 240×160，只编入 GB 时是 160×144，以后不再释放，因为生产者随时可能拿着其中一个；如果等到第一个游戏才分配，它们会落在这个游戏的块中间，游戏退出以后把 PSRAM 切开。呈现任务把 BGR555 转成面板格式，按整数倍放大写进游戏窗口。不旋转的 SPI 屏分段发送时也接受 GB 模式的灰阶（`PixelFormat::shades`，每像素一字节），呈现任务按当前调色板的四种颜色转换，渲染器就不用先把灰阶转成 BGR555 写进 PSRAM；其他显示不接受，`game_shades_supported()` 返回 false。`NEAREST` 和 `SMOOTH` 的窗口、尺寸和黑边相同。这一步转换可以借用模拟所在核的空闲时间，由 `Game` 决定，理由写在 `components/app/src/game.h`。
 
