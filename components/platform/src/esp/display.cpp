@@ -379,10 +379,15 @@ void present_loop(void*) {
     uint32_t frames_taken = 0;                 // frames read since the latest show_game()
     int reader = 0;
     uint64_t counted_id = ~uint64_t{0};
-    bool deferred = false;  // a fresh frame waits for kGameFrameGapUs
+    int64_t defer_until = 0;  // when a fresh frame waiting for kGameFrameGapUs is due
     for (;;) {
         GBX_IF_PROFILER(present_stage.store(PresentStage::notify, std::memory_order_relaxed);)
-        ulTaskNotifyTake(pdTRUE, deferred ? pdMS_TO_TICKS(kGameFrameGapUs / 1000 + 1) : portMAX_DELAY);
+        TickType_t wait = portMAX_DELAY;
+        if (defer_until) {
+            const int64_t left = defer_until - esp_timer_get_time();
+            wait = left > 0 ? pdMS_TO_TICKS(left / 1000 + 1) : 0;
+        }
+        ulTaskNotifyTake(pdTRUE, wait);
         GBX_IF_PROFILER(present_stage.store(PresentStage::dispatch, std::memory_order_relaxed);
                         const int64_t busy_start = esp_timer_get_time();
                         const uint32_t scans_start = frames_done.load(std::memory_order_relaxed);)
@@ -415,7 +420,9 @@ void present_loop(void*) {
             now.add(old_window);
         }
         const bool fresh = layer.shown && (ready.load(std::memory_order_acquire) & kFresh);
-        deferred = fresh && esp_timer_get_time() - taken_us.load(std::memory_order_relaxed) < kGameFrameGapUs;
+        const int64_t taken = taken_us.load(std::memory_order_relaxed);
+        const bool deferred = fresh && esp_timer_get_time() - taken < kGameFrameGapUs;
+        defer_until = deferred ? taken + kGameFrameGapUs : 0;
         if (fresh && !deferred) {
             taken_us.store(esp_timer_get_time(), std::memory_order_relaxed);
             reader = static_cast<int>(ready.exchange(reader, std::memory_order_acq_rel) & 3);
