@@ -21,3 +21,9 @@ CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 
 # Keep the QIO bootloader within the 0x2000..0x8000 boot area.
 CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# A HID gamepad on the USB-A port, which has 5 V whenever the board does.
+# The USB controller's DMA buffers go to PSRAM, leaving internal RAM to the
+# JIT.
+CONFIG_GBX_USB_GAMEPAD=y
+CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM=y

@@ -234,7 +234,7 @@ GPIO4、5、6、20、21 只在使用 J3 的屏幕时有意义。本项目的屏�
 
 烧录 P4 时，S1 要拨向 P4，资料仓库的 README 写的是“往上拨烧录 ESP32-P4”。esptool 通过 DTR/RTS 自动进入下载模式和复位。手动进入下载模式时按住 BOOT 键 K2（GPIO35）再按 RESET 键 K1。S1 拨向 C5 时，串口、复位和 BOOT 都切到 C5，这时不能烧录 P4。
 
-另一个 Type-C 口 J8 接 P4 的高速 USB。U15 由 J8 的 VIN2_5V 经 Q1 控制：J8 有 5V 时 P4 的 USB 接到 J8，否则接到 USB-A。项目只用调试口。
+另一个 Type-C 口 J8 接 P4 的高速 USB。U15 由 J8 的 VIN2_5V 经 Q1 控制：J8 有 5V 时 P4 的 USB 接到 J8，否则接到 USB-A。USB-A 的 5V 由 U12 MT9700 从 VIN_5V 得到，EN 经 R41 上拉到 VIN_5V，板子有电时一直输出（`09-usb-host.png`）。项目在 USB-A 上接 USB 手柄，这块板子打开了 `GBX_USB_GAMEPAD`。用手柄时 J8 不能插线，烧录和日志都走调试口 J7。
 
 出厂固件没有备份。厂商的 IDF6 示例可以重新编译，作为接近出厂状态的显示和触摸程序。资料仓库的 `firmware/ESP32C5_2.12.9_0X0.bin` 是 C5 的合并镜像，要把 S1 拨向 C5 后烧到 `0x0`，不是 P4 的恢复镜像。
 

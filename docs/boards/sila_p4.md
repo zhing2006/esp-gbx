@@ -209,7 +209,7 @@ SY7200 方框的电源端口标为 `+5V`，连接的网络却标为 `+3.3V`，�
 
 烧录接口是 CH340 转 UART0，VID:PID 为 `1a86:7523`。板级控制台选择 `CONFIG_ESP_CONSOLE_UART_CUSTOM=y`，UART0 仍使用 GPIO37/38，波特率由公共配置设为 460800。`CONFIG_ESP_CONSOLE_SECONDARY_NONE=y` 关闭了默认的 USB-Serial/JTAG 辅助控制台，因为 GPIO24/25 用于屏幕和触摸。esptool 可以通过 DTR/RTS 自动进入下载模式和复位，无需按 GPIO47 用户键。
 
-底板 Type-C 方框还画了另一组 USB_DP/DM，通向 P4 的专用高速 USB 引脚；SERIAL_DP/DN 才通向 CH340。图纸没有展开两个物理口的具体排列、CC 和 VBUS 保护，不能仅凭这个方框认定 OTG host 供电可用。项目使用 CH340 链路烧录和读取日志。
+底板 Type-C 方框还画了另一组 USB_DP/DM，通向 P4 的专用高速 USB 引脚；SERIAL_DP/DN 才通向 CH340。图纸没有展开两个物理口的具体排列、CC 和 VBUS 保护。实物上有两个 Type-C 口，板子由串口供电时，插在串口旁边那个口上的 DualSense 不亮，P4 也检测不到设备，所以这个口按不对外输出 5V 处理，这块板子没有打开 `GBX_USB_GAMEPAD`。项目使用 CH340 链路烧录和读取日志。
 
 使用 esptool 时应指定 `--chip esp32p4`，不能照资料包中 ESP32-S3 的通用教程操作。完整 flash 备份读取使用 230400 baud，备份文件需要读回校验。
 
