@@ -10,6 +10,7 @@
 
 #include "gbx/gba/system.h"
 #include "gbx/platform.h"
+#include "../common/encoding.h"
 #include "../gb/offload.h"
 #include "mixer.h"
 #include "renderer.h"
@@ -72,24 +73,10 @@ std::array<uint32_t, Ppu::kDirtyWords> to_ppu(const std::array<uint32_t, kDirtyW
     return marks;
 }
 
-constexpr std::array<uint32_t, 256> kCrcTable = [] {
-    std::array<uint32_t, 256> table{};
-    for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t c = i;
-        for (int k = 0; k < 8; ++k) c = c & 1 ? 0xedb88320u ^ (c >> 1) : c >> 1;
-        table[i] = c;
-    }
-    return table;
-}();
-uint32_t crc32(std::span<const uint8_t> data) {
-    uint32_t c = 0xffffffffu;
-    for (uint8_t b : data) c = kCrcTable[(c ^ b) & 0xff] ^ (c >> 8);
-    return c ^ 0xffffffffu;
-}
-uint32_t get16(const uint8_t* p) { return p[0] | p[1] << 8; }
-uint32_t get32(const uint8_t* p) { return get16(p) | get16(p + 2) << 16; }
-void put16(uint8_t* p, uint32_t v) { p[0] = static_cast<uint8_t>(v); p[1] = static_cast<uint8_t>(v >> 8); }
-void put32(uint8_t* p, uint32_t v) { put16(p, v); put16(p + 2, v >> 16); }
+using encoding::get16;
+using encoding::get32;
+using encoding::put16;
+using encoding::put32;
 }  // namespace
 
 // Everything a running GBA holds, as plain copies. Device classes keep their
@@ -354,91 +341,60 @@ template<class S, class F> void fields(S& s, F& f) {
     f(m.sum_left); f(m.sum_right);
 }
 
-template<class T> constexpr size_t width() {
-    if constexpr (std::is_enum_v<T>) return 1;
-    else return sizeof(T);
-}
-
-class Writer {
+class Writer : public encoding::Output {
 public:
-    explicit Writer(uint8_t* out) : out_(out) {}
-    template<class T> void operator()(const T& value) {
-        uint64_t v;
-        if constexpr (std::is_enum_v<T>) v = static_cast<uint8_t>(value);
-        else if constexpr (std::is_same_v<T, bool>) v = value;
-        else v = static_cast<std::make_unsigned_t<T>>(value);
-        for (size_t i = 0; i < width<T>(); ++i) out_[size_++] = static_cast<uint8_t>(v >> (i * 8));
-    }
-    void bytes(std::span<const uint8_t> data) { std::memcpy(out_ + size_, data.data(), data.size()); size_ += data.size(); }
-    void words(std::span<const uint16_t> data) {
-        for (uint16_t w : data) { out_[size_++] = static_cast<uint8_t>(w); out_[size_++] = static_cast<uint8_t>(w >> 8); }
-    }
-    bool present(bool flag) const { return flag; }
-    size_t limit(size_t count, size_t) const { return count; }
+    using Output::Output;
     uint32_t mask(uint32_t word, uint32_t) const { return word; }
-    size_t size() const { return size_; }
-private:
-    uint8_t* out_;
-    size_t size_ = 0;
 };
 
-// Counts the largest payload: every optional field there, every page and
-// write. It reads no field.
+// Counts a payload: with `largest` the largest one, with every optional
+// field there and every page and write, which reads no field; otherwise the
+// one of the state it visits.
 class Measure {
 public:
-    template<class T> void operator()(const T&) { size_ += width<T>(); }
+    explicit Measure(bool largest) : largest_(largest) {}
+    template<class T> void operator()(const T&) { size_ += encoding::width<T>(); }
     void bytes(std::span<const uint8_t> data) { size_ += data.size(); }
     void words(std::span<const uint16_t> data) { size_ += data.size() * 2; }
-    bool present(bool) const { return true; }
-    size_t limit(size_t, size_t capacity) const { return capacity; }
-    uint32_t mask(uint32_t, uint32_t full) const { return full; }
+    bool present(bool flag) const { return largest_ || flag; }
+    size_t limit(size_t count, size_t capacity) const { return largest_ ? capacity : count; }
+    uint32_t mask(uint32_t word, uint32_t full) const { return largest_ ? full : word; }
     size_t size() const { return size_; }
 private:
+    bool largest_;
     size_t size_ = 0;
 };
 
-class Reader {
+class Reader : public encoding::Input {
 public:
-    explicit Reader(std::span<const uint8_t> in) : in_(in) {}
-    template<class T> void operator()(T& value) {
-        if (!take(width<T>())) { value = T{}; return; }
-        uint64_t v = 0;
-        for (size_t i = 0; i < width<T>(); ++i) v |= uint64_t{in_[at_ - width<T>() + i]} << (i * 8);
-        if constexpr (std::is_same_v<T, bool>) {
-            ok_ &= v <= 1;
-            value = v;
-        } else value = static_cast<T>(v);
-    }
-    void bytes(std::span<uint8_t> data) {
-        if (take(data.size())) std::memcpy(data.data(), in_.data() + at_ - data.size(), data.size());
-    }
-    void words(std::span<uint16_t> data) {
-        if (!take(data.size() * 2)) return;
-        const auto* in = in_.data() + at_ - data.size() * 2;
-        for (size_t i = 0; i < data.size(); ++i) data[i] = static_cast<uint16_t>(in[2 * i] | in[2 * i + 1] << 8);
-    }
-    bool present(bool flag) const { return flag; }
-    // A count beyond its array makes the state invalid; read no more.
-    size_t limit(size_t count, size_t capacity) {
-        if (count > capacity) { ok_ = false; return 0; }
-        return count;
-    }
+    using Input::Input;
     uint32_t mask(uint32_t word, uint32_t full) {
-        if (word & ~full) { ok_ = false; return 0; }
+        if (word & ~full) { fail(); return 0; }
         return word;
     }
-    bool ok() const { return ok_; }
-    size_t position() const { return at_; }
-private:
-    std::span<const uint8_t> in_;
-    size_t at_ = 0;
-    bool ok_ = true;
-    bool take(size_t n) {
-        if (!ok_ || in_.size() - at_ < n) { ok_ = false; return false; }
-        at_ += n;
-        return true;
-    }
 };
+
+// The header of an encoding.
+struct Header {
+    RomIdentity identity{};
+    size_t backup = 0, payload = 0;
+};
+// Reads the header of an encoding of `size` bytes. It is filled in unless
+// the encoding is unknown, of another system or of another version.
+Snapshot::Status read_header(Reader& reader, size_t size, Header& out) {
+    using Status = Snapshot::Status;
+    uint8_t h[kHeader];
+    if (size < kHeader || !reader.take(h, kHeader) || std::memcmp(h, kMagic, sizeof kMagic) != 0)
+        return Status::unknown;
+    if (get16(h + 10) != kSystem) return Status::system;
+    if (get16(h + 8) != kVersion) return Status::version;
+    std::copy_n(h + 12, out.identity.size(), out.identity.begin());
+    out.backup = get32(h + 36);
+    out.payload = get32(h + 40);
+    if (out.backup > kMaxBackup || out.payload < out.backup || size != kHeader + out.payload + kTrailer)
+        return Status::damaged;
+    return Status::ok;
+}
 
 // Values that index arrays, divide or pick code paths. A state that passes
 // its checksum was written by this version, so these hold unless it was
@@ -866,57 +822,76 @@ std::span<const uint16_t> Snapshot::frame() const {
 
 size_t Snapshot::max_encoded() const {
     if (!state_) return 0;
-    Measure measure;
+    Measure measure(true);
     fields(*state_, measure);
     return kHeader + measure.size() + kMaxBackup + kTrailer;
 }
 
+size_t Snapshot::encoded_size() const {
+    if (!valid_) return 0;
+    Measure measure(false);
+    fields(*state_, measure);
+    return kHeader + measure.size() + backup().size() + kTrailer;
+}
+
 size_t Snapshot::encode(std::span<uint8_t> out) const {
     if (!valid_ || out.size() < max_encoded()) return 0;
-    Writer writer(out.data() + kHeader);
-    fields(*state_, writer);
+    return encode(out, nullptr, nullptr);
+}
+
+size_t Snapshot::encode(std::span<uint8_t> buffer, PieceSink sink, void* context) const {
+    const size_t size = encoded_size();
+    if (!size) return 0;
+    const size_t payload = size - kHeader - kTrailer;
     const auto backup = this->backup();
-    writer.bytes(backup);
-    const size_t payload = writer.size();
-    auto* h = out.data();
+    uint8_t h[kHeader];
     std::memcpy(h, kMagic, sizeof kMagic);
     put16(h + 8, kVersion);
     put16(h + 10, kSystem);
     std::copy(identity_.begin(), identity_.end(), h + 12);
     put32(h + 36, static_cast<uint32_t>(backup.size()));
     put32(h + 40, static_cast<uint32_t>(payload));
-    const size_t size = kHeader + payload;
-    put32(h + size, crc32({h, size}));
-    return size + kTrailer;
+    Writer writer(buffer, sink, context);
+    writer.bytes(h);
+    fields(*state_, writer);
+    writer.bytes(backup);
+    return writer.written() == kHeader + payload && writer.finish() ? size : 0;
 }
 
 Snapshot::Status Snapshot::inspect(std::span<const uint8_t> bytes, RomIdentity* identity) {
-    if (bytes.size() < kHeader || std::memcmp(bytes.data(), kMagic, sizeof kMagic) != 0) return Status::unknown;
-    const auto* h = bytes.data();
-    if (get16(h + 10) != kSystem) return Status::system;
-    if (get16(h + 8) != kVersion) return Status::version;
-    if (identity) std::copy_n(h + 12, identity->size(), identity->begin());
-    const size_t backup = get32(h + 36), payload = get32(h + 40);
-    if (backup > kMaxBackup || payload < backup || bytes.size() != kHeader + payload + kTrailer ||
-        crc32(bytes.first(kHeader + payload)) != get32(h + kHeader + payload))
-        return Status::damaged;
-    return Status::ok;
+    encoding::Whole whole{bytes};
+    return inspect(bytes.size(), encoding::Whole::next, &whole, identity);
+}
+
+Snapshot::Status Snapshot::inspect(size_t size, PieceSource source, void* context, RomIdentity* identity) {
+    Reader reader(source, context, size);
+    Header header;
+    const auto status = read_header(reader, size, header);
+    if (status == Status::unknown || status == Status::system || status == Status::version) return status;
+    if (identity) *identity = header.identity;
+    if (status != Status::ok) return status;
+    return reader.take(nullptr, header.payload) && reader.check() ? Status::ok : Status::damaged;
 }
 
 Snapshot::Status Snapshot::decode(std::span<const uint8_t> bytes) {
+    encoding::Whole whole{bytes};
+    return decode(bytes.size(), encoding::Whole::next, &whole);
+}
+
+Snapshot::Status Snapshot::decode(size_t size, PieceSource source, void* context) {
     valid_ = false;
-    RomIdentity identity{};
-    const auto status = inspect(bytes, &identity);
+    Reader reader(source, context, size);
+    Header header;
+    const auto status = read_header(reader, size, header);
     if (status != Status::ok) return status;
     if (!state_) return Status::damaged;
-    const size_t backup = get32(bytes.data() + 36), payload = get32(bytes.data() + 40);
-    Reader reader(bytes.subspan(kHeader, payload));
     fields(*state_, reader);
-    if (!reader.ok() || backup != Backup::size_of(state_->backup.type)) return Status::damaged;
-    state_->backup.size = static_cast<uint32_t>(backup);
-    reader.bytes(std::span(state_->backup.data).first(backup));
-    if (!reader.ok() || reader.position() != payload || !plausible(*state_)) return Status::damaged;
-    identity_ = identity;
+    if (!reader.ok() || header.backup != Backup::size_of(state_->backup.type)) return Status::damaged;
+    state_->backup.size = static_cast<uint32_t>(header.backup);
+    reader.bytes(std::span(state_->backup.data).first(header.backup));
+    if (!reader.ok() || reader.position() != kHeader + header.payload || !reader.check() || !plausible(*state_))
+        return Status::damaged;
+    identity_ = header.identity;
     valid_ = true;
     return Status::ok;
 }

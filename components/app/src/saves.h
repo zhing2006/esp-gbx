@@ -18,8 +18,9 @@
 
 namespace gbx::app {
 
-// CRC-32 with the zlib polynomial, the check of the app's files.
-uint32_t crc32(std::span<const uint8_t> data);
+// CRC-32 with the zlib polynomial, the check of the app's files, going on
+// from `crc`, the value of the bytes before, as zlib's crc32() does.
+uint32_t crc32(std::span<const uint8_t> data, uint32_t crc = 0);
 
 // The part of a ROM path that its save and state paths keep: the path below
 // roms/ without the extension, or the file name for a path outside roms/.

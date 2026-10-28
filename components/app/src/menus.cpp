@@ -1491,8 +1491,7 @@ void Menus::build_slots(Screen& s) {
     s.slots.enabled[0] = !busy && listed;
     s.slots.enabled[1] = !busy && ok;
     // A slot of another mode cannot load, but shows its frame.
-    if (ok || (listed && info.kind == Slots::Kind::mode)) {
-        send_thumbnail(slot_selected_ + 1, slots.generation());
+    if ((ok || (listed && info.kind == Slots::Kind::mode)) && send_thumbnail(slot_selected_ + 1, slots.generation())) {
         s.slots.thumbnail = true;
         s.slots.thumbnail_id = thumbnail_id_;
     }
@@ -1506,10 +1505,12 @@ void Menus::build_slots(Screen& s) {
     }
 }
 
-void Menus::send_thumbnail(int slot, uint32_t generation) {
+bool Menus::send_thumbnail(int slot, uint32_t generation) {
     const ThumbnailKey key{slot, generation, parts_.game->palette(), parts_.game->color_fix()};
-    if (key == thumbnail_key_ && thumbnail_id_) return;
-    if (!parts_.game->slots().thumbnail(slot, *thumbnail_)) return;
+    if (key == thumbnail_key_ && thumbnail_id_) return true;
+    // Slots reads the thumbnail from the card first; generation changes
+    // once it has.
+    if (!parts_.game->slots().thumbnail(slot, *thumbnail_)) return false;
     thumbnail_key_ = key;
     const Slots::Thumbnail& t = *thumbnail_;
 #if GBX_HAS_GBA
@@ -1518,7 +1519,7 @@ void Menus::send_thumbnail(int slot, uint32_t generation) {
         std::copy_n(t.colors.begin(), gba::kFramePixels, thumbnail_pixels_);
         parts_.view->set_thumbnail({thumbnail_pixels_, gba::kFramePixels}, gba::kScreenWidth, gba::kScreenHeight);
         ++thumbnail_id_;
-        return;
+        return true;
     }
 #endif
     if (t.mode == gb::Mode::dmg) {
@@ -1532,6 +1533,7 @@ void Menus::send_thumbnail(int slot, uint32_t generation) {
     }
     parts_.view->set_thumbnail({thumbnail_pixels_, gb::kFramePixels}, 160, 144);
     ++thumbnail_id_;
+    return true;
 }
 
 // The footer for the selected slot and the cursor's button.

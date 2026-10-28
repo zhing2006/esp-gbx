@@ -112,38 +112,76 @@ int64_t read_start(const char* path, std::span<uint8_t> out) {
 }
 
 Error write(const char* path, std::span<const uint8_t> data, std::atomic<size_t>* written) {
+    Writer file;
+    Error error = file.open(path);
+    for (size_t done = 0; error == Error::none && done < data.size();) {
+        const size_t n = std::min(data.size() - done, kChunk);
+        error = file.write(data.subspan(done, n));
+        done += n;
+        if (written && error == Error::none) written->store(done, std::memory_order_relaxed);
+    }
+    return error == Error::none ? file.finish() : error;
+}
+
+Error Writer::open(const char* path) {
+    close();
     std::lock_guard lock(card);
     CardPath full(path);
     if (!full.ok()) return Error::failed;
     // No O_TRUNC: a file of the same size keeps its clusters, see files.h.
     const int fd = ::open(full.c_str(), O_WRONLY | O_CREAT, 0666);
     if (fd < 0) return error_from(errno, "open", path);
-    size_t done = 0;
-    while (done < data.size()) {
-        const ssize_t n = ::write(fd, data.data() + done, std::min(data.size() - done, kChunk));
-        if (n <= 0) {
-            const int error = n == 0 ? ENOSPC : errno;
-            ::close(fd);
-            return error_from(error, "write", path);
-        }
+    handle_ = fd;
+    size_ = 0;
+    path_ = path;
+    mount_ = mount_count;
+    return Error::none;
+}
+
+Error Writer::write(std::span<const uint8_t> data) {
+    std::lock_guard lock(card);
+    if (handle_ == -1 || mount_ != mount_count) return Error::failed;
+    const int fd = static_cast<int>(handle_);
+    for (size_t done = 0; done < data.size();) {
+        const ssize_t n = ::write(fd, data.data() + done, data.size() - done);
+        if (n <= 0) return error_from(n == 0 ? ENOSPC : errno, "write", path_);
         done += static_cast<size_t>(n);
-        if (written) written->store(done, std::memory_order_relaxed);
     }
+    size_ += data.size();
+    return Error::none;
+}
+
+Error Writer::finish() {
+    std::lock_guard lock(card);
+    if (handle_ == -1 || mount_ != mount_count) {
+        handle_ = -1;
+        return Error::failed;
+    }
+    const int fd = static_cast<int>(handle_);
+    handle_ = -1;
     struct stat info{};
-    if (::fstat(fd, &info) == 0 && info.st_size > static_cast<off_t>(data.size()) &&
-        ::ftruncate(fd, static_cast<off_t>(data.size())) != 0) {
+    if (::fstat(fd, &info) == 0 && static_cast<uint64_t>(info.st_size) > size_ &&
+        ::ftruncate(fd, static_cast<off_t>(size_)) != 0) {
         const int error = errno;
         ::close(fd);
-        return error_from(error, "truncate", path);
+        return error_from(error, "truncate", path_);
     }
     // f_sync() writes the data, the FAT and the directory entry to the card.
     if (::fsync(fd) != 0) {
         const int error = errno;
         ::close(fd);
-        return error_from(error, "flush", path);
+        return error_from(error, "flush", path_);
     }
-    if (::close(fd) != 0) return error_from(errno, "close", path);
+    if (::close(fd) != 0) return error_from(errno, "close", path_);
     return Error::none;
+}
+
+void Writer::close() {
+    if (handle_ == -1) return;
+    std::lock_guard lock(card);
+    // A remount closed the volume under it; there is nothing left to close.
+    if (mount_ == mount_count) ::close(static_cast<int>(handle_));
+    handle_ = -1;
 }
 
 Error make_parents(const char* path) {

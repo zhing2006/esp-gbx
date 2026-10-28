@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <span>
 
+#include "gbx/common/pieces.h"
 #include "gbx/gba/backup.h"
 
 namespace gbx::gba {
@@ -54,8 +55,14 @@ public:
     // The largest encoding, for the buffer that encode() fills; 0 before
     // allocate().
     size_t max_encoded() const;
+    // The size of the encoding of the state held; 0 without one.
+    size_t encoded_size() const;
     // Writes the state; returns its size, or 0 when `out` is too small.
     size_t encode(std::span<uint8_t> out) const;
+    // Writes the state through `buffer`, handing it to `sink` each time it
+    // is full and once at the end; returns its size, or 0 when the sink
+    // stopped it or there is no state.
+    size_t encode(std::span<uint8_t> buffer, PieceSink sink, void* context) const;
     enum class Status : uint8_t {
         ok,
         unknown,  // not a state
@@ -69,6 +76,12 @@ public:
     static Status inspect(std::span<const uint8_t> bytes, RomIdentity* identity = nullptr);
     // Reads an encoding. A failure leaves the snapshot without a state.
     Status decode(std::span<const uint8_t> bytes);
+    // inspect() and decode() of an encoding of `size` bytes that `source`
+    // gives in order. They stop at the first thing wrong, which can leave
+    // bytes the source has not given; decode() checks the checksum only at
+    // the end, after it has written the state.
+    static Status inspect(size_t size, PieceSource source, void* context, RomIdentity* identity = nullptr);
+    Status decode(size_t size, PieceSource source, void* context);
 
 private:
     friend class System;

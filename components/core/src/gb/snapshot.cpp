@@ -9,6 +9,7 @@
 
 #include "gbx/gb/system.h"
 #include "gbx/platform.h"
+#include "../common/encoding.h"
 #include "mixer.h"
 #include "offload.h"
 #include "renderer.h"
@@ -59,24 +60,10 @@ constexpr size_t kHeader = 44, kTrailer = 4;
 // The largest cartridge RAM is 128 KiB (Pan Docs, The Cartridge Header, 0149).
 constexpr size_t kMaxRam = 128 * 1024;
 
-constexpr std::array<uint32_t, 256> kCrcTable = [] {
-    std::array<uint32_t, 256> table{};
-    for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t c = i;
-        for (int k = 0; k < 8; ++k) c = c & 1 ? 0xedb88320u ^ (c >> 1) : c >> 1;
-        table[i] = c;
-    }
-    return table;
-}();
-uint32_t crc32(std::span<const uint8_t> data) {
-    uint32_t c = 0xffffffffu;
-    for (uint8_t b : data) c = kCrcTable[(c ^ b) & 0xff] ^ (c >> 8);
-    return c ^ 0xffffffffu;
-}
-uint32_t get16(const uint8_t* p) { return p[0] | p[1] << 8; }
-uint32_t get32(const uint8_t* p) { return get16(p) | get16(p + 2) << 16; }
-void put16(uint8_t* p, uint32_t v) { p[0] = static_cast<uint8_t>(v); p[1] = static_cast<uint8_t>(v >> 8); }
-void put32(uint8_t* p, uint32_t v) { put16(p, v); put16(p + 2, v >> 16); }
+using encoding::get16;
+using encoding::get32;
+using encoding::put16;
+using encoding::put32;
 }  // namespace
 
 // Everything a running DMG holds, as plain copies. Device classes keep their
@@ -324,108 +311,83 @@ template<class S, class F> void fields(S& s, F& f) {
     }
 }
 
-template<class T> constexpr size_t width() {
-    if constexpr (std::is_enum_v<T>) return 1;
-    else return sizeof(T);
-}
-
-class Writer {
+// Writes the payload: the encoding's integers, with the frames of shades
+// packed four pixels a byte and the row's VRAM in its dirty pages.
+class Writer : public encoding::Output {
 public:
-    explicit Writer(uint8_t* out) : out_(out) {}
-    template<class T> void operator()(const T& value) {
-        uint64_t v;
-        if constexpr (std::is_enum_v<T>) v = static_cast<uint8_t>(value);
-        else if constexpr (std::is_same_v<T, bool>) v = value;
-        else v = static_cast<std::make_unsigned_t<T>>(value);
-        for (size_t i = 0; i < width<T>(); ++i) out_[size_++] = static_cast<uint8_t>(v >> (i * 8));
-    }
-    void bytes(std::span<const uint8_t> data) { std::memcpy(out_ + size_, data.data(), data.size()); size_ += data.size(); }
+    using Output::Output;
     void pages(const std::array<uint8_t, 8192>& vram, uint64_t dirty) {
         for (; dirty; dirty &= dirty - 1) bytes(std::span(vram).subspan(std::countr_zero(dirty) * 128, 128));
     }
     void shades(const std::array<uint8_t, kFramePixels>& pixels) {
         for (unsigned i = 0; i < kFramePixels; i += 4)
-            out_[size_++] = static_cast<uint8_t>((pixels[i] & 3) | (pixels[i + 1] & 3) << 2 |
-                                                 (pixels[i + 2] & 3) << 4 | (pixels[i + 3] & 3) << 6);
+            put(static_cast<uint8_t>((pixels[i] & 3) | (pixels[i + 1] & 3) << 2 | (pixels[i + 2] & 3) << 4 |
+                                     (pixels[i + 3] & 3) << 6));
     }
-    void words(std::span<const uint16_t> data) {
-        for (uint16_t w : data) { out_[size_++] = static_cast<uint8_t>(w); out_[size_++] = static_cast<uint8_t>(w >> 8); }
-    }
-    bool present(bool flag) const { return flag; }
     bool color(bool flag) const { return flag; }
-    size_t limit(size_t count, size_t) const { return count; }
-    size_t size() const { return size_; }
-private:
-    uint8_t* out_;
-    size_t size_ = 0;
 };
 
-// Counts the largest payload in a mode: every optional field there, every
-// page dirty and the row full of changes. It reads no field.
+// Counts a payload: with `largest` the largest one in a mode, with every
+// optional field there, every page dirty and the row full of changes, which
+// reads no field; otherwise the one of the state it visits, which has that
+// mode.
 class Measure {
 public:
-    explicit Measure(Mode mode) : color_(mode != Mode::dmg) {}
-    template<class T> void operator()(const T&) { size_ += width<T>(); }
+    Measure(Mode mode, bool largest) : color_(mode != Mode::dmg), largest_(largest) {}
+    template<class T> void operator()(const T&) { size_ += encoding::width<T>(); }
     void bytes(std::span<const uint8_t> data) { size_ += data.size(); }
-    void pages(const std::array<uint8_t, 8192>& vram, uint64_t) { size_ += vram.size(); }
+    void pages(const std::array<uint8_t, 8192>& vram, uint64_t dirty) {
+        size_ += largest_ ? vram.size() : size_t{128} * std::popcount(dirty);
+    }
     void shades(const std::array<uint8_t, kFramePixels>&) { size_ += kFramePixels / 4; }
     void words(std::span<const uint16_t> data) { size_ += data.size() * 2; }
-    bool present(bool) const { return true; }
+    bool present(bool flag) const { return largest_ || flag; }
     bool color(bool) const { return color_; }
-    size_t limit(size_t, size_t capacity) const { return capacity; }
+    size_t limit(size_t count, size_t capacity) const { return largest_ ? capacity : count; }
     size_t size() const { return size_; }
 private:
-    bool color_;
+    bool color_, largest_;
     size_t size_ = 0;
 };
 
-class Reader {
+class Reader : public encoding::Input {
 public:
-    explicit Reader(std::span<const uint8_t> in) : in_(in) {}
-    template<class T> void operator()(T& value) {
-        if (!take(width<T>())) { value = T{}; return; }
-        uint64_t v = 0;
-        for (size_t i = 0; i < width<T>(); ++i) v |= uint64_t{in_[at_ - width<T>() + i]} << (i * 8);
-        if constexpr (std::is_same_v<T, bool>) {
-            ok_ &= v <= 1;
-            value = v;
-        } else value = static_cast<T>(v);
-    }
-    void bytes(std::span<uint8_t> data) {
-        if (take(data.size())) std::memcpy(data.data(), in_.data() + at_ - data.size(), data.size());
-    }
+    using Input::Input;
     void pages(std::array<uint8_t, 8192>& vram, uint64_t dirty) {
         for (; dirty; dirty &= dirty - 1) bytes(std::span(vram).subspan(std::countr_zero(dirty) * 128, 128));
     }
     void shades(std::array<uint8_t, kFramePixels>& pixels) {
-        if (!take(kFramePixels / 4)) return;
-        const auto* packed = in_.data() + at_ - kFramePixels / 4;
-        for (unsigned i = 0; i < kFramePixels; ++i) pixels[i] = (packed[i / 4] >> (i % 4 * 2)) & 3;
+        for (unsigned i = 0; i < kFramePixels; i += 4) {
+            uint8_t packed;
+            if (!take(&packed, 1)) return;
+            for (unsigned k = 0; k < 4; ++k) pixels[i + k] = (packed >> (k * 2)) & 3;
+        }
     }
-    void words(std::span<uint16_t> data) {
-        if (!take(data.size() * 2)) return;
-        const auto* in = in_.data() + at_ - data.size() * 2;
-        for (size_t i = 0; i < data.size(); ++i) data[i] = static_cast<uint16_t>(in[2 * i] | in[2 * i + 1] << 8);
-    }
-    bool present(bool flag) const { return flag; }
     bool color(bool flag) const { return flag; }
-    // A count beyond its array makes the state invalid; read no more.
-    size_t limit(size_t count, size_t capacity) {
-        if (count > capacity) { ok_ = false; return 0; }
-        return count;
-    }
-    bool ok() const { return ok_; }
-    size_t position() const { return at_; }
-private:
-    std::span<const uint8_t> in_;
-    size_t at_ = 0;
-    bool ok_ = true;
-    bool take(size_t n) {
-        if (!ok_ || in_.size() - at_ < n) { ok_ = false; return false; }
-        at_ += n;
-        return true;
-    }
 };
+
+// The header of an encoding.
+struct Header {
+    RomIdentity identity{};
+    size_t ram_size = 0, payload = 0;
+    Mode mode = Mode::dmg;
+};
+// Reads the header of an encoding of `size` bytes. It is filled in unless
+// the encoding is unknown, of another version or of another system.
+Snapshot::Status read_header(Reader& reader, size_t size, Header& out) {
+    using Status = Snapshot::Status;
+    uint8_t h[kHeader];
+    if (size < kHeader || !reader.take(h, kHeader) || std::memcmp(h, kMagic, sizeof kMagic) != 0)
+        return Status::unknown;
+    if (get16(h + 8) != kVersion) return Status::version;
+    if (!mode_of(static_cast<uint16_t>(get16(h + 10)), out.mode)) return Status::system;
+    std::copy_n(h + 12, out.identity.size(), out.identity.begin());
+    out.ram_size = get32(h + 36);
+    out.payload = get32(h + 40);
+    if (out.ram_size > kMaxRam || out.payload < out.ram_size || size != kHeader + out.payload + kTrailer)
+        return Status::damaged;
+    return Status::ok;
+}
 
 // Values that index arrays or pick code paths. A state that passes its
 // checksum was written by this version, so these hold unless it was
@@ -819,59 +781,72 @@ std::span<const uint16_t> Snapshot::color_frame() const {
 }
 size_t Snapshot::max_encoded(Mode mode) const {
     if (!state_) return 0;
-    Measure measure(mode);
+    Measure measure(mode, true);
+    fields(*state_, measure);
+    return kHeader + measure.size() + ram_size_ + kTrailer;
+}
+size_t Snapshot::encoded_size() const {
+    if (!valid_) return 0;
+    Measure measure(state_->mode, false);
     fields(*state_, measure);
     return kHeader + measure.size() + ram_size_ + kTrailer;
 }
 size_t Snapshot::encode(std::span<uint8_t> out) const {
     if (!valid_ || out.size() < max_encoded()) return 0;
-    Writer writer(out.data() + kHeader);
-    fields(*state_, writer);
-    writer.bytes({ram_, ram_size_});
-    const size_t payload = writer.size();
-    auto* h = out.data();
+    return encode(out, nullptr, nullptr);
+}
+size_t Snapshot::encode(std::span<uint8_t> buffer, PieceSink sink, void* context) const {
+    const size_t size = encoded_size();
+    if (!size) return 0;
+    const size_t payload = size - kHeader - kTrailer;
+    uint8_t h[kHeader];
     std::memcpy(h, kMagic, sizeof kMagic);
     put16(h + 8, kVersion);
     put16(h + 10, system_of(mode_));
     std::copy(identity_.begin(), identity_.end(), h + 12);
     put32(h + 36, static_cast<uint32_t>(ram_size_));
     put32(h + 40, static_cast<uint32_t>(payload));
-    const size_t size = kHeader + payload;
-    put32(h + size, crc32({h, size}));
-    return size + kTrailer;
+    Writer writer(buffer, sink, context);
+    writer.bytes(h);
+    fields(*state_, writer);
+    writer.bytes({ram_, ram_size_});
+    return writer.written() == kHeader + payload && writer.finish() ? size : 0;
 }
 Snapshot::Status Snapshot::inspect(std::span<const uint8_t> bytes, RomIdentity* identity, size_t* ram_size,
                                    Mode* mode) {
-    if (bytes.size() < kHeader || std::memcmp(bytes.data(), kMagic, sizeof kMagic) != 0) return Status::unknown;
-    const auto* h = bytes.data();
-    if (get16(h + 8) != kVersion) return Status::version;
-    Mode state_mode;
-    if (!mode_of(static_cast<uint16_t>(get16(h + 10)), state_mode)) return Status::system;
-    if (identity) std::copy_n(h + 12, identity->size(), identity->begin());
-    if (ram_size) *ram_size = get32(h + 36);
-    if (mode) *mode = state_mode;
-    const size_t payload = get32(h + 40);
-    if (get32(h + 36) > kMaxRam || payload < get32(h + 36) || bytes.size() != kHeader + payload + kTrailer ||
-        crc32(bytes.first(kHeader + payload)) != get32(h + kHeader + payload))
-        return Status::damaged;
-    return Status::ok;
+    encoding::Whole whole{bytes};
+    return inspect(bytes.size(), encoding::Whole::next, &whole, identity, ram_size, mode);
+}
+Snapshot::Status Snapshot::inspect(size_t size, PieceSource source, void* context, RomIdentity* identity,
+                                   size_t* ram_size, Mode* mode) {
+    Reader reader(source, context, size);
+    Header header;
+    const auto status = read_header(reader, size, header);
+    if (status == Status::unknown || status == Status::version || status == Status::system) return status;
+    if (identity) *identity = header.identity;
+    if (ram_size) *ram_size = header.ram_size;
+    if (mode) *mode = header.mode;
+    if (status != Status::ok) return status;
+    return reader.take(nullptr, header.payload) && reader.check() ? Status::ok : Status::damaged;
 }
 Snapshot::Status Snapshot::decode(std::span<const uint8_t> bytes) {
+    encoding::Whole whole{bytes};
+    return decode(bytes.size(), encoding::Whole::next, &whole);
+}
+Snapshot::Status Snapshot::decode(size_t size, PieceSource source, void* context) {
     valid_ = false;
-    size_t ram_size = 0;
-    RomIdentity identity{};
-    Mode mode = Mode::dmg;
-    const auto status = inspect(bytes, &identity, &ram_size, &mode);
+    Reader reader(source, context, size);
+    Header header;
+    const auto status = read_header(reader, size, header);
     if (status != Status::ok) return status;
-    if (!state_ || ram_size != ram_size_) return Status::incompatible;
-    const size_t payload = get32(bytes.data() + 40);
-    state_->mode = mode;
-    Reader reader(bytes.subspan(kHeader, payload));
+    if (!state_ || header.ram_size != ram_size_) return Status::incompatible;
+    state_->mode = header.mode;
     fields(*state_, reader);
     reader.bytes({ram_, ram_size_});
-    if (!reader.ok() || reader.position() != payload || !plausible(*state_)) return Status::damaged;
-    identity_ = identity;
-    mode_ = mode;
+    if (!reader.ok() || reader.position() != kHeader + header.payload || !reader.check() || !plausible(*state_))
+        return Status::damaged;
+    identity_ = header.identity;
+    mode_ = header.mode;
     valid_ = true;
     return Status::ok;
 }

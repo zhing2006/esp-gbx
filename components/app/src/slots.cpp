@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <string_view>
 
 #include "gbx/files.h"
@@ -75,6 +76,8 @@ constexpr uint32_t kWallTrusted = 1;
 constexpr int kPending = Slots::kCount;
 constexpr int kScratch = Slots::kCount + 1;
 constexpr int kInfos = Slots::kCount + 2;
+// The task's buffer, through which the files go to and from the card.
+constexpr size_t kPiece = 16 * 1024;
 
 uint32_t get16(const uint8_t* p) { return p[0] | p[1] << 8; }
 uint32_t get32(const uint8_t* p) { return get16(p) | get16(p + 2) << 16; }
@@ -87,6 +90,66 @@ const char* reason(Error e) {
     return e == Error::full ? "the SD card is full." : "the SD card reported an error.";
 }
 
+// A slot file read from its start through the task's buffer, with the check
+// of what it has read. `done`, when given, counts the bytes read.
+struct Scan {
+    platform::files::File& file;
+    std::span<uint8_t> buffer;
+    std::atomic<size_t>* done;
+    size_t at = 0;
+    uint32_t crc = 0;
+    bool failed = false;  // a read failed
+
+    // The next bytes, at most `most`; none once a read has failed.
+    std::span<const uint8_t> next(size_t most) {
+        const auto piece = buffer.first(std::min(most, buffer.size()));
+        if (failed || piece.empty() || !file.read(at, piece)) {
+            failed = true;
+            return {};
+        }
+        at += piece.size();
+        crc = crc32(piece, crc);
+        if (done) done->store(at, std::memory_order_relaxed);
+        return piece;
+    }
+    static std::span<const uint8_t> source(void* self, size_t most) { return static_cast<Scan*>(self)->next(most); }
+    // Reads on to `end` for the check alone.
+    bool skip_to(size_t end) {
+        while (at < end) {
+            if (next(end - at).empty()) return false;
+        }
+        return true;
+    }
+};
+
+// A slot file written from its start, with the check of what it has written.
+struct Out {
+    platform::files::Writer& file;
+    std::atomic<size_t>& written;
+    size_t at = 0;
+    uint32_t crc = 0;
+    Error error = Error::none;
+
+    bool write(std::span<const uint8_t> data) {
+        if (error == Error::none) error = file.write(data);
+        if (error != Error::none) return false;
+        crc = crc32(data, crc);
+        at += data.size();
+        written.store(at, std::memory_order_relaxed);
+        return true;
+    }
+    static bool sink(void* self, std::span<const uint8_t> data) { return static_cast<Out*>(self)->write(data); }
+    // The check of everything written, at the end.
+    bool finish() {
+        uint8_t check[kTrailer];
+        put32(check, crc);
+        if (error == Error::none) error = file.write(check);
+        if (error == Error::none) written.store(at + kTrailer, std::memory_order_relaxed);
+        if (error == Error::none) error = file.finish();
+        return error == Error::none;
+    }
+};
+
 }  // namespace
 
 void state_path(const char* rom_path, int slot, char* out, size_t size) {
@@ -98,11 +161,12 @@ bool Slots::start(Faults& faults, platform::Notification& done) {
     faults_ = &faults;
     done_ = &done;
     infos_ = static_cast<Info*>(platform::allocate_external(sizeof(Info) * kInfos));
-    // External memory: four color thumbnails are 180 KiB.
-    thumbnails_ = static_cast<Thumbnail*>(platform::allocate_external(sizeof(Thumbnail) * kInfos));
-    if (!infos_ || !thumbnails_) return false;
+    // External memory: a color thumbnail is 45 KiB.
+    thumbnail_ = static_cast<Thumbnail*>(platform::allocate_external(sizeof(Thumbnail)));
+    piece_ = static_cast<uint8_t*>(platform::allocate_external(kPiece));
+    if (!infos_ || !thumbnail_ || !piece_) return false;
     std::uninitialized_default_construct_n(infos_, kInfos);
-    std::uninitialized_default_construct_n(thumbnails_, kInfos);
+    new (thumbnail_) Thumbnail{};
     return wake_.initialize(1) &&
            task_.start(run_entry, this, 0, "gbx-slots", 6144, 2, platform::StackMemory::external);
 }
@@ -115,8 +179,10 @@ void Slots::stop() {
     stopping_.store(false);
     platform::free_external(infos_);
     infos_ = nullptr;
-    platform::free_external(thumbnails_);
-    thumbnails_ = nullptr;
+    platform::free_external(thumbnail_);
+    thumbnail_ = nullptr;
+    platform::free_external(piece_);
+    piece_ = nullptr;
 }
 
 bool Slots::open(const char* rom_path, const gb::System& system) {
@@ -129,10 +195,9 @@ bool Slots::open(const char* rom_path, const gb::System& system) {
     const size_t file_size = state_offset(mode) + snapshot_.max_encoded() + kTrailer;
     // A file of the other kind of mode, for the list: GB mode's, or a CGB's.
     const gb::Mode other = mode == gb::Mode::dmg ? gb::Mode::cgb : gb::Mode::dmg;
-    const size_t buffer_size = std::max(file_size, state_offset(other) + snapshot_.max_encoded(other) + kTrailer);
-    if (begin(rom_path, gb::rom_identity(system.memory.rom()), file_size, buffer_size)) return true;
-    snapshot_.release();
-    return false;
+    const size_t largest = std::max(file_size, state_offset(other) + snapshot_.max_encoded(other) + kTrailer);
+    begin(rom_path, gb::rom_identity(system.memory.rom()), file_size, largest);
+    return true;
 }
 
 #if GBX_HAS_GBA
@@ -142,16 +207,13 @@ bool Slots::open(const char* rom_path, gba::System& system) {
     gba_ = true;
     mode_ = gb::Mode::dmg;
     const size_t file_size = state_offset(mode_, true) + gba_snapshot_.max_encoded() + kTrailer;
-    if (begin(rom_path, gba::rom_identity(*system.memory.rom), file_size, file_size)) return true;
-    gba_snapshot_.release();
-    return false;
+    begin(rom_path, gba::rom_identity(*system.memory.rom), file_size, file_size);
+    return true;
 }
 #endif
 
-// The buffers and paths of the slots, and their listing.
-bool Slots::begin(const char* rom_path, const gb::RomIdentity& identity, size_t file_size, size_t buffer_size) {
-    auto* file = static_cast<uint8_t*>(platform::allocate_external(buffer_size));
-    if (!file) return false;
+// The paths of the slots, and their listing.
+void Slots::begin(const char* rom_path, const gb::RomIdentity& identity, size_t file_size, size_t largest) {
     const std::string_view path(rom_path);
     const size_t slash = path.find_last_of("/\\");
     const std::string_view name = slash == std::string_view::npos ? path : path.substr(slash + 1);
@@ -160,18 +222,18 @@ bool Slots::begin(const char* rom_path, const gb::RomIdentity& identity, size_t 
         for (int slot = 1; slot <= kCount; ++slot) state_path(rom_path, slot, paths_[slot - 1], sizeof paths_[0]);
         std::snprintf(name_, sizeof name_, "%.*s", static_cast<int>(name.size()), name.data());
         identity_ = identity;
-        file_ = file;
         file_size_ = file_size;
-        buffer_size_ = buffer_size;
+        largest_ = largest;
         error_[0] = '\0';
         listed_ = false;
         active_ = true;
         work_ = Work::listing;
         requested_ = true;
+        ++opened_;
+        thumbnail_slot_ = thumbnail_wanted_ = 0;
     }
     generation_.fetch_add(1, std::memory_order_release);
     wake_.signal();
-    return true;
 }
 
 void Slots::close() {
@@ -183,14 +245,15 @@ void Slots::close() {
             if (work_ == Work::none) {
                 active_ = false;
                 listed_ = false;
+                file_size_ = largest_ = 0;
+                // A thumbnail being read is of these slots.
+                ++opened_;
+                thumbnail_slot_ = thumbnail_wanted_ = 0;
                 break;
             }
         }
         platform::sleep_ms(5);
     }
-    platform::free_external(file_);
-    file_ = nullptr;
-    file_size_ = buffer_size_ = 0;
     snapshot_.release();
 #if GBX_HAS_GBA
     gba_snapshot_.release();
@@ -315,12 +378,19 @@ bool Slots::info(int slot, Info& out) const {
 }
 
 bool Slots::thumbnail(int slot, Thumbnail& out) const {
-    std::lock_guard lock(mutex_);
-    if (!active_ || !listed_ || slot < 1 || slot > kCount) return false;
-    const int at = pending_ && slot == slot_ ? kPending : slot - 1;
-    if (infos_[at].kind != Kind::ok && infos_[at].kind != Kind::mode) return false;
-    out = thumbnails_[at];
-    return true;
+    {
+        std::lock_guard lock(mutex_);
+        if (!active_ || !listed_ || slot < 1 || slot > kCount) return false;
+        const Info& info = pending_ && slot == slot_ ? infos_[kPending] : infos_[slot - 1];
+        if (info.kind != Kind::ok && info.kind != Kind::mode) return false;
+        if (thumbnail_slot_ == slot) {
+            if (thumbnail_ok_) out = *thumbnail_;
+            return thumbnail_ok_;
+        }
+        thumbnail_wanted_ = slot;
+    }
+    wake_.signal();
+    return false;
 }
 
 void Slots::error(char* out, size_t size) const {
@@ -337,12 +407,23 @@ void Slots::rom_title(char (&out)[17]) const {
 void Slots::run() {
     while (!stopping_.load()) {
         Work work;
-        int slot;
+        int slot, thumbnail = 0;
+        uint32_t opened = 0;
         {
             std::lock_guard lock(mutex_);
             work = requested_ ? work_ : Work::none;
             requested_ = false;
             slot = slot_;
+            // Between work, the thumbnail the menus asked for.
+            if (work_ == Work::none && listed_ && thumbnail_wanted_ && thumbnail_wanted_ != thumbnail_slot_) {
+                thumbnail = thumbnail_wanted_;
+                thumbnail_slot_ = 0;
+                opened = opened_;
+            }
+        }
+        if (thumbnail) {
+            read_thumbnail(thumbnail, opened);
+            continue;
         }
         if (work == Work::none) {
             wake_.wait();
@@ -364,9 +445,9 @@ void Slots::finish(Work work) {
     done_->signal();
 }
 
-// The file of `slot` as the list shows it. It stays in file_, so an ok one
-// can be decoded from there.
-Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
+// The file of `slot` as the list shows it, checked whole. With `decode`, an
+// ok state is also decoded into the snapshot on the way.
+Slots::Kind Slots::examine(int slot, Info& info, bool decode) {
     // Field by field: `info = {}` would build an Info on the stack.
     info.kind = Kind::empty;
     info.mode = gb::Mode::dmg;
@@ -381,61 +462,79 @@ Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
     }
     const int64_t size = platform::files::size(path);
     if (size == platform::files::kNoFile) return Kind::empty;
-    if (size < 0) return Kind::unreadable;
-    // A file of this ROM, in either kind of mode, fits the buffer and is
-    // read whole. A larger one, of a ROM with more RAM, gives the buffer its
-    // header and the start of its state, which say what it is.
-    const bool whole = static_cast<size_t>(size) <= buffer_size_;
-    if (whole ? !platform::files::read(path, {file_, static_cast<size_t>(size)},
-                                       static_cast<size_t>(size) == file_size_ ? &written_ : nullptr)
-              : platform::files::read_start(path, {file_, buffer_size_}) < 0)
-        return Kind::unreadable;
-    const size_t have = std::min<size_t>(static_cast<size_t>(size), buffer_size_);
-    const uint8_t* h = file_;
-    if (have < kHeader || std::memcmp(h, kMagic, sizeof kMagic) != 0) return Kind::damaged;
+    platform::files::File file;
+    if (size < 0 || !file.open(path) || file.size() != size) return Kind::unreadable;
+    const auto file_size = static_cast<size_t>(size);
+    uint8_t h[kHeader];
+    if (file_size < kHeader) return Kind::damaged;
+    if (!file.read(0, h)) return Kind::unreadable;
+    if (std::memcmp(h, kMagic, sizeof kMagic) != 0) return Kind::damaged;
     if (get16(h + 8) != kVersion) return Kind::version;
     gb::Mode mode;
     bool gba;
-    if (get16(h + 10) != kHeader || !mode_of(h[56], mode, gba) || have < state_offset(mode, gba) + kTrailer)
+    if (get16(h + 10) != kHeader || !mode_of(h[56], mode, gba) || file_size < state_offset(mode, gba) + kTrailer)
         return Kind::damaged;
     // A GB's state in a GBA's slots, or the other way round.
     if (gba != gba_) return Kind::system;
     const size_t at = state_offset(mode, gba);
     const size_t state_size = get32(h + 52);
-    const std::span<const uint8_t> state(h + at, std::min(state_size, have - at));
-    if (!whole) {
-        // The state's own header still tells another version or system. A
-        // GBA's files all fit the buffer.
-        const auto status = gb::Snapshot::inspect(state);
+    if (file_size > largest_) {
+        // A file of a ROM with more RAM: the start of its state still tells
+        // another version or system. A GBA's files all have one size.
+        const std::span<uint8_t> start(piece_, std::min({kPiece, state_size, file_size - at}));
+        if (!file.read(at, start)) return Kind::unreadable;
+        const auto status = gb::Snapshot::inspect(start);
         if (status == gb::Snapshot::Status::version) return Kind::version;
         if (status == gb::Snapshot::Status::system) return Kind::system;
         return get32(h + 48) != snapshot_.ram_size() ? Kind::incompatible : Kind::damaged;
     }
-    const size_t file_size = static_cast<size_t>(size);
-    if (crc32({h, file_size - kTrailer}) != get32(h + file_size - kTrailer) || state_size > file_size - at - kTrailer)
-        return Kind::damaged;
+    if (state_size > file_size - at - kTrailer) return Kind::damaged;
+    // The header, the thumbnail, the state, the zeros after it and the check.
+    Scan scan{file, {piece_, kPiece}, file_size == file_size_ ? &written_ : nullptr};
+    scan.at = kHeader;
+    scan.crc = crc32(h);
+    if (!scan.skip_to(at)) return Kind::unreadable;
+    // A state that can be loaded is decoded, any other only checked.
+    const bool decoding = decode && mode == mode_ && file_size == file_size_;
     gb::RomIdentity identity{};
+    size_t ram_size = 0;
+    gb::Mode state_mode = mode;
+    bool state_ok = false, other_version = false, other_system = false, other_ram = false;
 #if GBX_HAS_GBA
     if (gba) {
-        switch (gba::Snapshot::inspect(state, &identity)) {
-        case gba::Snapshot::Status::ok: break;
-        case gba::Snapshot::Status::version: return Kind::version;
-        case gba::Snapshot::Status::system: return Kind::system;
-        default: return Kind::damaged;
-        }
-        if (file_size != file_size_) return Kind::damaged;
-        info.kind = Kind::ok;
+        const auto status = decoding ? gba_snapshot_.decode(state_size, Scan::source, &scan)
+                                     : gba::Snapshot::inspect(state_size, Scan::source, &scan, &identity);
+        if (decoding && status == gba::Snapshot::Status::ok) identity = gba_snapshot_.identity();
+        state_ok = status == gba::Snapshot::Status::ok;
+        other_version = status == gba::Snapshot::Status::version;
+        other_system = status == gba::Snapshot::Status::system;
     } else
 #endif
     {
-        size_t ram_size = 0;
-        gb::Mode state_mode;
-        switch (gb::Snapshot::inspect(state, &identity, &ram_size, &state_mode)) {
-        case gb::Snapshot::Status::ok: break;
-        case gb::Snapshot::Status::version: return Kind::version;
-        case gb::Snapshot::Status::system: return Kind::system;
-        default: return Kind::damaged;
+        const auto status = decoding ? snapshot_.decode(state_size, Scan::source, &scan)
+                                     : gb::Snapshot::inspect(state_size, Scan::source, &scan, &identity, &ram_size,
+                                                             &state_mode);
+        if (decoding && status == gb::Snapshot::Status::ok) {
+            identity = snapshot_.identity();
+            ram_size = snapshot_.ram_size();
+            state_mode = snapshot_.mode();
         }
+        state_ok = status == gb::Snapshot::Status::ok;
+        other_version = status == gb::Snapshot::Status::version;
+        other_system = status == gb::Snapshot::Status::system;
+        other_ram = status == gb::Snapshot::Status::incompatible;
+    }
+    uint8_t check[kTrailer];
+    if (!scan.skip_to(file_size - kTrailer) || !file.read(file_size - kTrailer, check)) return Kind::unreadable;
+    if (scan.crc != get32(check)) return Kind::damaged;
+    if (other_version) return Kind::version;
+    if (other_system) return Kind::system;
+    if (other_ram) return Kind::incompatible;
+    if (!state_ok) return Kind::damaged;
+    if (gba) {
+        if (file_size != file_size_) return Kind::damaged;
+        info.kind = Kind::ok;
+    } else {
         if (ram_size != snapshot_.ram_size()) return Kind::incompatible;
         if (state_mode != mode) return Kind::damaged;
         // The same ROM in the same mode makes files of the same size.
@@ -451,29 +550,54 @@ Slots::Kind Slots::examine(int slot, Info& info, Thumbnail& thumbnail) {
     if (gba) app::gba_title(std::span<const uint8_t, 12>(identity.data(), 12), info.title);
     else app::rom_title(std::span<const uint8_t, 16>(identity.data(), 16), info.title);
     info.wall = {(get32(h + 12) & kWallTrusted) != 0, static_cast<int64_t>(get64(h + 16))};
-    thumbnail.mode = mode;
-    thumbnail.gba = gba;
-    if (!gba && mode == gb::Mode::dmg) {
-        std::copy_n(h + kHeader, thumbnail.shades.size(), thumbnail.shades.begin());
-    } else {
-        // Only the slots of a GBA game take a GBA's states, see above.
-        const size_t pixels = GBX_HAS_GBA && gba ? gba::kFramePixels : gb::kFramePixels;
-        for (size_t i = 0; i < pixels; ++i) thumbnail.colors[i] = static_cast<uint16_t>(get16(h + kHeader + 2 * i));
-    }
     return info.kind;
 }
 
 void Slots::list() {
     Info& info = infos_[kScratch];
     for (int slot = 1; slot <= kCount; ++slot) {
-        info.kind = examine(slot, info, thumbnails_[kScratch]);
+        info.kind = examine(slot, info, false);
         std::lock_guard lock(mutex_);
         if (!active_) return;
         infos_[slot - 1] = info;
-        thumbnails_[slot - 1] = thumbnails_[kScratch];
     }
     std::lock_guard lock(mutex_);
     listed_ = true;
+}
+
+// Reads the thumbnail of `slot`, which the list found ok or of another mode,
+// from its file, unless the slots have closed or opened since `opened`.
+void Slots::read_thumbnail(int slot, uint32_t opened) {
+    char path[kSavePathSize];
+    {
+        std::lock_guard lock(mutex_);
+        std::memcpy(path, paths_[slot - 1], sizeof path);
+    }
+    Thumbnail& thumbnail = *thumbnail_;
+    platform::files::File file;
+    uint8_t h[kHeader];
+    bool ok = file.open(path) && file.size() >= static_cast<int64_t>(kHeader) && file.read(0, h) &&
+              std::memcmp(h, kMagic, sizeof kMagic) == 0 && get16(h + 8) == kVersion && get16(h + 10) == kHeader &&
+              mode_of(h[56], thumbnail.mode, thumbnail.gba) && thumbnail.gba == gba_;
+    if (ok && !thumbnail.gba && thumbnail.mode == gb::Mode::dmg) {
+        ok = file.read(kHeader, thumbnail.shades);
+    } else if (ok) {
+        // Only the slots of a GBA game take a GBA's states.
+        const size_t pixels = GBX_HAS_GBA && thumbnail.gba ? gba::kFramePixels : gb::kFramePixels;
+        for (size_t i = 0; ok && i < pixels;) {
+            const size_t n = std::min(pixels - i, kPiece / 2);
+            ok = file.read(kHeader + 2 * i, {piece_, 2 * n});
+            for (size_t k = 0; ok && k < n; ++k) thumbnail.colors[i + k] = static_cast<uint16_t>(get16(piece_ + 2 * k));
+            i += n;
+        }
+    }
+    {
+        std::lock_guard lock(mutex_);
+        if (opened != opened_) return;
+        thumbnail_slot_ = slot;
+        thumbnail_ok_ = ok;
+    }
+    generation_.fetch_add(1, std::memory_order_release);
 }
 
 void Slots::write_slot(int slot) {
@@ -485,47 +609,29 @@ void Slots::write_slot(int slot) {
         std::memcpy(path, paths_[slot - 1], sizeof path);
         wall = wall_;
         identity = identity_;
+        // The thumbnail becomes the state's.
+        thumbnail_slot_ = 0;
     }
 #ifdef GBX_PROFILER
     const uint64_t start = platform::monotonic_us();
 #endif
-    uint8_t* h = file_;
-    const size_t at = state_offset(mode_, gba_);
-    std::memset(h, 0, file_size_);
-    std::memcpy(h, kMagic, sizeof kMagic);
-    put16(h + 8, kVersion);
-    put16(h + 10, kHeader);
-    put32(h + 12, wall.trusted ? kWallTrusted : 0);
-    put64(h + 16, static_cast<uint64_t>(wall.us));
-#if GBX_HAS_GBA
-    const auto& state_identity = gba_ ? gba_snapshot_.identity() : snapshot_.identity();
-    std::copy(state_identity.begin(), state_identity.end(), h + 24);
-    put32(h + 48, static_cast<uint32_t>(gba_ ? gba_snapshot_.backup().size() : snapshot_.ram_size()));
-#else
-    std::copy(snapshot_.identity().begin(), snapshot_.identity().end(), h + 24);
-    put32(h + 48, static_cast<uint32_t>(snapshot_.ram_size()));
-#endif
-    h[56] = gba_ ? kGbaByte : mode_byte(mode_);
-    Thumbnail& thumbnail = thumbnails_[kScratch];
+    Thumbnail& thumbnail = *thumbnail_;
     thumbnail.mode = mode_;
     thumbnail.gba = gba_;
 #if GBX_HAS_GBA
     if (gba_) {
         const auto frame = gba_snapshot_.frame();
-        for (size_t i = 0; i < frame.size(); ++i) put16(h + kHeader + 2 * i, frame[i]);
         std::copy(frame.begin(), frame.end(), thumbnail.colors.begin());
     } else
 #endif
     if (mode_ == gb::Mode::dmg) {
         const auto frame = snapshot_.frame();
         for (size_t i = 0; i + 3 < frame.size(); i += 4) {
-            h[kHeader + i / 4] = static_cast<uint8_t>((frame[i] & 3) | (frame[i + 1] & 3) << 2 |
-                                                      (frame[i + 2] & 3) << 4 | (frame[i + 3] & 3) << 6);
+            thumbnail.shades[i / 4] = static_cast<uint8_t>((frame[i] & 3) | (frame[i + 1] & 3) << 2 |
+                                                           (frame[i + 2] & 3) << 4 | (frame[i + 3] & 3) << 6);
         }
-        std::copy_n(h + kHeader, thumbnail.shades.size(), thumbnail.shades.begin());
     } else {
         const auto frame = snapshot_.color_frame();
-        for (size_t i = 0; i < frame.size(); ++i) put16(h + kHeader + 2 * i, frame[i]);
         std::copy(frame.begin(), frame.end(), thumbnail.colors.begin());
     }
     {
@@ -539,40 +645,85 @@ void Slots::write_slot(int slot) {
         if (gba_) app::gba_title(std::span<const uint8_t, 12>(identity.data(), 12), info.title);
         else app::rom_title(std::span<const uint8_t, 16>(identity.data(), 16), info.title);
         info.wall = wall;
-        thumbnails_[kPending] = thumbnail;
+        thumbnail_slot_ = slot;
+        thumbnail_ok_ = true;
         pending_ = true;
     }
     generation_.fetch_add(1, std::memory_order_release);
-    const std::span<uint8_t> room(h + at, file_size_ - at - kTrailer);
 #if GBX_HAS_GBA
-    const size_t state_size = gba_ ? gba_snapshot_.encode(room) : snapshot_.encode(room);
+    const size_t state_size = gba_ ? gba_snapshot_.encoded_size() : snapshot_.encoded_size();
 #else
-    const size_t state_size = snapshot_.encode(room);
+    const size_t state_size = snapshot_.encoded_size();
 #endif
-    put32(h + 52, static_cast<uint32_t>(state_size));
-    put32(h + file_size_ - kTrailer, crc32({h, file_size_ - kTrailer}));
-#ifdef GBX_PROFILER
-    const uint64_t encoded = platform::monotonic_us();
+    const size_t at = state_offset(mode_, gba_);
+    // The file goes to the card a buffer at a time, and over the old one in
+    // place.
+    platform::files::Writer file;
+    Out out{file, written_};
+    if (state_size == 0 || state_size > file_size_ - at - kTrailer) out.error = Error::failed;
+    if (out.error == Error::none) out.error = platform::files::make_parents(path);
+    if (out.error == Error::none) out.error = file.open(path);
+    if (out.error == Error::none) {
+        uint8_t* h = piece_;
+        std::memset(h, 0, kHeader);
+        std::memcpy(h, kMagic, sizeof kMagic);
+        put16(h + 8, kVersion);
+        put16(h + 10, kHeader);
+        put32(h + 12, wall.trusted ? kWallTrusted : 0);
+        put64(h + 16, static_cast<uint64_t>(wall.us));
+#if GBX_HAS_GBA
+        const auto& state_identity = gba_ ? gba_snapshot_.identity() : snapshot_.identity();
+        std::copy(state_identity.begin(), state_identity.end(), h + 24);
+        put32(h + 48, static_cast<uint32_t>(gba_ ? gba_snapshot_.backup().size() : snapshot_.ram_size()));
+#else
+        std::copy(snapshot_.identity().begin(), snapshot_.identity().end(), h + 24);
+        put32(h + 48, static_cast<uint32_t>(snapshot_.ram_size()));
 #endif
-    Error error = state_size ? Error::none : Error::failed;
-    if (error == Error::none) error = platform::files::make_parents(path);
-    if (error == Error::none) error = platform::files::write(path, {file_, file_size_}, &written_);
-    if (error == Error::none) {
+        put32(h + 52, static_cast<uint32_t>(state_size));
+        h[56] = gba_ ? kGbaByte : mode_byte(mode_);
+        out.write({h, kHeader});
+    }
+    if (!gba_ && mode_ == gb::Mode::dmg) {
+        out.write(thumbnail.shades);
+    } else {
+        const size_t pixels = GBX_HAS_GBA && gba_ ? gba::kFramePixels : gb::kFramePixels;
+        for (size_t i = 0; i < pixels;) {
+            const size_t n = std::min(pixels - i, kPiece / 2);
+            for (size_t k = 0; k < n; ++k) put16(piece_ + 2 * k, thumbnail.colors[i + k]);
+            if (!out.write({piece_, 2 * n})) break;
+            i += n;
+        }
+    }
+    if (out.error == Error::none) {
+#if GBX_HAS_GBA
+        const size_t encoded = gba_ ? gba_snapshot_.encode({piece_, kPiece}, Out::sink, &out)
+                                    : snapshot_.encode({piece_, kPiece}, Out::sink, &out);
+#else
+        const size_t encoded = snapshot_.encode({piece_, kPiece}, Out::sink, &out);
+#endif
+        if (encoded != state_size && out.error == Error::none) out.error = Error::failed;
+    }
+    // Zeros up to the check, so that every file of the mode has one size.
+    std::memset(piece_, 0, kPiece);
+    while (out.error == Error::none && out.at < file_size_ - kTrailer)
+        out.write({piece_, std::min(kPiece, file_size_ - kTrailer - out.at)});
+    if (out.finish()) {
         {
             std::lock_guard lock(mutex_);
             infos_[slot - 1] = infos_[kPending];
-            thumbnails_[slot - 1] = thumbnails_[kPending];
             pending_ = false;
             error_[0] = '\0';
         }
         writes_.fetch_add(1, std::memory_order_release);
 #ifdef GBX_PROFILER
-        platform::log(platform::LogLevel::warn, kTag, "wrote SLOT %d: state %u bytes, encode %llu us, write %llu ms",
-                      slot, static_cast<unsigned>(state_size), static_cast<unsigned long long>(encoded - start),
-                      static_cast<unsigned long long>((platform::monotonic_us() - encoded) / 1000));
+        platform::log(platform::LogLevel::warn, kTag, "wrote SLOT %d: state %u bytes in %llu ms", slot,
+                      static_cast<unsigned>(state_size),
+                      static_cast<unsigned long long>((platform::monotonic_us() - start) / 1000));
 #endif
         return;
     }
+    file.close();
+    const Error error = out.error;
     char name[sizeof name_];
     {
         std::lock_guard lock(mutex_);
@@ -582,12 +733,12 @@ void Slots::write_slot(int slot) {
     faults_->add("Can't write SLOT %d of %s: %s", slot, name, reason(error));
     // The file may be half written; the list shows what is there now.
     Info& info = infos_[kScratch];
-    info.kind = examine(slot, info, thumbnails_[kScratch]);
+    info.kind = examine(slot, info, false);
     {
         std::lock_guard lock(mutex_);
         infos_[slot - 1] = info;
-        thumbnails_[slot - 1] = thumbnails_[kScratch];
         pending_ = false;
+        if (thumbnail_slot_ == slot) thumbnail_slot_ = 0;
     }
     writes_.fetch_add(1, std::memory_order_release);
 }
@@ -598,24 +749,10 @@ void Slots::read_slot(int slot) {
     const uint64_t start = platform::monotonic_us();
 #endif
     Info& info = infos_[kScratch];
-    Kind kind = examine(slot, info, thumbnails_[kScratch]);
+    const Kind kind = examine(slot, info, true);
 #ifdef GBX_PROFILER
-    const uint64_t read = platform::monotonic_us();
-#endif
-    if (kind == Kind::ok) {
-        const std::span<const uint8_t> state(file_ + state_offset(mode_, gba_), get32(file_ + 52));
-#if GBX_HAS_GBA
-        const bool decoded = gba_ ? gba_snapshot_.decode(state) == gba::Snapshot::Status::ok
-                                  : snapshot_.decode(state) == gb::Snapshot::Status::ok;
-#else
-        const bool decoded = snapshot_.decode(state) == gb::Snapshot::Status::ok;
-#endif
-        if (!decoded) kind = Kind::damaged;
-    }
-#ifdef GBX_PROFILER
-    platform::log(platform::LogLevel::warn, kTag, "read SLOT %d: kind %d, read %llu ms, decode %llu us", slot,
-                  static_cast<int>(kind), static_cast<unsigned long long>((read - start) / 1000),
-                  static_cast<unsigned long long>(platform::monotonic_us() - read));
+    platform::log(platform::LogLevel::warn, kTag, "read SLOT %d: kind %d in %llu ms", slot, static_cast<int>(kind),
+                  static_cast<unsigned long long>((platform::monotonic_us() - start) / 1000));
 #endif
     {
         std::lock_guard lock(mutex_);
@@ -625,7 +762,7 @@ void Slots::read_slot(int slot) {
         if (kind != Kind::ok) {
             info.kind = kind;
             infos_[slot - 1] = info;
-            thumbnails_[slot - 1] = thumbnails_[kScratch];
+            if (thumbnail_slot_ == slot) thumbnail_slot_ = 0;
         }
     }
 }

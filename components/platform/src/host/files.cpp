@@ -118,33 +118,59 @@ int64_t read_start(const char* path, std::span<uint8_t> out) {
 }
 
 Error write(const char* path, std::span<const uint8_t> data, std::atomic<size_t>* written) {
+    Writer file;
+    Error error = file.open(path);
+    for (size_t done = 0; error == Error::none && done < data.size();) {
+        const size_t n = std::min(data.size() - done, kChunk);
+        error = file.write(data.subspan(done, n));
+        done += n;
+        if (written && error == Error::none) written->store(done, std::memory_order_relaxed);
+    }
+    return error == Error::none ? file.finish() : error;
+}
+
+Error Writer::open(const char* path) {
+    close();
     // As on the firmware, an existing file is overwritten in place.
     FILE* file = open_file(path, "r+b");
     if (!file) file = open_file(path, "wb");
     if (!file) return error_from(errno, "open", path);
-    size_t done = 0;
-    while (done < data.size()) {
-        const size_t n = std::fwrite(data.data() + done, 1, std::min(data.size() - done, kChunk), file);
-        if (n == 0) {
-            const int error = errno;
-            std::fclose(file);
-            return error_from(error, "write", path);
-        }
-        done += n;
-        if (written) written->store(done, std::memory_order_relaxed);
-    }
+    handle_ = reinterpret_cast<intptr_t>(file);
+    size_ = 0;
+    path_ = path;
+    return Error::none;
+}
+
+Error Writer::write(std::span<const uint8_t> data) {
+    if (handle_ == -1) return Error::failed;
+    if (std::fwrite(data.data(), 1, data.size(), reinterpret_cast<FILE*>(handle_)) != data.size())
+        return error_from(errno, "write", path_);
+    size_ += data.size();
+    return Error::none;
+}
+
+Error Writer::finish() {
+    if (handle_ == -1) return Error::failed;
+    auto* file = reinterpret_cast<FILE*>(handle_);
+    handle_ = -1;
     if (std::fflush(file) != 0 || flush_to_disk(file) != 0) {
         const int error = errno;
         std::fclose(file);
-        return error_from(error, "flush", path);
+        return error_from(error, "flush", path_);
     }
-    if (std::fclose(file) != 0) return error_from(errno, "close", path);
+    if (std::fclose(file) != 0) return error_from(errno, "close", path_);
     std::error_code ec;
-    if (fs::file_size(native(path), ec) > data.size() && !ec) {
-        fs::resize_file(native(path), data.size(), ec);
-        if (ec) return error_from(ec.value(), "truncate", path);
+    if (fs::file_size(native(path_), ec) > size_ && !ec) {
+        fs::resize_file(native(path_), size_, ec);
+        if (ec) return error_from(ec.value(), "truncate", path_);
     }
     return Error::none;
+}
+
+void Writer::close() {
+    if (handle_ == -1) return;
+    std::fclose(reinterpret_cast<FILE*>(handle_));
+    handle_ = -1;
 }
 
 Error make_parents(const char* path) {

@@ -160,8 +160,8 @@ void GbaSaveCartridge::set_clock(std::span<const uint8_t, kClockBytes> r) {
 }
 #endif
 
-uint32_t crc32(std::span<const uint8_t> data) {
-    uint32_t c = 0xffffffffu;
+uint32_t crc32(std::span<const uint8_t> data, uint32_t crc) {
+    uint32_t c = crc ^ 0xffffffffu;
     for (uint8_t b : data) c = kCrcTable[(c ^ b) & 0xff] ^ (c >> 8);
     return c ^ 0xffffffffu;
 }

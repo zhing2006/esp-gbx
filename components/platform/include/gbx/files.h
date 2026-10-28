@@ -84,6 +84,34 @@ private:
     [[maybe_unused]] uint32_t mount_ = 0;  // the mount it was opened on; the board only
 };
 
+// A file written from its start in pieces and then flushed to the card, for
+// one not held whole in memory. As with write(), a file of the same size is
+// overwritten in place. One task uses an object at a time; each call holds
+// the card for its own length only. A remount() ends it: writes then fail.
+class Writer {
+public:
+    Writer() = default;
+    ~Writer() { close(); }
+    Writer(const Writer&) = delete;
+    Writer& operator=(const Writer&) = delete;
+    // Opens `path`, creating it if needed. The path stays the caller's
+    // until finish() or close(), for the log.
+    Error open(const char* path);
+    // Appends `data`.
+    Error write(std::span<const uint8_t> data);
+    // Cuts the file to what was written, flushes it to the card and closes
+    // it.
+    Error finish();
+    // Closes the file without flushing it, as after a failed write.
+    void close();
+
+private:
+    intptr_t handle_ = -1;
+    uint64_t size_ = 0;  // written
+    const char* path_ = "";
+    [[maybe_unused]] uint32_t mount_ = 0;  // the mount it was opened on; the board only
+};
+
 // One name in a directory.
 struct Entry {
     char name[256];

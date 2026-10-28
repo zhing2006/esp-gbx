@@ -26,9 +26,11 @@ void state_path(const char* rom_path, int slot, char* out, size_t size);
 
 // The instant saves of the running game: four slots, a file each, see
 // slots.cpp for the format. The emulation task only copies the state into a
-// snapshot, see System::capture(). A task on core 0 encodes it, writes the
-// file and flushes the card; for a load it reads the file and decodes it,
-// and the emulation task restores the copy. The task also lists the slots.
+// snapshot, see System::capture(). A task on core 0 encodes it and writes
+// the file a buffer at a time, then flushes the card; for a load it reads
+// the file and decodes it the same way, and the emulation task restores the
+// copy. The task also lists the slots, and reads the thumbnail the menus
+// show.
 //
 // The task runs on core 0 at priority 2, like the cartridge save's writer.
 class Slots {
@@ -109,7 +111,9 @@ public:
     // shows the state it is taking.
     bool info(int slot, Info& out) const;
     // The thumbnail of an ok slot or one of another mode, as info() lists
-    // it; false for the others.
+    // it; false for the others. The task holds one thumbnail: for another
+    // slot this asks it to read that one from the card and is false until
+    // generation() changes with it there.
     bool thumbnail(int slot, Thumbnail& out) const;
     // Changes whenever a slot's info does.
     uint32_t generation() const { return generation_.load(std::memory_order_acquire); }
@@ -129,18 +133,18 @@ private:
     void list();
     void write_slot(int slot);
     void read_slot(int slot);
-    Kind examine(int slot, Info& info, Thumbnail& thumbnail);
+    void read_thumbnail(int slot, uint32_t opened);
+    Kind examine(int slot, Info& info, bool decode);
     void finish(Work work);
     void refuse(int slot, const char* why);
     bool reserve(int slot);
     bool submit(int slot, bool captured);
-    bool begin(const char* rom_path, const gb::RomIdentity& identity, size_t file_size, size_t buffer_size);
-    void release();
+    void begin(const char* rom_path, const gb::RomIdentity& identity, size_t file_size, size_t largest);
 
     Faults* faults_ = nullptr;
     platform::Notification* done_ = nullptr;
     platform::Worker task_;
-    platform::Notification wake_;
+    mutable platform::Notification wake_;
     std::atomic<bool> stopping_{false};
 
     mutable std::mutex mutex_;
@@ -152,10 +156,18 @@ private:
     char paths_[kCount][kSavePathSize] = {};
     char name_[64] = {};
     gb::RomIdentity identity_{};
-    // kCount slots, then the write under way and the task's own. The
-    // thumbnails, more than the task's stack, are in external memory.
+    // kCount slots, then the write under way and the task's own, in
+    // external memory like the thumbnail and the buffer below.
     Info* infos_ = nullptr;
-    Thumbnail* thumbnails_ = nullptr;
+    // The thumbnail of thumbnail_slot_, read from its file or of the state
+    // being written; ok when it could be read. The task fills it while
+    // thumbnail_slot_ is 0. opened_ counts open() and close(), so that a
+    // thumbnail read across them is dropped.
+    Thumbnail* thumbnail_ = nullptr;
+    int thumbnail_slot_ = 0;
+    bool thumbnail_ok_ = false;
+    mutable int thumbnail_wanted_ = 0;  // the slot the menus asked for
+    uint32_t opened_ = 0;
     bool listed_ = false;
     bool pending_ = false;  // infos_[kCount] stands for slot_
     char error_[48] = {};
@@ -173,11 +185,12 @@ private:
     gba::Snapshot gba_snapshot_;
 #endif
     bool gba_ = false;
-    // The files of this ROM in its run mode have file_size_ bytes; the
-    // buffer holds one of the other mode too.
-    uint8_t* file_ = nullptr;
-    size_t file_size_ = 0, buffer_size_ = 0;
+    // The files of this ROM in its run mode have file_size_ bytes; the list
+    // checks whole those up to largest_, the size in the other mode.
+    size_t file_size_ = 0, largest_ = 0;
     gb::Mode mode_ = gb::Mode::dmg;
+    // The task's, for the files.
+    uint8_t* piece_ = nullptr;
 };
 
 }  // namespace gbx::app

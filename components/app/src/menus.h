@@ -125,8 +125,9 @@ private:
     void build_pause(ui::MenuScreen& s);
     void build_slots(ui::MenuScreen& s);
     void slot_note(int slot, const Slots::Info& info, bool listed, ui::MenuScreen& s) const;
-    // Gives the view the selected slot's thumbnail when it changed.
-    void send_thumbnail(int slot, uint32_t generation);
+    // Gives the view the selected slot's thumbnail when it changed; false
+    // while the view has none of it.
+    bool send_thumbnail(int slot, uint32_t generation);
     void build_dialog(ui::MenuScreen& s);
     int pause_items(std::array<Item, 6>& out) const;
     void show();
