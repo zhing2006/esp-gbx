@@ -80,6 +80,11 @@ public:
     // The pool's allocation with `capacity`, its shared code included,
     // rounded up.
     static size_t reserved_bytes(const Capacity& capacity) { return capacity.pool_bytes + kSharedReserve; }
+    // The second level, where initialize() set up none: `bytes` of PSRAM
+    // with room for `records` blocks, between runs. False without the
+    // memory, or with a second level already.
+    bool initialize_store(size_t bytes, size_t records);
+    size_t store_capacity() const { return store_.capacity_bytes(); }
     bool available() const { return cache_.capacity_bytes() != 0 && gateway_bytes_; }
     void clear();
     // Only together with a caller-owned CPU/memory reset, never a cache flush.

@@ -1,0 +1,21 @@
+menu "GBX app"
+
+config GBX_LIBRARY_ENTRIES
+    int "ROM library: files and folders"
+    range 256 4096
+    default 4096
+    help
+        The entries of the ROM list, files and folders under roms/, in
+        PSRAM; a card with more stops the scan there. A board with little
+        PSRAM sets less in boards/<board>/sdkconfig.defaults.
+
+config GBX_LIBRARY_NAMES_KB
+    int "ROM library: pool of names, KiB"
+    range 32 512
+    default 512
+    help
+        The names of the ROM list's entries, in PSRAM; a card whose names
+        take more stops the scan there. A board with little PSRAM sets less
+        in boards/<board>/sdkconfig.defaults.
+
+endmenu

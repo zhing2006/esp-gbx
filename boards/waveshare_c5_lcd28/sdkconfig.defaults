@@ -26,10 +26,16 @@ CONFIG_SPIRAM_SPEED_120M=y
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 
-# PSRAM budget for 8 MB, see components/core/Kconfig: the smallest second
-# level of the GB JIT, so that a 1 MB game with the JIT still has PSRAM for
-# its instant saves.
+# PSRAM budget for 8 MB, see components/core/Kconfig and
+# components/app/Kconfig. The GB JIT's second level takes the PSRAM a game
+# leaves after its save and instant saves, which a 4 MB game nearly fills,
+# less what the menus and the saves allocate while it runs, up to 1 MB. The
+# test firmware, which runs no game, takes the 1 MB whole. The ROM library
+# is smaller to leave the second level more.
 CONFIG_GBX_GB_JIT_STORE_KB=1024
+CONFIG_GBX_GB_JIT_STORE_LEAVE_KB=256
+CONFIG_GBX_LIBRARY_ENTRIES=1024
+CONFIG_GBX_LIBRARY_NAMES_KB=64
 # Internal RAM budget, see components/core/Kconfig: 384 KB of SRAM leave
 # about 220 KB of heap at startup, which also holds the tasks' stacks, the
 # drivers' buffers and the JIT's block tables, which grow with the pool. A

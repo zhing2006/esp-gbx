@@ -16,15 +16,16 @@ namespace gbx::app {
 // so the ROM list fills in while the scan goes on. It reads each ROM's
 // header for the badge and the footer, and lists saves/ once per folder to
 // mark the ROMs that have a save. Entries live in fixed arrays in external
-// memory; a card with more stops the scan at kMaxEntries.
+// memory, sized by the board, see components/app/Kconfig; a card with more
+// stops the scan at kMaxEntries.
 //
 // The scan task runs on core 0 at priority 2, below the audio (7), the PPU
 // and APU worker (5), the present task (4) and LVGL (3), and away from the
 // emulation on core 1.
 class Library {
 public:
-    static constexpr int kMaxEntries = 4096;
-    static constexpr size_t kNamePool = 512 * 1024;
+    static constexpr int kMaxEntries = GBX_LIBRARY_ENTRIES;
+    static constexpr size_t kNamePool = GBX_LIBRARY_NAME_BYTES;
     static constexpr int kRoot = -1;  // roms/ itself
 
     struct Entry {

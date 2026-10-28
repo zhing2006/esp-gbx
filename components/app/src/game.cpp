@@ -1,6 +1,7 @@
 #include "game.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -402,6 +403,28 @@ void Game::reserve_jit() {
     const size_t bytes = gb::Sm83Jit::reserved_bytes({});
 #endif
     jit_reserved_ = platform::allocate_executable(bytes);
+}
+
+void Game::fill_jit_store() {
+#if GBX_GB_JIT_STORE_LEAVE_BYTES
+    auto* jit = system_->jit();
+    if (!jit || jit->store_capacity()) return;
+    const size_t free = platform::heap_stats().external_free;
+    if (free <= GBX_GB_JIT_STORE_LEAVE_BYTES) return;
+    const size_t room = free - GBX_GB_JIT_STORE_LEAVE_BYTES;
+    // Its index takes a word for each of twice as many records, rounded up
+    // to a power of two, see jit::CodeStore.
+    const auto taken = [](size_t bytes) { return bytes + std::bit_ceil(bytes / 256 * 2) * 4; };
+    constexpr size_t kStep = 16 * 1024;
+    size_t bytes = std::min<size_t>(GBX_GB_JIT_STORE_BYTES, room);
+    for (bytes -= bytes % kStep; bytes >= kStep && taken(bytes) > room;) bytes -= kStep;
+    // The free PSRAM may be in pieces smaller than that.
+    for (; bytes >= kStep; bytes -= kStep)
+        if (jit->initialize_store(bytes, bytes / 256)) break;
+    platform::log(platform::LogLevel::info, kTag, "JIT second level %u KiB, %u KiB of PSRAM left",
+                  static_cast<unsigned>(jit->store_capacity() / 1024),
+                  static_cast<unsigned>(platform::heap_stats().external_free / 1024));
+#endif
 }
 
 void Game::Mark::store(uint64_t count, uint64_t us) {
@@ -1126,6 +1149,7 @@ void Game::change_backend() {
         faults_->add("Can't start the JIT: not enough memory for its code.");
         return;
     }
+    fill_jit_store();
     backend_.store(backend);
     lend_core();
     platform::log(platform::LogLevel::info, kTag, "backend %s", backend == Backend::jit ? "jit" : "int");
@@ -1352,6 +1376,15 @@ void Game::load(const char* path, Backend backend, bool cgb) {
         fail("Not enough memory for the emulator.");
         return;
     }
+#if GBX_GB_JIT_STORE_LEAVE_BYTES
+    {
+        // The second level waits for the PSRAM the game leaves, see
+        // fill_jit_store().
+        gb::Sm83Jit::Capacity capacity;
+        capacity.store_bytes = capacity.store_records = 0;
+        system_->set_jit_capacity(capacity);
+    }
+#endif
     gb_cart_.attach(system_.get());
     const std::span<const uint8_t> bytes{rom, static_cast<size_t>(size)};
     const bool loaded = system_->load_rom(bytes, false, gb::run_mode(bytes, cgb));
@@ -1409,6 +1442,7 @@ void Game::load(const char* path, Backend backend, bool cgb) {
     }
     // Without memory for them, the game runs without instant saves.
     if (!slots_.open(path, *system_)) faults_->add("No memory for the instant saves of %s.", file_name(path));
+    fill_jit_store();
 #ifdef GBX_PROFILER
     replay_.started(*system_);
 #endif

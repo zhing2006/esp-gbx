@@ -1658,17 +1658,7 @@ bool Sm83Jit::initialize(Memory& memory, bool stop_on_marker, const Capacity& ca
                       static_cast<unsigned>(platform::largest_executable()));
         return false;
     }
-    // Each segment of the second level starts with a copy of the gateway.
-    store_.initialize(capacity.store_bytes, capacity.store_records, cache_.shared().first(gateway_bytes_ / 4),
-                      reinterpret_cast<uintptr_t>(cache_.shared().data()));
-#ifdef GBX_PROFILER
-    // For attributing profiler samples in the copies, see the gateway's line.
-    if (!store_.storage().empty())
-        platform::log(platform::LogLevel::warn, "jit", "store %08lx %u bytes, segments of %u bytes",
-                      static_cast<unsigned long>(reinterpret_cast<uintptr_t>(store_.storage().data())),
-                      static_cast<unsigned>(store_.storage().size_bytes()),
-                      static_cast<unsigned>(jit::CodeStore::kSegmentBytes));
-#endif
+    if (capacity.store_bytes) initialize_store(capacity.store_bytes, capacity.store_records);
     dispatch_.reset(new (std::nothrow) Dispatch);
     mid_.reset(new (std::nothrow) MidEntries{});
     link_records_.reset(new (std::nothrow) LinkRecord[kLinkRecords]);
@@ -1681,6 +1671,21 @@ bool Sm83Jit::initialize(Memory& memory, bool stop_on_marker, const Capacity& ca
     for (auto& slot : *dispatch_) slot[0] = UINT32_MAX;
     memory_ = &memory;
     stop_on_marker_ = stop_on_marker;
+    return true;
+}
+
+bool Sm83Jit::initialize_store(size_t bytes, size_t records) {
+    // Each segment of the second level starts with a copy of the gateway.
+    if (!store_.initialize(bytes, records, cache_.shared().first(gateway_bytes_ / 4),
+                           reinterpret_cast<uintptr_t>(cache_.shared().data())))
+        return false;
+#ifdef GBX_PROFILER
+    // For attributing profiler samples in the copies, see the gateway's line.
+    platform::log(platform::LogLevel::warn, "jit", "store %08lx %u bytes, segments of %u bytes",
+                  static_cast<unsigned long>(reinterpret_cast<uintptr_t>(store_.storage().data())),
+                  static_cast<unsigned>(store_.storage().size_bytes()),
+                  static_cast<unsigned>(jit::CodeStore::kSegmentBytes));
+#endif
     return true;
 }
 

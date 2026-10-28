@@ -58,6 +58,8 @@ public:
     // every reference to them.
     void clear();
     size_t used_bytes() const { return used_ * 4; }
+    // The storage initialize() set up, 0 without any.
+    size_t capacity_bytes() const { return capacity_ * 4; }
     size_t records() const { return count_; }
     size_t drops() const { return drops_; }
 #ifdef GBX_PROFILER

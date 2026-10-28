@@ -125,6 +125,7 @@ public:
     uint32_t take_ram_written() { return memory.cartridge.take_ram_written(); }
     bool take_rtc_written() { return memory.cartridge.take_rtc_written(); }
     const Sm83Jit* jit() const { return jit_.get(); }
+    Sm83Jit* jit() { return jit_.get(); }
 
     // Instant saves, see Snapshot. Between runs, which end at instruction
     // boundaries: waits for the worker to finish the rows and sound handed

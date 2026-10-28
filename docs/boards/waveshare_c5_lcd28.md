@@ -72,7 +72,7 @@ ESP32-C5-WROOM-1-N32R8 是 32MB flash、8MB PSRAM 的模组。ESP32-C5 是单核
 - CPU 240MHz，和厂商示例相同。
 - PSRAM 是四线模式，120MHz，厂商示例用的是 80MHz。代码、数据和画面都要经过 PSRAM，所以用了 IDF 给 ESP32-C5 提供的最高一档。
 - flash 用 QIO、20MHz，大小按实际的 32MB 配置。共用的分区表只用前 16MB，所以读 flash 用的都是 3 字节地址。厂商示例的 flash 是 80MHz，但是 flash 和 PSRAM 共用 MSPI 的核心时钟，PSRAM 用 120MHz 时，flash 只能用 20MHz 或 120MHz（IDF v6.1 中 ESP32-C5 的 `mspi_timing_tuning_configs.h`）：80MHz 要求的核心时钟和 PSRAM 不同；40MHz 的分频比是 3，而 SDR 模式要求分频比是 1 或偶数；120MHz 要打开 flash 的 HPM。代码和只读数据在启动时已经复制到 PSRAM（`SPIRAM_XIP_FROM_PSRAM`），运行时从 flash 读的主要是 UI 资源分区。
-- GB JIT 的第二级在 PSRAM 里配 1024KB（`GBX_GB_JIT_STORE_KB`），是允许的最小值，这样 1MB 的游戏用 JIT 时，PSRAM 里还放得下即时存档。
+- GB JIT 的第二级等存档和即时存档分到内存以后再分配，取剩下的 PSRAM，留出 256KB（`GBX_GB_JIT_STORE_LEAVE_KB`）给游戏运行时菜单和存档的分配。4MB 的游戏差不多占满 PSRAM，所以 ROM 列表改成最多 1024 项、名字共 64KB（`GBX_LIBRARY_ENTRIES`、`GBX_LIBRARY_NAMES_KB`），比默认值小，给第二级多留一些。
 - 片内 RAM 放不下 192KB 的 GB JIT 代码池。JIT 的块表也要放在片内 RAM 里，它的大小随代码池的块数变化，所以 `GBX_GB_JIT_POOL_KB` 设成 64，让代码池、共用代码和块表都留在片内。
 - 控制台是 USB-Serial/JTAG，见“烧录和恢复”。厂商的出厂工程用 UART0、2000000 波特率，USB-Serial/JTAG 作为第二控制台。
 

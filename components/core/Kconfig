@@ -49,12 +49,27 @@ menu "GBX PSRAM budgets"
 
 config GBX_GB_JIT_STORE_KB
     int "GB JIT: second level of the code cache, KiB"
-    range 1024 16384
+    range 256 16384
     default 8192
     help
         The copies of the GB JIT's ROM blocks that run from PSRAM after the
         code pool evicts them, one record per 256 bytes. Each board sets it
-        for its PSRAM in boards/<board>/sdkconfig.defaults.
+        for its PSRAM in boards/<board>/sdkconfig.defaults. With
+        GBX_GB_JIT_STORE_LEAVE_KB, a game's second level takes at most this
+        much; the test firmware takes it whole.
+
+config GBX_GB_JIT_STORE_LEAVE_KB
+    int "GB JIT: PSRAM the second level leaves free, KiB"
+    range 0 4096
+    default 0
+    help
+        With 0, the GB JIT's second level takes GBX_GB_JIT_STORE_KB when
+        the JIT starts. Otherwise the game sets it up once the save and the
+        instant saves have their memory: it takes the PSRAM left, up to
+        GBX_GB_JIT_STORE_KB, less this much, which stays free for what the
+        menus and the saves allocate while the game runs. A board whose
+        PSRAM a large game fills sets it in
+        boards/<board>/sdkconfig.defaults.
 
 config GBX_GBA_ROM_CACHE_KB
     int "GBA: ROM cache, KiB"
