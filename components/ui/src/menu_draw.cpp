@@ -48,9 +48,10 @@ std::string_view lstrip(std::string_view t) {
     return t;
 }
 
-// The ERRORS page's buttons, and those of SAVE / LOAD.
+// The buttons of the ERRORS page, of SAVE / LOAD and of WIRELESS GAMEPAD.
 constexpr const char* kErrorButtons[] = {"CLEAR", "BACK"};
 constexpr const char* kSlotButtons[] = {"SAVE", "LOAD"};
+constexpr const char* kGamepadButtons[] = {"PAIR", "BACK"};
 
 const char* save_text(Screen::Save save) {
     switch (save) {
@@ -352,6 +353,7 @@ void MenuPainter::draw(const Screen& m, Surface& s, const uint16_t* backdrop, co
         case Screen::Kind::errors: errors(m, s); break;
         case Screen::Kind::loading: loading(m, s); break;
         case Screen::Kind::slots: slots(m, s, thumbnail); break;
+        case Screen::Kind::gamepad: gamepad(m, s); break;
     }
     if (m.dialog.shown) {
         dialog(m, s);
@@ -452,11 +454,15 @@ void MenuPainter::roms(const Screen& m, Surface& s, int marquee) const {
 }
 
 void MenuPainter::message(const Screen& m, Surface& s) const {
-    const int W = theme_.width;
-    s.fill(0, 0, W, theme_.height, c(MenuColor::paper));
+    s.fill(0, 0, theme_.width, theme_.height, c(MenuColor::paper));
     header(s, view(m.title), {}, view(m.status));
+    notice(m, s, c(MenuColor::ink));
+}
+
+void MenuPainter::notice(const Screen& m, Surface& s, uint16_t heading) const {
+    const int W = theme_.width;
     icon(s, view(m.icon), W / 2 - 16, 34, c(MenuColor::muted), 2);
-    text(s, W / 2, 74, view(m.heading), c(MenuColor::ink), kNoWidth, Align::center);
+    text(s, W / 2, 74, view(m.heading), heading, W - 40, Align::center);
     std::array<std::string_view, 3> lines;
     const int n = wrap(view(m.body), W - 40, lines);
     for (int i = 0; i < n; ++i) {
@@ -638,6 +644,16 @@ void MenuPainter::errors(const Screen& m, Surface& s) const {
     }
     s.fill(0, kFooter, W, 1, c(MenuColor::rule));
     buttons(s, W / 2, kFooter + 2, kErrorButtons, m.selected);
+}
+
+void MenuPainter::gamepad(const Screen& m, Surface& s) const {
+    const int W = theme_.width;
+    s.fill(0, 0, W, theme_.height, c(MenuColor::paper));
+    header(s, view(m.title), {}, view(m.status));
+    notice(m, s, c(m.gamepad.alert ? MenuColor::alert : MenuColor::ink));
+    s.fill(0, kFooter, W, 1, c(MenuColor::rule));
+    const bool enabled[] = {m.gamepad.pair, true};
+    buttons(s, W / 2, kFooter + 2, kGamepadButtons, m.selected, enabled);
 }
 
 void MenuPainter::loading(const Screen& m, Surface& s) const {
@@ -874,6 +890,7 @@ MenuHit MenuPainter::hit(const Screen& m, int x, int y) const {
             break;
         }
         case Screen::Kind::errors: return hit_buttons(x, y, W / 2, kFooter + 2, kErrorButtons);
+        case Screen::Kind::gamepad: return hit_buttons(x, y, W / 2, kFooter + 2, kGamepadButtons);
         case Screen::Kind::slots: {
             if (const MenuHit b = hit_buttons(x, y, slot_buttons_x(m), kSlotButtonsY, kSlotButtons);
                 b.target != Target::none) {

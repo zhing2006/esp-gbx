@@ -8,7 +8,8 @@ Each board gets idle.png (no ROM loaded), gb.png and gbc.png (a GB and a GBC
 game in their black border) and gba.png, with the lamps a running game would light, and home.png
 and pause.png with a menu in the game window. Games and menus are at the
 largest whole scale the window holds; a board whose window is too small for
-2x also gets settings.png, which then has no SCALING. menus/ holds every menu
+2x also gets settings.png, which then has no SCALING. The HOME of a board in
+BLUETOOTH_GAMEPAD has a fourth card, WIRELESS GAMEPAD. menus/ holds every menu
 screen and dialog at 2x, from menu_scenes.py. states.png lists every
 control, switch and lamp state on the Tab5. The game scene comes from
 preview_scene.py and VFD values are shown as uncollected; neither is
@@ -24,7 +25,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 import menu_kit
-from menu_scenes import screens, small_window_screens
+from menu_scenes import gamepad_home_screens, screens, small_window_screens
 from preview_scene import scene
 from uikit import ASSETS, DOCS, boards, place
 from vfd_font import VfdFont, draw_cell, placeholder
@@ -38,6 +39,10 @@ PREVIEWS = {
     "home": {"window": "home", "run_state": "NO ROM", "lamps": {}, "speed": "1x"},
     "pause": {"window": "pause", "run_state": "PAUSE", "lamps": {"gb": "lime", "int": "green"}, "speed": "1x"},
 }
+
+# Boards whose firmware is built with the Bluetooth gamepad. Keep in step with
+# their build configuration.
+BLUETOOTH_GAMEPAD = {"jc1060p470"}
 
 
 class Board:
@@ -130,12 +135,15 @@ def outputs():
         b = Board(name)
         previews, windows = PREVIEWS, menus
         _, _, w, h = b.m["display"]
-        if w < 2 * menu_kit.W or h < 2 * menu_kit.H:
+        small = w < 2 * menu_kit.W or h < 2 * menu_kit.H
+        menu_kit.use_scale(1 if small else 2)
+        if small:
             # The menus at 1x; SETTINGS has no SCALING, as frames are not scaled.
-            menu_kit.use_scale(1)
             windows = dict(screens() + small_window_screens())
-            menu_kit.use_scale(2)
             previews = PREVIEWS | {"settings": dict(PREVIEWS["home"], window="settings-no-scaling")}
+        if name in BLUETOOTH_GAMEPAD:
+            windows = windows | dict(gamepad_home_screens())
+        menu_kit.use_scale(2)
         for key, p in previews.items():
             im = b.render(lamps=p["lamps"], speed=p["speed"], system=p.get("system"), run_state=p.get("run_state"),
                           window=windows.get(p.get("window")))

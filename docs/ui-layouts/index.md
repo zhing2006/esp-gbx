@@ -17,7 +17,7 @@
 | 乐鑫 ESP32-S31-Korvo-1 | 480×800 | [idle](esp32_s31_korvo_1/idle.png) | [gb](esp32_s31_korvo_1/gb.png) | [gbc](esp32_s31_korvo_1/gbc.png) | [gba](esp32_s31_korvo_1/gba.png) | [home](esp32_s31_korvo_1/home.png) | [pause](esp32_s31_korvo_1/pause.png) |
 | Waveshare ESP32-C5-Touch-LCD-2.8 | 240×320 | [idle](waveshare_c5_lcd28/idle.png) | [gb](waveshare_c5_lcd28/gb.png) | [gbc](waveshare_c5_lcd28/gbc.png) | [gba](waveshare_c5_lcd28/gba.png) | [home](waveshare_c5_lcd28/home.png) | [pause](waveshare_c5_lcd28/pause.png) |
 
-GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。
+GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。JC1060P470 的固件编入了蓝牙手柄，所以它的主界面效果图比其他板子多一张 WIRELESS GAMEPAD 卡片。
 
 Sila P4X 的 6.2 英寸屏幕用横屏布局。它的底图是 `tools/ui/pasteup.py` 按 `raws/ui/sila_p4x/spec.json` 拼出的底稿，直接使用，没有再生成成品底图，也没有序列号贴纸。屏幕和触摸的接线条件见 [Sila P4X 板级文档](../boards/sila_p4x.md#屏幕与触摸)，显示方向和触摸尚未上板确认。
 
@@ -85,7 +85,7 @@ Waveshare ESP32-C5-Touch-LCD-2.8 的 2.8 英寸屏幕是 240×320 的竖屏，�
 
 | 效果图 | 说明 |
 |---|---|
-| [home](menus/home.png)、[home-settings](menus/home-settings.png)、[home-errors](menus/home-errors.png) | 主界面有 ROMS、SETTINGS 和 ERRORS 三个入口，入口是列表，以后可以增加。卡片高 26 像素，按放得下四张卡片的位置排列，第四格空着，留给以后的入口。ERRORS 右边是故障的条数，没有故障时显示为灰色，标 `NONE`。标题栏右边是卡的状态，底栏说明光标所在的入口，ROMS 的说明是上次玩的游戏，ERRORS 的说明是最新一条故障 |
+| [home](menus/home.png)、[home-settings](menus/home-settings.png)、[home-errors](menus/home-errors.png) | 主界面有 ROMS、SETTINGS 和 ERRORS 三个入口，编入了蓝牙手柄的固件还有第四个入口 WIRELESS GAMEPAD。入口是列表，以后可以增加。卡片高 26 像素，按放得下四张卡片的位置排列，没有 WIRELESS GAMEPAD 时第四格空着。ERRORS 右边是故障的条数，没有故障时显示为灰色，标 `NONE`。标题栏右边是卡的状态，底栏说明光标所在的入口，ROMS 的说明是上次玩的游戏，ERRORS 的说明是最新一条故障 |
 | [roms-top](menus/roms-top.png)、[roms](menus/roms.png)、[roms-long](menus/roms-long.png) | ROMS 按 `roms/` 的目录浏览，A 进入子目录，B 回到上一级，在顶层按 B 回到主界面。先列子目录，右边是其中 ROM 的个数，包括更深的子目录；再列 ROM。名称排序不区分大小写，数字按数值比较。标题栏显示当前路径和光标位置，底栏显示所选 ROM 头里的标题、MBC 和卡带 RAM 大小。GBA 游戏的底栏显示标题和游戏代码，登记为带 RTC 的游戏后面再标 `RTC` |
 | [roms-gbc](menus/roms-gbc.png)、[roms-unsupported](menus/roms-unsupported.png) | 徽标按 ROM 头的 CGB 标志显示（Pan Docs “The Cartridge Header”的 0143），0x80 和 0xC0 的游戏都显示 GBC。徽标只表示卡带，不表示游戏会按哪种模式启动，模式由 PALETTE 决定，见 SETTINGS。GBA 游戏显示 GBA 徽标。卡带类型还不能运行的游戏整行变灰，比如 MBC7，选中时底栏用红字写出原因，按 A 不启动 |
 | [roms-missing-glyph](menus/roms-missing-glyph.png) | 字体缺字时显示方框 |
@@ -96,6 +96,8 @@ Waveshare ESP32-C5-Touch-LCD-2.8 的 2.8 英寸屏幕是 240×320 的竖屏，�
 | [loading](menus/loading.png) | 载入时显示游戏名和读取进度 |
 | [pause](menus/pause.png)、[pause-writing](menus/pause-writing.png)、[pause-error](menus/pause-error.png) | 暂停菜单浮在压暗的最后一帧游戏画面上，有 RESUME、SAVE / LOAD、SETTINGS、ERRORS 和 QUIT，ERRORS 在没有故障时是灰色。下面是存档状态，颜色和 SAVE 灯一致。有故障时，ERRORS 右边用红字写出故障的条数，原因要进 ERRORS 页面看。存档出错时，第一项是 RETRY SAVE |
 | [errors](menus/errors.png) | 从主界面或者暂停菜单的 ERRORS 进入。按时间倒序列出最近的故障，左边是发生了多久（`<1m`、`5m`、`2h`、`3d`，按开机以后的单调时钟算，不依赖板上时钟），右边是原因，最多折成两行。底部是 CLEAR 和 BACK，左右切换，默认选中 CLEAR。CLEAR 清空列表、熄灭 ERR 灯，然后回到进来的地方；BACK 和 B 直接回去 |
+| [home-gamepad](menus/home-gamepad.png)、[gamepad](menus/gamepad.png)、[gamepad-none](menus/gamepad-none.png) | 主界面的 WIRELESS GAMEPAD 卡片右边是保存的手柄的状态：已经连上时标 `ON`，配对过但是没有连上时标 `OFF`，没有配对过时标 `NONE`。光标停在这张卡片上时，底栏写出手柄的名字和它是否连上。从这张卡片进入 WIRELESS GAMEPAD 页面。页面中间写出保存的手柄是否连上和它的名字，没有配对过时显示 `NO GAMEPAD`。底部是 PAIR 和 BACK，默认选中 PAIR。暂停菜单里没有这个入口 |
+| [gamepad-searching](menus/gamepad-searching.png)、[gamepad-paired](menus/gamepad-paired.png)、[gamepad-failed](menus/gamepad-failed.png) | 按 PAIR 开始配对，页面依次显示 `STARTING`、`SEARCHING` 和 `CONNECTING`。`SEARCHING` 时提示按住手柄的配对键，让它进入配对模式，最多找一分钟。配对进行时 PAIR 是灰色的，蓝牙手柄的按键也不起作用，但是触摸和其他按键照常可用。配对成功后显示 `PAIRED` 和新手柄的名字，新手柄替换原来保存的那个。如果失败，页面用红字显示 `NOT PAIRED` 和原因，原来保存的手柄继续使用。有了结果以后可以再按 PAIR。BACK 和 B 放弃还没完成的配对，回到主界面 |
 
 SCALING 提供 NEAREST 和 SMOOTH，见 [settings-scaling](menus/settings-scaling.png)，两种模式使用同一套整数倍尺寸和黑边。有平滑实现的平台默认选中 SMOOTH，否则选中 NEAREST。暂停时切换会在恢复游戏时生效。CPU 显示后端没有平滑实现，因此 SCALING 整行置灰、不可修改，固定选中 NEAREST，见 [settings-scaling-unavailable](menus/settings-scaling-unavailable.png)。如果文件里保存了当前构建不支持的 SMOOTH，读取时自动回退到 NEAREST，界面选中 NEAREST，不阻止游戏运行。
 
@@ -208,7 +210,7 @@ uv run tools/ui/export_boards.py
 uv run tools/ui/render_previews.py
 ```
 
-各脚本的用途见[工具说明](../../tools/README.md)，生成参数见脚本和 `spec.json`。改过素材以后，用下面的命令确认效果图和素材一致：
+各脚本的用途见[工具说明](../../tools/README.md)，生成参数见脚本和 `spec.json`。哪些板子的主界面效果图有 WIRELESS GAMEPAD，由 `render_previews.py` 里的 `BLUETOOTH_GAMEPAD` 列出，板子的固件编入或者去掉蓝牙手柄时要一起改。改过素材以后，用下面的命令确认效果图和素材一致：
 
 ```sh
 uv run tools/ui/render_previews.py --check

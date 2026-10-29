@@ -136,11 +136,15 @@ private:
     void home(const MenuScreen& m, Surface& s) const;
     void roms(const MenuScreen& m, Surface& s, int marquee) const;
     void message(const MenuScreen& m, Surface& s) const;
+    // A message's icon, its heading in `heading` and up to three lines of
+    // text; WIRELESS GAMEPAD shows the same over its buttons.
+    void notice(const MenuScreen& m, Surface& s, uint16_t heading) const;
     void settings(const MenuScreen& m, Surface& s) const;
     void pause(const MenuScreen& m, Surface& s, const uint16_t* backdrop) const;
     void errors(const MenuScreen& m, Surface& s) const;
     void loading(const MenuScreen& m, Surface& s) const;
     void slots(const MenuScreen& m, Surface& s, const uint16_t* thumbnail) const;
+    void gamepad(const MenuScreen& m, Surface& s) const;
     void dialog(const MenuScreen& m, Surface& s) const;
 
     // Layout shared by drawing and hit testing.

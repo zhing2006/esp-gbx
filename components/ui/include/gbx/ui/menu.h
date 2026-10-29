@@ -11,8 +11,8 @@
 #endif
 
 // The menus in the game window: the home screen, the ROM list, SETTINGS, the
-// pause menu, SAVE / LOAD, ERRORS, the loading screen and the dialogs over
-// them, drawn as in
+// pause menu, SAVE / LOAD, ERRORS, WIRELESS GAMEPAD, the loading screen and
+// the dialogs over them, drawn as in
 // tools/ui/menu_kit.py and docs/ui-layouts/index.md#菜单.
 //
 // The app owns the menu state and navigation and describes each screen with
@@ -23,7 +23,7 @@ namespace gbx::ui {
 
 // Text fields are UTF-8 and NUL terminated; longer text is cut when drawn.
 struct MenuScreen {
-    enum class Kind : uint8_t { home, roms, message, settings, pause, errors, loading, slots };
+    enum class Kind : uint8_t { home, roms, message, settings, pause, errors, loading, slots, gamepad };
     enum class Badge : uint8_t { none, folder, gb, gbc, gba };
     enum class Setting : uint8_t { level, choice };
     enum class Save : uint8_t { none, clean, dirty, writing, error };
@@ -73,7 +73,7 @@ struct MenuScreen {
     };
 
     Kind kind = Kind::home;
-    char title[16] = {};    // title bar, left
+    char title[24] = {};    // title bar, left
     char path[256] = {};    // ROMS: the folder, after the title
     char status[24] = {};   // title bar, right
     char footer[160] = {};
@@ -104,10 +104,18 @@ struct MenuScreen {
         bool wide = false;
     } slots;
 
-    // message: an icon, a heading and wrapped text; loading: the heading
+    // message: an icon, a heading and wrapped text; loading: the heading;
+    // gamepad: as a message, over the PAIR and BACK buttons, `selected`
+    // being the button
     char icon[12] = {};
     char heading[32] = {};
     char body[160] = {};
+
+    // gamepad
+    struct Gamepad {
+        bool pair = true;    // PAIR can start a pairing: none runs
+        bool alert = false;  // the heading is red, as for a failed pairing
+    } gamepad;
 
     // loading
     char name[256] = {};

@@ -333,14 +333,31 @@ def rom_list(path, items, selected, first=0, status="", note=None, note_alert=Fa
     return cv.image()
 
 
+def notice(cv, icon, heading, body, heading_color=C["ink"]):
+    """A large icon, a heading and the text under it, in the middle."""
+    cv.icon(icon, W // 2 - 16, 34, C["muted"], zoom=2)
+    cv.text(W // 2, 74, heading, heading_color, width=W - 40, align="center")
+    for n, line in enumerate(cv.wrap(body, W - 40)):
+        cv.text(W // 2, 94 + n * LINE, line, C["muted"], align="center")
+
+
 def message(title, icon, heading, body):
     """A screen with nothing to list, such as a missing card."""
     cv = Canvas()
     header(cv, title)
-    cv.icon(icon, W // 2 - 16, 34, C["muted"], zoom=2)
-    cv.text(W // 2, 74, heading, C["ink"], align="center")
-    for n, line in enumerate(cv.wrap(body, W - 40)):
-        cv.text(W // 2, 94 + n * LINE, line, C["muted"], align="center")
+    notice(cv, icon, heading, body)
+    return cv.image()
+
+
+def gamepad(heading, body, selected, pairing=False, alert=False):
+    """WIRELESS GAMEPAD: the saved gamepad, a pairing under way or its
+    result, over the PAIR and BACK buttons. PAIR is gray while a pairing
+    runs; the heading of a failed one is red."""
+    cv = Canvas()
+    header(cv, "WIRELESS GAMEPAD")
+    notice(cv, "gamepad", heading, body, C["alert"] if alert else C["ink"])
+    cv.fill(0, FOOTER, W, 1, C["rule"])
+    buttons(cv, W // 2, FOOTER + 2, ["PAIR", "BACK"], selected, [not pairing, True])
     return cv.image()
 
 

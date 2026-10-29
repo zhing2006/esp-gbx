@@ -265,7 +265,7 @@ P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，
 板子的差异放在 `boards/<板子>/`，描述板上焊了什么：
 
 - 引脚、屏幕和初始化序列、触摸、codec 和 RTC 的型号、按键的接法、电池 ADC 和 LDO 通道。接口声明在 `components/board/include/gbx/esp/board.h`，各板子相同的步骤在 `components/board/src/board_support.cpp`，其中 MIPI DSI 的部分只在有 DSI 的芯片上编译。显示呈现、触摸坐标换算和 SD 挂载由平台实现统一处理。SD 卡接在 SDMMC 控制器上，或者和 SPI 屏共用一条 SPI 总线，由 `board::sdmmc()` 说明；共用总线时，板子在 `init()` 里初始化总线，平台只在上面加一个设备。
-- `sdkconfig.defaults`，写芯片、芯片修订、PSRAM、flash 和主频。P4 v1.x 和 v3.x 要用不同的芯片修订配置编译，所以这些配置跟着板子走。USB host 口能给手柄供 5V 的板子在这里打开 `GBX_USB_GAMEPAD`，见“显示和触摸”。
+- `sdkconfig.defaults`，写芯片、芯片修订、PSRAM、flash 和主频。P4 v1.x 和 v3.x 要用不同的芯片修订配置编译，所以这些配置跟着板子走。USB host 口能给手柄供 5V 的板子在这里打开 `GBX_USB_GAMEPAD`。P4 经 SDIO 接了 C5 或 C6 的板子可以打开 `GBX_BT_GAMEPAD`，同时写 ESP-Hosted 的引脚、NimBLE 和 LP Core 的配置。两种手柄见“显示和触摸”。
 - 用到的乐鑫组件在 `idf_component.yml` 里列出并锁定版本。
 
 几块板子都可能用到的外设驱动放在 `drivers/`，可以使用乐鑫的组件，因为 AGENTS.md 要求从零编写的只是模拟核心、解释器、JIT 和设备模型。板子的资料整理成 `docs/boards/<板子>.md`，原始资料放在 `refs/boards/<板子>/`。
@@ -288,7 +288,18 @@ PC 版的游戏层由 `components/platform/src/host/display.cpp` 实现，见 [P
 
 触摸不经过 LVGL 的输入设备，因为它只支持一个触点，而游戏要多指同时按。命中规则见 [UI 布局的“触摸”一节](ui-layouts/index.md#触摸)。
 
-实体按键由 `display.h` 的 `keys::read()` 提供，和触摸控件的按键合在一起。固件上的实体按键目前只有 USB 手柄：打开 `GBX_USB_GAMEPAD` 的板子在 USB host 口上读 HID 游戏手柄，乐鑫的 USB Host 库只在这个选项打开时进入构建。USB 的中断和两个任务都在 core 0，模拟所在的 core 1 不参与；任务栈在 PSRAM，片内 RAM 留给 JIT。设备的打开、报告描述符的读取、报告的接收和拔出后的清理都在同一个客户端任务里按库的事件顺序处理，所以设备拔出时没有别的任务还在用它。按键来自报告描述符里的 hat switch、X、Y 和按钮编号，A、B 按位置对应，一次只用一个手柄。映射表和两个任务的分工写在 `components/platform/src/esp/usb_gamepad.cpp`。
+实体按键由 `display.h` 的 `keys::read()` 提供，和触摸控件的按键合在一起。固件上的实体按键有 USB 手柄和蓝牙手柄，`components/platform/src/esp/keys.cpp` 合并两者的按键，每种手柄只在自己的选项打开时编入。HID 报告描述符的解析和报告的解码写在 `hid_gamepad.h`，两种手柄共用。
+
+打开 `GBX_USB_GAMEPAD` 的板子在 USB host 口上读 HID 游戏手柄，乐鑫的 USB Host 库只在这个选项打开时进入构建。USB 的中断和两个任务都在 core 0，模拟所在的 core 1 不参与；任务栈在 PSRAM，片内 RAM 留给 JIT。设备的打开、报告描述符的读取、报告的接收和拔出后的清理都在同一个客户端任务里按库的事件顺序处理，所以设备拔出时没有别的任务还在用它。按键来自报告描述符里的 hat switch、X、Y 和按钮编号，A、B 按位置对应，一次只用一个手柄。映射表和两个任务的分工写在 `components/platform/src/esp/usb_gamepad.cpp`。
+
+打开 `GBX_BT_GAMEPAD` 的 P4 板子经板上的 C5 或 C6 读蓝牙 LE 的 HID 手柄。C5/C6 跑 ESP-Hosted，作为蓝牙 Controller，接在 SDMMC 控制器的一个 SDIO slot 上。只做一次的事由 HP 核完成，游戏运行时一直要做的收发由 LP Core 完成，HP 核只读共享的按键状态。
+
+- 配对从 HOME 的 WIRELESS GAMEPAD 页开始。HP 核收回 SDIO，用 ESP-IDF 的 NimBLE 找到手柄并配对，读出 HID 服务，把以后连接要用的信息写进 NVS，再把 SDIO 交回 LP Core。NimBLE 只在配对时运行。这部分在 `components/platform/src/esp/bt/bt_gamepad.cpp`。
+- 开机时如果已经配对过，HP 核初始化 ESP-Hosted，然后启动 LP Core 的程序。
+- LP Core 的程序在 `components/platform/src/esp/bt/lp/`，全部放在 LP SRAM 里。它直接操作 SDMMC 控制器收发 HCI 包，连接手柄，读输入报告，把按键写在共享区。
+- SD 卡和 C5/C6 共用一个 SDMMC 控制器，HP 核和 LP Core 用锁轮流使用，规则写在 `components/platform/src/esp/bt/sdmmc_share.h`。
+
+NimBLE、ESP-Hosted 和 LP Core 的工具链由 `components/bluetooth/` 带进构建，只在选项打开时编入。
 
 ## 运行游戏
 

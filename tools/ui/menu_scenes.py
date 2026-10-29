@@ -6,7 +6,7 @@ screens lay out; they are not read from a card or a ROM.
 
 from PIL import Image, ImageChops
 
-from menu_kit import dialog, errors, home, loading, message, pause, rom_list, settings, slots
+from menu_kit import dialog, errors, gamepad, home, loading, message, pause, rom_list, settings, slots
 from preview_scene import scene
 
 HOME = [
@@ -21,6 +21,9 @@ ERRORS = [
     {"age": "3d", "text": "Can't write the settings: the SD card reported an error."},
 ]
 HOME_ERRORS = [dict(e, detail=str(len(ERRORS)), enabled=True) if e["label"] == "ERRORS" else e for e in HOME]
+# A board with a Bluetooth gamepad has a fourth card; the name is made up.
+PAD = "8BitDo SN30 Pro"
+HOME_GAMEPAD = HOME + [{"icon": "gamepad", "label": "WIRELESS GAMEPAD", "detail": "ON", "enabled": True}]
 
 TOP = [
     {"kind": "dir", "name": "gb", "count": 31},
@@ -183,7 +186,27 @@ def screens():
     out.append(("dialog-save-failed", dialog(quitting, "SAVE FAILED", [
         "The save could not be written: the SD card is full."], ["RETRY", "QUIT WITHOUT SAVING"], tone="alert")))
     out += slot_screens()
+    out += gamepad_screens()
     return out
+
+
+def gamepad_screens():
+    """HOME's WIRELESS GAMEPAD card and its page, on a board with a Bluetooth gamepad."""
+    return [
+        ("home-gamepad", home(HOME_GAMEPAD, 3, "SD 48 ROMS", f"Connected: {PAD}")),
+        ("gamepad", gamepad("CONNECTED", PAD, 0)),
+        ("gamepad-none", gamepad("NO GAMEPAD", "PAIR finds a Bluetooth gamepad in pairing mode.", 0)),
+        ("gamepad-searching", gamepad("SEARCHING", "Put the gamepad in pairing mode: hold its pair button.", 0,
+                                      pairing=True)),
+        ("gamepad-paired", gamepad("PAIRED", PAD, 0)),
+        ("gamepad-failed", gamepad("NOT PAIRED", "No gamepad in pairing mode was found within a minute.", 0,
+                                   alert=True)),
+    ]
+
+
+def gamepad_home_screens():
+    """(name, image) for the HOME a board with a Bluetooth gamepad shows: four cards."""
+    return [("home", home(HOME_GAMEPAD, 0, "SD 48 ROMS", "Last played: Pokemon Yellow"))]
 
 
 def small_window_screens():

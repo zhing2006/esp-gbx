@@ -22,8 +22,8 @@ struct MenuInput {
     float x = 0, y = 0;  // the first touch, logical screen pixels
 };
 
-// The menus' state and flow: HOME, ROMS, SETTINGS, ERRORS, the pause menu,
-// SAVE / LOAD, loading and the dialogs. They live in the app, which also owns the game,
+// The menus' state and flow: HOME, ROMS, SETTINGS, ERRORS, WIRELESS GAMEPAD,
+// the pause menu, SAVE / LOAD, loading and the dialogs. They live in the app, which also owns the game,
 // the saves and the settings they act on; ui::MenuView only draws the
 // MenuScreen descriptions they build and maps touches back to rows. All
 // calls come from the app's task.
@@ -51,7 +51,7 @@ public:
     void load_slot_from_console(int slot);
 
 private:
-    enum class Page : uint8_t { home, roms, settings, errors, pause, slots, loading, game };
+    enum class Page : uint8_t { home, roms, settings, errors, gamepad, pause, slots, loading, game };
     enum class Dialog : uint8_t {
         none, cant_load, mismatch, damaged, clock, saving, save_failed,
         slot_overwrite, slot_rom, slot_clock, slot_failed, slot_load_failed, slot_saving
@@ -72,6 +72,7 @@ private:
     void open_roms();
     void open_settings(bool in_game);
     void open_errors(bool in_game);
+    void open_gamepad();
     void open_slots();
     void save_slot(int slot);
     void load_slot(int slot, bool other_rom);
@@ -86,6 +87,7 @@ private:
     void press_roms(uint16_t keys);
     void press_settings(uint16_t keys);
     void press_errors(uint16_t keys);
+    void press_gamepad(uint16_t keys);
     void press_pause(uint16_t keys);
     void press_slots(uint16_t keys);
     void touch(const MenuInput& input);
@@ -118,10 +120,14 @@ private:
 
     // Building the screens.
     void build(ui::MenuScreen& s);
+    // HOME's cards: WIRELESS GAMEPAD comes after the other three on a board
+    // with a Bluetooth gamepad.
+    int home_cards() const;
     void build_home(ui::MenuScreen& s);
     void build_roms(ui::MenuScreen& s);
     void build_settings(ui::MenuScreen& s);
     void build_errors(ui::MenuScreen& s);
+    void build_gamepad(ui::MenuScreen& s);
     void build_pause(ui::MenuScreen& s);
     void build_slots(ui::MenuScreen& s);
     void slot_note(int slot, const Slots::Info& info, bool listed, ui::MenuScreen& s) const;
@@ -142,6 +148,7 @@ private:
     int home_selected_ = 0;
     int settings_selected_ = 0;
     int errors_button_ = 0;
+    int gamepad_button_ = 0;  // 0 PAIR or 1 BACK
     Item pause_item_ = Item::resume;
     bool in_game_ = false;  // SETTINGS and ERRORS opened from the pause menu
 

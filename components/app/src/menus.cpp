@@ -12,6 +12,7 @@
 #include "gbx/display.h"
 #include "gbx/executable.h"
 #include "gbx/files.h"
+#include "gbx/gamepad.h"
 #include "gbx/platform.h"
 #include "gbx/systems.h"
 #include "color_fix.h"
@@ -205,6 +206,8 @@ void Menus::follow_game() {
         slot_used_ = 0;
         slot_watching_ = false;
         slot_loading_ = false;
+        // Leaving WIRELESS GAMEPAD gives up its pairing, as B does.
+        if (page_ == Page::gamepad) platform::gamepad::cancel();
         if (page_ != Page::loading) back_ = page_ == Page::roms ? Page::roms : Page::home;
         page_ = Page::loading;
     }
@@ -408,6 +411,11 @@ void Menus::open_errors(bool in_game) {
     page_ = Page::errors;
 }
 
+void Menus::open_gamepad() {
+    gamepad_button_ = 0;
+    page_ = Page::gamepad;
+}
+
 void Menus::open_slots() {
     page_ = Page::slots;
     slot_button_ = -1;
@@ -497,6 +505,7 @@ void Menus::press(uint16_t keys) {
         case Page::roms: press_roms(keys); break;
         case Page::settings: press_settings(keys); break;
         case Page::errors: press_errors(keys); break;
+        case Page::gamepad: press_gamepad(keys); break;
         case Page::pause: press_pause(keys); break;
         case Page::slots: press_slots(keys); break;
         case Page::loading:
@@ -568,7 +577,7 @@ void Menus::press_dialog(uint16_t keys) {
 
 void Menus::press_home(uint16_t keys) {
     if (keys & kUp) home_selected_ = std::max(home_selected_ - 1, 0);
-    if (keys & kDown) home_selected_ = std::min(home_selected_ + 1, 2);
+    if (keys & kDown) home_selected_ = std::min(home_selected_ + 1, home_cards() - 1);
     if (!(keys & (kA | kStart))) return;
     switch (home_selected_) {
         case 0: open_roms(); break;
@@ -576,6 +585,7 @@ void Menus::press_home(uint16_t keys) {
         case 2:
             if (parts_.faults->count()) open_errors(false);
             break;
+        case 3: open_gamepad(); break;
         default: break;
     }
 }
@@ -676,6 +686,20 @@ void Menus::press_errors(uint16_t keys) {
         page_ = back;
     } else if ((keys & kMenu) && in_game_ && parts_.game->state() == GameState::paused) {
         resume();
+    }
+}
+
+// PAIR starts a pairing, and again after its result; BACK and B give up a
+// pairing under way, or clear its result, and go back to HOME.
+void Menus::press_gamepad(uint16_t keys) {
+    if (keys & (kLeft | kRight)) gamepad_button_ ^= 1;
+    if ((keys & (kA | kStart)) && gamepad_button_ == 0) {
+        // False while a pairing runs, when PAIR is gray. The screen may
+        // show the pairing only at a later update.
+        if (platform::gamepad::pair()) acted_ = true;
+    } else if (keys & (kA | kStart | kB)) {
+        platform::gamepad::cancel();
+        page_ = Page::home;
     }
 }
 
@@ -848,6 +872,15 @@ void Menus::tap(const ui::MenuHit& hit) {
             } else {
                 intent_ |= kA;
                 press_errors(kA);
+            }
+            break;
+        case Page::gamepad:
+            if (hit.target != Target::button) break;
+            if (hit.index != gamepad_button_) {
+                gamepad_button_ = hit.index;
+            } else {
+                intent_ |= kA;
+                press_gamepad(kA);
             }
             break;
         case Page::slots:
@@ -1135,6 +1168,7 @@ void Menus::build(Screen& s) {
         case Page::roms: build_roms(s); break;
         case Page::settings: build_settings(s); break;
         case Page::errors: build_errors(s); break;
+        case Page::gamepad: build_gamepad(s); break;
         case Page::pause:
         case Page::game: build_pause(s); break;
         case Page::slots: build_slots(s); break;
@@ -1149,6 +1183,10 @@ void Menus::build(Screen& s) {
         }
     }
     if (dialog_ != Dialog::none) build_dialog(s);
+}
+
+int Menus::home_cards() const {
+    return platform::gamepad::bluetooth() ? 4 : 3;
 }
 
 void Menus::build_home(Screen& s) {
@@ -1170,9 +1208,12 @@ void Menus::build_home(Screen& s) {
         const char* label;
         bool enabled;
     };
-    const Card cards[] = {{"cartridge", "ROMS", true}, {"gear", "SETTINGS", true}, {"alert", "ERRORS", faults > 0}};
-    s.row_count = 3;
-    for (int i = 0; i < 3; ++i) {
+    const Card cards[] = {{"cartridge", "ROMS", true},
+                          {"gear", "SETTINGS", true},
+                          {"alert", "ERRORS", faults > 0},
+                          {"gamepad", "WIRELESS GAMEPAD", true}};
+    s.row_count = home_cards();
+    for (int i = 0; i < s.row_count; ++i) {
         put(s.rows[i].icon, cards[i].icon);
         put(s.rows[i].label, cards[i].label);
         s.rows[i].enabled = cards[i].enabled;
@@ -1182,6 +1223,11 @@ void Menus::build_home(Screen& s) {
         std::snprintf(s.rows[2].detail, sizeof s.rows[2].detail, "%d", faults);
     } else {
         put(s.rows[2].detail, "NONE");
+    }
+    platform::gamepad::Status pad;
+    if (s.row_count > 3) {
+        pad = platform::gamepad::status();
+        put(s.rows[3].detail, pad.connected ? "ON" : pad.paired ? "OFF" : "NONE");
     }
     s.selected = home_selected_;
     switch (home_selected_) {
@@ -1195,6 +1241,16 @@ void Menus::build_home(Screen& s) {
             }
             break;
         case 1: put(s.footer, "Sound, display and emulation settings."); break;
+        case 3:
+            if (!pad.paired) {
+                put(s.footer, "Pair a Bluetooth gamepad.");
+            } else if (!pad.name[0]) {
+                put(s.footer, pad.connected ? "The gamepad is connected." : "The gamepad is not connected.");
+            } else {
+                std::snprintf(s.footer, sizeof s.footer, "%s: %s", pad.connected ? "Connected" : "Not connected",
+                              pad.name);
+            }
+            break;
         default:
             if (faults) {
                 Faults::Fault newest[1];
@@ -1373,6 +1429,58 @@ void Menus::build_errors(Screen& s) {
         age(now_ - std::min(now_, faults[i].us), s.rows[i].detail);
     }
     s.selected = errors_button_;
+}
+
+// The saved gamepad while no pairing runs; then each step of a pairing and
+// its result.
+void Menus::build_gamepad(Screen& s) {
+    using platform::gamepad::Failure;
+    using platform::gamepad::Pairing;
+    const platform::gamepad::Status pad = platform::gamepad::status();
+    s.kind = Screen::Kind::gamepad;
+    put(s.title, "WIRELESS GAMEPAD");
+    put(s.icon, "gamepad");
+    s.selected = gamepad_button_;
+    s.gamepad.pair = pad.pairing == Pairing::idle || pad.pairing == Pairing::paired || pad.pairing == Pairing::failed;
+    switch (pad.pairing) {
+        case Pairing::idle:
+            if (!pad.paired) {
+                put(s.heading, "NO GAMEPAD");
+                put(s.body, "PAIR finds a Bluetooth gamepad in pairing mode.");
+            } else {
+                put(s.heading, pad.connected ? "CONNECTED" : "NOT CONNECTED");
+                put(s.body, pad.name);
+            }
+            break;
+        case Pairing::starting:
+            put(s.heading, "STARTING");
+            put(s.body, "Getting Bluetooth ready.");
+            break;
+        case Pairing::searching:
+            put(s.heading, "SEARCHING");
+            put(s.body, "Put the gamepad in pairing mode: hold its pair button.");
+            break;
+        case Pairing::connecting:
+            put(s.heading, "CONNECTING");
+            put(s.body, pad.name);
+            break;
+        case Pairing::paired:
+            put(s.heading, "PAIRED");
+            put(s.body, pad.name);
+            break;
+        case Pairing::failed:
+            s.gamepad.alert = true;
+            put(s.heading, "NOT PAIRED");
+            switch (pad.failure) {
+                case Failure::none:
+                case Failure::refused: put(s.body, "The connection or the pairing failed."); break;
+                case Failure::radio: put(s.body, "The Bluetooth radio did not answer."); break;
+                case Failure::not_found: put(s.body, "No gamepad in pairing mode was found within a minute."); break;
+                case Failure::unsupported: put(s.body, "The gamepad reports no keys that can be read."); break;
+                case Failure::storage: put(s.body, "The pairing could not be saved."); break;
+            }
+            break;
+    }
 }
 
 void Menus::build_pause(Screen& s) {
