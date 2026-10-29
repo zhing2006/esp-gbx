@@ -17,7 +17,7 @@
 | 乐鑫 ESP32-S31-Korvo-1 | 480×800 | [idle](esp32_s31_korvo_1/idle.png) | [gb](esp32_s31_korvo_1/gb.png) | [gbc](esp32_s31_korvo_1/gbc.png) | [gba](esp32_s31_korvo_1/gba.png) | [home](esp32_s31_korvo_1/home.png) | [pause](esp32_s31_korvo_1/pause.png) |
 | Waveshare ESP32-C5-Touch-LCD-2.8 | 240×320 | [idle](waveshare_c5_lcd28/idle.png) | [gb](waveshare_c5_lcd28/gb.png) | [gbc](waveshare_c5_lcd28/gbc.png) | [gba](waveshare_c5_lcd28/gba.png) | [home](waveshare_c5_lcd28/home.png) | [pause](waveshare_c5_lcd28/pause.png) |
 
-GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。JC1060P470 和 Sila P4X 的固件编入了蓝牙手柄，所以它们的主界面效果图比其他板子多一张 WIRELESS GAMEPAD 卡片。
+GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。JC1060P470、Sila P4X 和 OSPTEK ESP32-P4C5 的固件编入了蓝牙手柄，所以它们的主界面效果图比其他板子多一张 WIRELESS GAMEPAD 卡片。
 
 Sila P4X 的 6.2 英寸屏幕用横屏布局。它的底图是 `tools/ui/pasteup.py` 按 `raws/ui/sila_p4x/spec.json` 拼出的底稿，直接使用，没有再生成成品底图，也没有序列号贴纸。屏幕和触摸的接线条件见 [Sila P4X 板级文档](../boards/sila_p4x.md#屏幕与触摸)，显示方向和触摸尚未上板确认。
 
