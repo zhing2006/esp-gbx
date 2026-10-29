@@ -21,6 +21,9 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 # The ST7121 touch controller reports up to 10 points
 CONFIG_ESP_LCD_TOUCH_MAX_POINTS=10
 
+# The UI layout with a 720x480 game window, GBA at 3x
+CONFIG_GBX_TAB5_X3_LAYOUT=y
+
 # A HID gamepad on the USB-A port, whose 5 V board::init() switches on. The
 # USB controller's DMA buffers go to PSRAM, leaving internal RAM to the JIT.
 CONFIG_GBX_USB_GAMEPAD=y

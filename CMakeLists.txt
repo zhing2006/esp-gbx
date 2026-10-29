@@ -91,16 +91,22 @@ if(GBX_APP STREQUAL "main")
     endif()
     partition_table_get_partition_info(assets_size "--partition-name assets" "size")
     set(assets_bin "${CMAKE_BINARY_DIR}/assets.bin")
+    # The board's layout under assets/ui, or another layout of its panel that
+    # the board's component selects through GBX_UI_LAYOUT.
+    idf_build_get_property(ui_layout GBX_UI_LAYOUT)
+    if(NOT ui_layout)
+        set(ui_layout "${GBX_BOARD}")
+    endif()
     file(GLOB_RECURSE assets_inputs CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_LIST_DIR}/assets/ui/common/*"
-        "${CMAKE_CURRENT_LIST_DIR}/assets/ui/${GBX_BOARD}/*"
+        "${CMAKE_CURRENT_LIST_DIR}/assets/ui/${ui_layout}/*"
         "${CMAKE_CURRENT_LIST_DIR}/tools/ui/*.py")
     add_custom_command(OUTPUT "${assets_bin}"
         COMMAND "${GBX_UV}" run --quiet "${CMAKE_CURRENT_LIST_DIR}/tools/ui/pack_assets.py"
-                --board "${GBX_BOARD}" --output "${assets_bin}" --limit "${assets_size}"
+                --board "${ui_layout}" --output "${assets_bin}" --limit "${assets_size}"
         DEPENDS ${assets_inputs}
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}"
-        COMMENT "Packing UI assets for ${GBX_BOARD}"
+        COMMENT "Packing UI assets for ${ui_layout}"
         VERBATIM)
     add_custom_target(assets ALL DEPENDS "${assets_bin}")
     esp_partition_register_target(assets "${assets_bin}" ALWAYS_PLAINTEXT DEPENDS assets FLASH_IN_PROJECT)

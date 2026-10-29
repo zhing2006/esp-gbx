@@ -24,7 +24,7 @@ Sila P4X 的 6.2 英寸屏幕用横屏布局。它的底图是 `tools/ui/pasteup
 
 OSPTEK ESP32-P4C5 的 4.3 英寸屏幕是 480×800 的竖屏，布局按 JC1060P470 的竖屏布局缩小。游戏窗口和屏幕一样宽，镜片横贯整个屏幕，只在窗口上下露出来。窗口外没有地方露出屏幕不发光的边框，所以 `plate.display_border` 为 0。七个灯在镜片下沿排成一行，VFD 是 2×2 四格。它的底图和 Sila P4X 一样直接使用 `pasteup.py` 拼出的底稿，没有序列号贴纸。
 
-`m5stack_tab5_x3` 是 Tab5 的另一套布局，游戏窗口是 720×480，和屏幕一样宽，GBA 放大 3 倍铺满。它按慧勤智远 ESP32-S31 CB 的布局放大 1.5 倍排列，VFD 和 L/R 紧贴在镜片下面，`control_scale` 是 0.8，十字键和 A/B 跟在 L/R 下面，和底部的 SELECT/START 之间留出距离，减少误触。底图直接使用 `pasteup.py` 拼出的底稿。Tab5 的固件构建打包的仍是 `m5stack_tab5` 的布局，这套布局还没有接进构建。
+`m5stack_tab5_x3` 是 Tab5 的另一套布局，游戏窗口是 720×480，和屏幕一样宽，GBA 放大 3 倍铺满。它按慧勤智远 ESP32-S31 CB 的布局放大 1.5 倍排列，VFD 和 L/R 紧贴在镜片下面，`control_scale` 是 0.8，十字键和 A/B 跟在 L/R 下面，和底部的 SELECT/START 之间留出距离，减少误触。底图直接使用 `pasteup.py` 拼出的底稿。Tab5 的固件按 `boards/m5stack_tab5/Kconfig` 里的 `GBX_TAB5_X3_LAYOUT` 选择布局，这个选项在板子的 `sdkconfig.defaults` 里打开，构建时打包这套布局；关掉时打包 `m5stack_tab5` 的布局。
 
 慧勤智远 ESP32-S31 CB 配的 4.3 英寸 RGB 屏同样按 480×800 竖屏使用，`raws/ui/wks_s31_cb/` 复制了 OSPTEK ESP32-P4C5 的底稿和 `spec.json`，只改了板名，所以两块板子的底图和布局相同。乐鑫 ESP32-S31-Korvo-1 的屏幕也是 4.3 英寸 800×480，`raws/ui/esp32_s31_korvo_1/` 又复制了慧勤智远 ESP32-S31 CB 的这两个文件，只改了板名。
 
