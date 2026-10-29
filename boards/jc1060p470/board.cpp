@@ -130,8 +130,10 @@ bool init() {
     return true;
 }
 
+// GPIO39-44 are slot 0's IO MUX pins. Slot 1 is the C6's SDIO, see
+// docs/boards/jc1060p470.md.
 Sdmmc sdmmc() {
-    return {.slot = 1, .clk = 43, .cmd = 44, .data = {39, 40, 41, 42}};
+    return {.slot = 0, .clk = 43, .cmd = 44, .data = {39, 40, 41, 42}};
 }
 
 Display display_init(int frame_buffers) {
