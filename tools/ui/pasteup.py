@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy import ndimage as ndi
 
 from uikit import MASTER_SCALE, RAWS, boards, build_plate, draw_capsule, load_spec, rounded_rect_mask
 
@@ -28,6 +29,9 @@ LAMP_SRC = {"gb": (161, 379), "gbc": (161, 501), "gba": (161, 618), "int": (1280
             "jit": (1280, 483), "save": (1280, 601), "err": (1280, 720)}
 VFD_LABELS = {"speed": (160, 1204, 310, 1258), "frame": (772, 1204, 916, 1258),
               "audio": (160, 1374, 300, 1428), "memory": (772, 1374, 872, 1428)}
+# The labels' glow beyond those boxes: left, top, right, bottom. The left stays
+# clear of the window's lit bevel, the top of the divider between the rows.
+VFD_GLOW = (4, 4, 10, 10)
 PARTS = {
     "logo": (360, 1020, 1080, 1132),
     "print_text": (510, 178, 930, 214),
@@ -38,6 +42,9 @@ PARTS = {
     "label_start": (796, 2466, 910, 2512),
 }
 TAB5_SLOT_CENTER = (220, 72)
+# The slot with its bevel, a capsule in the slot_group crop: x0, y0, x1, y1.
+SLOT_BEVEL = (6, 31, 322, 111)
+PART_MARGIN = 16  # flat margin around a cleaned part, wider than the paste's feather
 DISH_SRC = ((352, 2060), 262)
 CAPSULE_SRC = ((1058, 2084), 640, 330, -40)
 # Tab5 offsets, in logical px, from a button centre to its printed label.
@@ -63,6 +70,116 @@ def paste_part(canvas, part, center, scale, feather=6, mask=None):
     canvas.paste(part, (round(center[0] - nw / 2), round(center[1] - nh / 2)), m)
 
 
+def clean_lamp(P, lx, ly, color):
+    """The Tab5 lamp at (lx, ly), its dome and printed name on a flat `color`.
+
+    The crop's own lens, with the plate's reflections and scratches, would
+    show as a box on the paste-up's flat lens. The dome keeps its dark rim and
+    the light lip around it, shifted from the plate's lens to `color`; the
+    name is a matte of the light print against the lens around it.
+    """
+    a = np.asarray(P.crop((lx - 40, ly - 30, lx + 40, ly + 74)), dtype=np.float32)
+    ys, xs = np.mgrid[:a.shape[0], :a.shape[1]]
+    r = np.hypot(xs - 40, ys - 30)
+    target = np.array(color, dtype=np.float32)
+    out = np.empty_like(a)
+    out[:] = target
+    shift = target - np.median(a[(r >= 19) & (r < 26)], 0)
+    dome = a + shift * np.clip((r - 14) / 3, 0, 1)[..., None]
+    m = np.clip((20 - r) / 2.5, 0, 1)[..., None]
+    out = out * (1 - m) + dome * m
+    name = a[56:92]
+    L = name.mean(-1)
+    lens = ndi.median_filter(L, size=17)
+    strong = L > lens + 60
+    ink = name[strong].mean(0)
+    near = ndi.binary_dilation(strong, iterations=2)
+    alpha = (np.clip((L - lens - 8) / (ink.mean() - lens - 8), 0, 1) * near)[..., None]
+    out[56:92] = out[56:92] * (1 - alpha) + ink * alpha
+    return Image.fromarray(np.clip(out, 0, 255).round().astype(np.uint8))
+
+
+def clean_slot_group(P, color):
+    """The Tab5 speed switch, its slot and the printed 1X, 2X and SPEED, on a flat `color`.
+
+    As with the lamps, the plate's plastic around them would show as a box.
+    The slot keeps its bevel, shifted from the plate's plastic to `color` at
+    its rim; the print is a matte of the dark ink against the plastic.
+    """
+    a = np.asarray(P.crop(PARTS["slot_group"]), dtype=np.float32)
+    target = np.array(color, dtype=np.float32)
+    x0, y0, x1, y1 = SLOT_BEVEL
+    r = (y1 - y0) / 2
+    ys, xs = np.mgrid[:a.shape[0], :a.shape[1]]
+    # Distance outside the capsule, negative inside.
+    d = np.hypot(xs - np.clip(xs, x0 + r, x1 - r), ys - (y0 + r)) - r
+    L = a.mean(-1)
+    plastic = (d > 4) & (np.abs(L - np.median(L)) < 18)
+    shift = target - np.median(a[plastic], 0)
+    slot = a + shift * np.clip((d + 6) / 4, 0, 1)[..., None]
+    m = np.clip((1.5 - d) / 3, 0, 1)[..., None]
+    out = np.empty_like(a)
+    out[:] = target
+    out = out * (1 - m) + slot * m
+    # The print reaches the crop's top edge, where a local estimate of the
+    # plastic would take in the ink; the plastic is even enough for one level.
+    level = np.median(L[plastic])
+    strong = (L < level - 60) & (d > 3)
+    ink = a[strong].mean(0)
+    near = ndi.binary_dilation(strong, iterations=2) & (d > 1.5)
+    alpha = (np.clip((level - L - 8) / (level - ink.mean() - 8), 0, 1) * near)[..., None]
+    out = out * (1 - alpha) + ink * alpha
+    return with_margin(out, target)
+
+
+def vfd_glyphs(a):
+    """The lit cyan of a VFD label, as export_boards.py finds it."""
+    return (a[..., 1] > 150) & (a[..., 2] > 150) & (a[..., 1] - a[..., 0] > 40)
+
+
+def clean_print(part, color, reach=3, glyphs=None):
+    """`part` with only its print kept, on a flat `color`.
+
+    Pixels within `reach` master px of the print are shifted from the part's
+    own background, the median of its outer edge, to `color`; the rest
+    becomes `color`, so the plate's grain and reflections leave no box. The
+    print is what stands out from the background, or what `glyphs` picks
+    where scratches and reflections stand out as much.
+    """
+    a = np.asarray(part, dtype=np.float32)
+    edge = np.concatenate([a[:4].reshape(-1, 3), a[-4:].reshape(-1, 3), a[:, :4].reshape(-1, 3),
+                           a[:, -4:].reshape(-1, 3)])
+    level = np.median(edge, 0)
+    core = glyphs(a) if glyphs else np.linalg.norm(a - level, axis=-1) > 40
+    w = ndi.binary_dilation(core, iterations=reach).astype(np.float32)
+    w = np.clip(ndi.gaussian_filter(w, reach / 2) * 1.5, 0, 1)[..., None]
+    target = np.array(color, dtype=np.float32)
+    return with_margin(target + (a - level) * w, target)
+
+
+def with_margin(a, color):
+    """`a` in a margin of `color`, so the paste's feathered edge only blends `color`."""
+    p = PART_MARGIN
+    out = np.empty((a.shape[0] + 2 * p, a.shape[1] + 2 * p, 3), dtype=np.float32)
+    out[:] = color
+    out[p:-p, p:-p] = a
+    return Image.fromarray(np.clip(out, 0, 255).round().astype(np.uint8))
+
+
+def under(canvas, center, size):
+    """The canvas color where a part of `size` will be pasted at `center`, all in master px."""
+    (x, y), (w, h) = center, size
+    box = (max(0, round(x - w / 2)), max(0, round(y - h / 2)),
+           min(canvas.width, round(x + w / 2)), min(canvas.height, round(y + h / 2)))
+    return tuple(np.median(np.asarray(canvas.crop(box)).reshape(-1, 3), 0))
+
+
+def paste_print(canvas, part, center, scale, reach=3, feather=6, glyphs=None):
+    """Paste `part`'s print, cleaned onto the canvas color where it lands."""
+    color = under(canvas, center, (part.width * scale, part.height * scale))
+    paste_part(canvas, clean_print(part, color, reach, glyphs), center, scale, feather)
+
+
 def fill(canvas, rect, radii, color):
     mask = rounded_rect_mask(canvas.size, [round(v * S) for v in rect], [round(v * S) for v in radii])
     canvas.paste(Image.new("RGB", canvas.size, color), (0, 0), mask)
@@ -86,9 +203,10 @@ def build(board):
 
     # Speed switch group, scaled around the slot centre.
     sx, sy, sw, sh = spec["slot"]
-    src = P.crop(PARTS["slot_group"])
-    ox = TAB5_SLOT_CENTER[0] - PARTS["slot_group"][0] - src.width / 2
-    oy = TAB5_SLOT_CENTER[1] - PARTS["slot_group"][1] - src.height / 2
+    src = clean_slot_group(P, grey)
+    bx0, by0, bx1, by1 = PARTS["slot_group"]
+    ox = TAB5_SLOT_CENTER[0] - (bx0 + bx1) / 2
+    oy = TAB5_SLOT_CENTER[1] - (by0 + by1) / 2
     paste_part(im, src, ((sx + sw / 2) * S - ox * s, (sy + sh / 2) * S - oy * s), s)
 
     # Lens, print lines and text, display, lamps.
@@ -98,16 +216,16 @@ def build(board):
         yy = (ly + i * 3 * min(1, s * 1.25)) * S
         d.line((lx0 * S, yy, g0 * S, yy), fill=c, width=S)
         d.line((g1 * S, yy, lx1 * S, yy), fill=c, width=S)
-    paste_part(im, P.crop(PARTS["print_text"]), ((g0 + g1) / 2 * S, (ly + 3) * S), s)
+    paste_print(im, P.crop(PARTS["print_text"]), ((g0 + g1) / 2 * S, (ly + 3) * S), s)
     x, y, w, h = spec["display"]
     d.rectangle((x * S, y * S, (x + w) * S - 1, (y + h) * S - 1), fill="#000000")
     for name, (cx, cy) in spec["lamps"].items():
         lx, lyy = LAMP_SRC[name]
-        part = P.crop((lx - 40, lyy - 30, lx + 40, lyy + 74))
-        paste_part(im, part, (cx * S, cy * S + 22 * s), s, feather=4)
+        paste_part(im, clean_lamp(P, lx, lyy, slate), (cx * S, cy * S + 22 * s), s, feather=4)
 
     lc = pu["logo"]
-    paste_part(im, P.crop(PARTS["logo"]), (lc["center"][0] * S, lc["center"][1] * S), lc["scale"], feather=10)
+    paste_print(im, P.crop(PARTS["logo"]), (lc["center"][0] * S, lc["center"][1] * S), lc["scale"], reach=6,
+                feather=10)
 
     # VFD windows, with each label at its cell's top-left, on boards with a VFD.
     for win in pu.get("windows", []):
@@ -115,8 +233,11 @@ def build(board):
         for line in win.get("dividers", []):
             d.line([v * S for v in line], fill=(34, 70, 62), width=S)
     for cid, (cx, cy, cw, ch) in spec.get("vfd", {}).get("cells", {}).items():
-        part = P.crop(VFD_LABELS[cid])
-        paste_part(im, part, ((cx + 6) * S + part.width * s / 2, (cy + 6) * S + part.height * s / 2), s, feather=4)
+        x0, y0, x1, y1 = VFD_LABELS[cid]
+        gl, gt, gr, gb = VFD_GLOW
+        part = P.crop((x0 - gl, y0 - gt, x1 + gr, y1 + gb))
+        center = ((cx + 6) * S + (x1 - x0 + gr - gl) / 2 * s, (cy + 6) * S + (y1 - y0 + gb - gt) / 2 * s)
+        paste_print(im, part, center, s, reach=8, feather=4, glyphs=vfd_glyphs)
 
     # Recesses from Tab5, scaled.
     (dcx, dcy), dr = DISH_SRC
@@ -134,7 +255,7 @@ def build(board):
     c = spec["controls"]
     for cid, part in (("a", "label_a"), ("b", "label_b"), ("select", "label_select"), ("start", "label_start")):
         ox, oy = LABEL_OFFSETS[cid]
-        paste_part(im, P.crop(PARTS[part]), ((c[cid][0] + ox * s) * S, (c[cid][1] + oy * s) * S), s, feather=4)
+        paste_print(im, P.crop(PARTS[part]), ((c[cid][0] + ox * s) * S, (c[cid][1] + oy * s) * S), s, feather=4)
 
     for spx, spy, ln, th, ang in pu["speaker"]:
         draw_capsule(d, (spx * S, spy * S), ln * S, th * S, ang, (36, 30, 62))
