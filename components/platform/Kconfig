@@ -71,4 +71,17 @@ config GBX_USB_GAMEPAD
         in boards/<board>/sdkconfig.defaults when its port gives a gamepad
         5 V, which not every board's does.
 
+config GBX_BT_GAMEPAD
+    bool "Read a Bluetooth gamepad through the co-processor"
+    depends on IDF_TARGET_ESP32P4
+    default n
+    help
+        A Bluetooth LE HID gamepad, paired from HOME, presses the keys of
+        platform::keys::read(), see src/esp/bt/bt_gamepad.cpp. The board's
+        C5 or C6 is the Bluetooth controller, behind ESP-Hosted on an SDIO
+        slot of the SDMMC controller, and the LP core reads the gamepad.
+        NimBLE, ESP-Hosted and the LP core's program are in the build only
+        with this option. A board that turns it on sets them up in
+        boards/<board>/sdkconfig.defaults.
+
 endmenu

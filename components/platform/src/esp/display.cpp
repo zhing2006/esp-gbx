@@ -949,19 +949,3 @@ int read(std::span<Point> points) {
 }
 
 }  // namespace gbx::platform::touch
-
-#if !CONFIG_GBX_USB_GAMEPAD
-namespace gbx::platform::keys {
-
-// No game keys without a USB gamepad, see usb_gamepad.cpp; the touch
-// controls stand in.
-bool start() {
-    return true;
-}
-
-uint16_t read() {
-    return 0;
-}
-
-}  // namespace gbx::platform::keys
-#endif

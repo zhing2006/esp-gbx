@@ -10,3 +10,13 @@ dependencies:
     rules:
       - if: "target in [esp32p4, esp32s31]"
       - if: "$CONFIG{GBX_USB_GAMEPAD} == True"
+  ## The Bluetooth gamepad, see GBX_BT_GAMEPAD in Kconfig: the component
+  ## carries what it builds with. Public, as ulp_embed_binary() builds the
+  ## LP core's program with platform's public include directories, which
+  ## then reach those of ulp.
+  bluetooth:
+    path: ../bluetooth
+    public: true
+    rules:
+      - if: "target == esp32p4"
+      - if: "$CONFIG{GBX_BT_GAMEPAD} == True"

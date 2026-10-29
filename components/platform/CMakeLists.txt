@@ -14,10 +14,17 @@ if(ESP_PLATFORM)
     if(CONFIG_LV_USE_CUSTOM_MALLOC)
         list(APPEND display_sources "src/esp/lvgl_memory.cpp")
     endif()
-    # The USB components come from idf_component.yml only with the option.
-    set(input_sources "")
+    # The gamepads keys::read() combines. Their components come from
+    # idf_component.yml only with their options.
+    set(input_sources "src/esp/keys.cpp")
+    if(CONFIG_GBX_USB_GAMEPAD OR CONFIG_GBX_BT_GAMEPAD)
+        list(APPEND input_sources "src/esp/hid_gamepad.cpp")
+    endif()
     if(CONFIG_GBX_USB_GAMEPAD)
         list(APPEND input_sources "src/esp/usb_gamepad.cpp")
+    endif()
+    if(CONFIG_GBX_BT_GAMEPAD)
+        list(APPEND input_sources "src/esp/bt/bt_gamepad.cpp" "src/esp/bt/sdmmc_share.cpp")
     endif()
     idf_component_register(
         SRCS "src/esp/platform.cpp" ${display_sources} ${input_sources}
@@ -35,6 +42,16 @@ if(ESP_PLATFORM)
     if(CONFIG_GBX_DISPLAY_ACCEL)
         idf_component_optional_requires(PRIVATE esp_driver_ppa esp_driver_dma)
     endif()
+    # The Bluetooth gamepad's LP core program, in LP SRAM, see src/esp/bt/.
+    if(CONFIG_GBX_BT_GAMEPAD)
+        set(lp "${CMAKE_CURRENT_LIST_DIR}/src/esp/bt/lp")
+        ulp_embed_binary(ulp_bt "${lp}/main.c;${lp}/sdio.c;${lp}/hosted.c;${lp}/hci.c"
+                         "${CMAKE_CURRENT_LIST_DIR}/src/esp/bt/bt_gamepad.cpp")
+        # Every transaction and slot removal on the SDMMC controller, ESP-Hosted's
+        # too, takes the lock the LP core shares, see src/esp/bt/sdmmc_share.h.
+        target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=sdmmc_host_do_transaction"
+                              "-Wl,--wrap=sdmmc_host_deinit_slot")
+    endif()
     idf_build_get_property(board GBX_BOARD)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE GBX_BOARD_ID="${board}")
     # LVGL, linked after this library, calls the allocator; nothing here does.
@@ -44,7 +61,7 @@ if(ESP_PLATFORM)
 else()
     find_package(Threads REQUIRED)
     add_library(gbx_platform STATIC src/host/platform.cpp src/host/executable.cpp src/host/worker.cpp
-                src/host/files.cpp)
+                src/host/files.cpp src/host/gamepad.cpp)
     target_link_libraries(gbx_platform PUBLIC Threads::Threads)
     target_include_directories(gbx_platform PUBLIC include)
     if(GBX_HOST_GUI)

@@ -29,7 +29,8 @@ CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=0
 
 # IDF code that leaves internal RAM. Code in IRAM is for running while the
 # cache is off, but with code and read-only data in PSRAM, flash reads keep
-# the cache on, and the firmware erases or writes no flash while it runs.
+# the cache on. The firmware erases or writes flash only to save a Bluetooth
+# gamepad's pairing, from HOME, see components/platform/src/esp/bt/.
 # No IRAM interrupt handler allocates, takes a C library lock or uses a ring
 # buffer: the UART and USB Serial/JTAG handlers are not IRAM. The I2C handler
 # serves the touch panel, the codec and the clock, a few transfers a frame.

@@ -1,0 +1,12 @@
+## The co-processor's Bluetooth controller over SDIO, the same version on
+## every board. With the same rules as platform's dependency on this
+## component: a project that selects its components still builds every
+## managed component it downloads, so without them ESP-Hosted and its
+## start-up code would reach boards built without the option.
+dependencies:
+  espressif/esp_hosted:
+    version: "==3.0.10"
+    public: true
+    rules:
+      - if: "target == esp32p4"
+      - if: "$CONFIG{GBX_BT_GAMEPAD} == True"

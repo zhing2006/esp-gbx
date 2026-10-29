@@ -7,9 +7,13 @@
 #include "esp_vfs_fat.h"
 #include "gbx/esp/board.h"
 #include "sdmmc_cmd.h"
+#include "sdkconfig.h"
 #include "soc/soc_caps.h"
 #if SOC_SDMMC_HOST_SUPPORTED
 #include "driver/sdmmc_host.h"
+#endif
+#if CONFIG_GBX_BT_GAMEPAD
+#include "bt/sdmmc_share.h"
 #endif
 
 namespace gbx::platform::storage {
@@ -40,7 +44,16 @@ esp_err_t mount_sdmmc(const board::Sdmmc& wiring, const esp_vfs_fat_mount_config
     // Assist the lines, but do not assume these replace external pull-ups.
     // Sila's schematic does not establish the external resistor population.
     slot.flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP;  // No UHS/1.8 V signaling.
+#if CONFIG_GBX_BT_GAMEPAD
+    // The co-processor's slot shares the controller with the LP core.
+    sdmmc_share::wrap(host);
+    sdmmc_share::lock();
+    const esp_err_t err = esp_vfs_fat_sdmmc_mount(kSdMountPath, &host, &slot, &mount, &card);
+    sdmmc_share::unlock();
+    return err;
+#else
     return esp_vfs_fat_sdmmc_mount(kSdMountPath, &host, &slot, &mount, &card);
+#endif
 }
 #endif
 
@@ -92,7 +105,13 @@ void unmount_sd() {
     if (card == nullptr) {
         return;
     }
+#if CONFIG_GBX_BT_GAMEPAD
+    sdmmc_share::lock();
+#endif
     esp_err_t err = esp_vfs_fat_sdcard_unmount(kSdMountPath, card);
+#if CONFIG_GBX_BT_GAMEPAD
+    sdmmc_share::unlock();
+#endif
     if (err != ESP_OK) {
         ESP_LOGW(kTag, "SD unmount: %s", esp_err_to_name(err));
     }

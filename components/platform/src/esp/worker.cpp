@@ -42,7 +42,8 @@ bool Worker::start(void (*entry)(void*), void* context, unsigned core, const cha
     if (!task->done.initialize(1)) { delete task; return false; }
     // A stack in PSRAM needs the cache on. With CONFIG_SPIRAM_XIP_FROM_PSRAM
     // flash reads leave it on; only erasing or writing flash while a region
-    // is mapped turns it off, and the firmware does neither while it runs.
+    // is mapped turns it off, which the firmware does only to save a
+    // Bluetooth gamepad's pairing, from a worker with an internal stack.
     // The TCB stays internal. Without PSRAM the stack goes internal. A
     // single core takes every worker.
     core %= portNUM_PROCESSORS;

@@ -155,11 +155,12 @@ int read(std::span<Point> points);
 namespace gbx::platform::keys {
 
 // Starts the physical controls that need it, such as a USB gamepad on a
-// board built with GBX_USB_GAMEPAD. False when they could not start; read()
-// then returns 0. Once, from the task that drives the app.
+// board built with GBX_USB_GAMEPAD or a Bluetooth gamepad with
+// GBX_BT_GAMEPAD. False when one could not start; read() then has none of
+// its keys. Once, from the task that drives the app.
 bool start();
 
-// Keys held on physical controls, such as a PC keyboard or a USB gamepad: the
+// Keys held on physical controls, such as a PC keyboard or a gamepad: the
 // GB keys from bit 0, Right, Left, Up, Down, A, B, Select, Start, then the
 // shell's L, R and MENU in bits 8 to 10. A key pressed and released since the
 // previous read counts as held once. 0 without keys.
