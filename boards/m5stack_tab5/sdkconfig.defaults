@@ -24,6 +24,14 @@ CONFIG_ESP_LCD_TOUCH_MAX_POINTS=10
 # The UI layout with a 720x480 game window, GBA at 3x
 CONFIG_GBX_TAB5_X3_LAYOUT=y
 
+# The JITs' second levels take the PSRAM a game leaves after its ROM cache,
+# save and instant saves, up to their budgets, less 256 KB for what the menus
+# and the saves allocate while it runs, as on the S31 boards. Taking the whole
+# budget when the JIT started left a game's instant saves no memory with the
+# 3x layout.
+CONFIG_GBX_GB_JIT_STORE_LEAVE_KB=256
+CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB=256
+
 # A HID gamepad on the USB-A port, whose 5 V board::init() switches on. The
 # USB controller's DMA buffers go to PSRAM, leaving internal RAM to the JIT.
 CONFIG_GBX_USB_GAMEPAD=y
