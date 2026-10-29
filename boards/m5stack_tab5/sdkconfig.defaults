@@ -20,3 +20,61 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # The ST7121 touch controller reports up to 10 points
 CONFIG_ESP_LCD_TOUCH_MAX_POINTS=10
+
+# A HID gamepad on the USB-A port, whose 5 V board::init() switches on. The
+# USB controller's DMA buffers go to PSRAM, leaving internal RAM to the JIT.
+CONFIG_GBX_USB_GAMEPAD=y
+CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM=y
+
+# The Bluetooth gamepad through the C6, see components/platform/src/esp/bt/
+CONFIG_GBX_BT_GAMEPAD=y
+# ESP-Hosted on SDMMC slot 1 to the C6, Bluetooth only, with the schematic's
+# 4-bit bus on GPIO8-13 and the C6's EN on GPIO15. ESP-Hosted locks the pins
+# per board: without its Tab5 board they fall back to those of Espressif's P4
+# function board, GPIO14-19 and 54. board::init() switches on the C6's
+# supply. The firmware starts ESP-Hosted itself, and a link failure stops the
+# gamepad instead of restarting the console.
+CONFIG_ESP_HOSTED_HOST_FEAT_BT=y
+CONFIG_ESP_HOSTED_HOST_FEAT_WIFI=n
+CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n
+CONFIG_ESP_HOSTED_HOST_TRANSPORT_RESTART_ON_FAILURE=n
+CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM=y
+CONFIG_ESP32P4_TAB5_C6_BOARD=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_CMD=13
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_CLK=12
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D0=11
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D1=10
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D2=9
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D3=8
+CONFIG_ESP_HOSTED_HOST_RESET_GPIO=15
+# NimBLE for pairing, as a central over the C6's controller, its memory in
+# PSRAM and its bonds in RAM: the firmware saves what it needs itself.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_DISABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_TRANSPORT_UART=n
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+CONFIG_BT_NIMBLE_SM_LEGACY=y
+CONFIG_BT_NIMBLE_SM_SC=y
+# Secure Connections' ECDH through mbedtls, as on the JC1060P470, where
+# TinyCrypt on the P4 v1.0's ECC accelerator gives a wrong DHKey. This
+# board's P4 is v1.3.
+CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS=y
+# mbedtls, which only pairing uses, allocates in PSRAM: the state it keeps
+# after the first pairing would otherwise hold internal RAM that games and
+# the SD card's DMA need.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
+# The LP core's program: code, data, buffers and stack in 16 KB of LP SRAM
+CONFIG_ULP_COPROC_ENABLED=y
+CONFIG_ULP_COPROC_TYPE_LP_CORE=y
+CONFIG_ULP_COPROC_RESERVE_MEM=16384

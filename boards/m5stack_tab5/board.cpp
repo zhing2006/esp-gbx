@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "gbx/esp/board_support.h"
+#include "sdkconfig.h"
 
 // Pins, IO expanders, timing and the measured results are in
 // docs/boards/m5stack_tab5.md. Only the ST7121 panel revision is supported.
@@ -29,10 +30,15 @@ constexpr gpio_num_t kI2cScl = GPIO_NUM_32;
 constexpr gpio_num_t kTouchInt = GPIO_NUM_23;
 
 // IO expander 0x43
+constexpr uint32_t kAntenna = IO_EXPANDER_PIN_NUM_0;     // the C6's RF switch, low for the internal antenna
 constexpr uint32_t kSpeaker = IO_EXPANDER_PIN_NUM_1;     // NS4150B enable, pulled down
 constexpr uint32_t kHeadphones = IO_EXPANDER_PIN_NUM_7;  // HP_DET, high with headphones in
 constexpr uint32_t kLcdReset = IO_EXPANDER_PIN_NUM_4;
 constexpr uint32_t kTouchReset = IO_EXPANDER_PIN_NUM_5;
+
+// IO expander 0x44
+constexpr uint32_t kC6Power = IO_EXPANDER_PIN_NUM_0;   // WLAN_PWR_EN, the C6's 3.3 V
+constexpr uint32_t kUsbPower = IO_EXPANDER_PIN_NUM_3;  // USB5V_EN, the USB-A port's 5 V
 
 // ES8388 at 0x10 on the shared bus plays; NS4150B runs from SYS_INT5V and
 // amplifies LOUT1 only.
@@ -44,6 +50,15 @@ esp_io_expander_handle_t expander_44 = nullptr;
 
 void delay_ms(int ms) {
     vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+// Drives expander pins at `level`. They drive only once set push-pull, see
+// the expander section of the board doc.
+esp_err_t drive(esp_io_expander_handle_t expander, uint32_t pins, int level) {
+    esp_err_t err = esp_io_expander_set_level(expander, pins, level);
+    if (err == ESP_OK) err = esp_io_expander_set_output_mode(expander, pins, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
+    if (err == ESP_OK) err = esp_io_expander_set_dir(expander, pins, IO_EXPANDER_OUTPUT);
+    return err;
 }
 
 // Resets the panel and the touch controller through expander 0x43. The panel
@@ -87,7 +102,7 @@ bool init() {
     // makes every pin an output in high impedance (OUT_H_IM 0xff) with a
     // pull-down, which leaves the speaker, the C6, USB-A power and battery
     // charging switched off. A pin drives only once it is set push-pull.
-    // TODO: switch on charging (0x44 P7) and the other rails when they are needed.
+    // TODO: switch on charging (0x44 P7) when it is needed.
     err = esp_io_expander_new_i2c_pi4ioe5v6408(i2c_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &expander_43);
     if (err == ESP_OK) {
         err = esp_io_expander_new_i2c_pi4ioe5v6408(i2c_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_HIGH,
@@ -97,12 +112,25 @@ bool init() {
         ESP_LOGE(kTag, "IO expanders: %s", esp_err_to_name(err));
         return false;
     }
+    // The gamepads' supplies, as the factory firmware switches them on. The
+    // C6 boots once powered; ESP-Hosted resets it through EN when it starts.
+#if CONFIG_GBX_BT_GAMEPAD
+    err = drive(expander_43, kAntenna, 0);
+    if (err == ESP_OK) err = drive(expander_44, kC6Power, 1);
+    if (err != ESP_OK) ESP_LOGE(kTag, "C6 power: %s", esp_err_to_name(err));
+#endif
+#if CONFIG_GBX_USB_GAMEPAD
+    err = drive(expander_44, kUsbPower, 1);
+    if (err != ESP_OK) ESP_LOGE(kTag, "USB-A power: %s", esp_err_to_name(err));
+#endif
     return true;
 }
 
+// GPIO39-44 are slot 0's IO MUX pins. Slot 1 is the C6's SDIO, see
+// docs/boards/m5stack_tab5.md. Both the card and the GPIO39-48 IO domain use
+// the external 3.3 V rail.
 Sdmmc sdmmc() {
-    // Both the card and the GPIO39-48 IO domain use the external 3.3 V rail.
-    return {.slot = 1, .clk = 43, .cmd = 44, .data = {39, 40, 41, 42}};
+    return {.slot = 0, .clk = 43, .cmd = 44, .data = {39, 40, 41, 42}};
 }
 
 Display display_init(int frame_buffers) {
@@ -208,9 +236,7 @@ Audio audio_init(uint32_t rate, uint32_t buffers, uint32_t frames) {
     // The speaker's amplifier is switched by the expander, not esp_codec_dev,
     // and stays off until the output knows whether headphones are in. HP_DET
     // is driven by the jack, so P7 has no pull, as in the factory firmware.
-    esp_err_t err = esp_io_expander_set_level(expander_43, kSpeaker, 0);
-    if (err == ESP_OK) err = esp_io_expander_set_output_mode(expander_43, kSpeaker, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
-    if (err == ESP_OK) err = esp_io_expander_set_dir(expander_43, kSpeaker, IO_EXPANDER_OUTPUT);
+    esp_err_t err = drive(expander_43, kSpeaker, 0);
     if (err == ESP_OK) err = esp_io_expander_set_dir(expander_43, kHeadphones, IO_EXPANDER_INPUT);
     if (err == ESP_OK) err = esp_io_expander_set_pullupdown(expander_43, kHeadphones, IO_EXPANDER_PULL_NONE);
     if (err != ESP_OK) {

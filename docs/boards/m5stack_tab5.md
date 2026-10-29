@@ -119,6 +119,8 @@ TF 卡用 SDMMC 4 位模式：D0～D3 是 GPIO39～42，CLK 是 GPIO43（经 R23
 
 esp-bsp 和出厂固件都用 `sd_pwr_ctrl_new_on_chip_ldo()` 打开 LDO 通道 4。按原理图，VO4（引脚 74）只接了电容 C29，打开它对 TF 卡没有作用。
 
+GPIO39～44 是 SDMMC slot 0 的 IO MUX 引脚，项目把卡接在 slot 0 上。slot 1 留给 C6 的 SDIO，见“Wi-Fi 和 BLE”。
+
 ### 按键和扩展口
 
 板上只有一个按键 S1，接 PMS150G（U28）的 PA4。PMS150G 的 PA3 控制主电源 MPWR_EN，PA5 接 GPIO35（BOOT），PA6 接绿色 LED 和唤醒信号。按 M5Stack 文档：关机时按一下开机，开机时双击关机；长按约 2 秒，等绿色 LED 快闪后松开，进入下载模式。经 USB-C 烧录时 esptool 能自动复位和进下载模式，不需要按键。GPIO35 上还有 R9（10K）上拉，也引到了 M5-Bus。
@@ -205,6 +207,8 @@ ES7210 和 ES8388 按单个寄存器读取。
 
 两片扩展器的 nRESET 接 P4 的 CHIP_PU，但 USB-Serial/JTAG 复位不会清除扩展器状态。因此 `board::init()` 必须先软件复位扩展器，避免继承上一固件的配置。
 
+复位以后，`board::init()` 按出厂固件的设置打开手柄要用的电源。编入蓝牙手柄时，它把 0x43 的 P0 拉低，选用内置天线，再打开 0x44 的 P0 给 C6 上电。编入 USB 手柄时，它打开 0x44 的 P3，给 USB-A 口供 5V。
+
 ### RTC
 
 RX8130CE 的 VDD 接常开的 VDD_STBY，后备电源是 BT1，经 R38（1K）接到 VBAT。M5Stack 的规格写的是 70000µF/3.3V 的超级电容。它的 /IRQ 经 Q11、Q12 接到唤醒电路 E_TRG，没有接到 P4。
@@ -237,7 +241,7 @@ BMI270 的电源 VDD_IMU 是复位芯片 U39（CN809R）的 RESET 输出，U39 �
 |---|---|
 | J8（USB-C） | 经共模电感 FT1 接 GPIO24（D-）、GPIO25（D+），是 P4 的 USB-Serial/JTAG，全速。项目通过这个口烧录和输出日志 |
 | J6（1.25mm 4P） | 和 USB-C 并联：1 脚 VBUS，2 脚 GND，3 脚 D-，4 脚 D+ |
-| J10（USB-A） | 接 P4 的 USB 2.0 高速 OTG，用专用引脚。VBUS 由 U27（MT9700）输出，使能是 IO 扩展器 0x44 的 P3 |
+| J10（USB-A） | 接 P4 的 USB 2.0 高速 OTG，用专用引脚。VBUS 由 U27（MT9700）输出，使能是 IO 扩展器 0x44 的 P3。项目在这个口上接 USB 手柄 |
 
 M5Stack 文档把 USB-C 写成“USB 2.0 OTG”，但是按原理图它接的是全速 PHY。CH9102F 没有焊，UART0（GPIO37、38）只引到了 M5-Bus。所以 `boards/m5stack_tab5/sdkconfig.defaults` 把控制台设到了 USB-Serial/JTAG。
 
@@ -260,6 +264,8 @@ C6 通过 4 位 SDIO 接 P4，跑 ESP-Hosted：
 
 出厂固件的启动日志里打印的 SDIO 引脚和上表一致，频率是 40MHz。C6 的 EN 经 R4（1K）接 GPIO15，有 R6（10K）上拉和 C32（1µF）电容。C6 的 3.3V 由 U38 从 SOC_3.3V 得到，使能是 IO 扩展器 0x44 的 P0，所以固件不打开它时 C6 不上电。J1（6P）引出了 C6 的 3.3V、TXD0、RXD0、EN、IO9 和 GND，用来单独给 C6 烧录。天线由射频开关 U29 在内置天线和 MMCX 外接天线之间切换，控制脚是 0x43 的 P0。
 
+蓝牙手柄经 C6 连接。P4 上的 ESP-Hosted 用 SDMMC slot 1 和 4 位总线，引脚按上表，用 GPIO15 复位 C6。ESP-Hosted 的 Kconfig 按板型锁定 SDIO 和复位引脚的取值，所以 `boards/m5stack_tab5/sdkconfig.defaults` 选了它的 Tab5 板型 `ESP32P4_TAB5_C6_BOARD`。不选时，引脚会落回乐鑫 P4 开发板的 GPIO14～19 和 GPIO54。
+
 ## GPIO 总表
 
 | GPIO | 原理图网络名 | 连接 |
@@ -273,7 +279,7 @@ C6 通过 4 位 SDIO 接 P4，跑 ESP-Hosted：
 | 12 | SDIO2_CLK | SDIO 时钟，接 C6 |
 | 13 | SDIO2_CMD | SDIO 命令，接 C6 |
 | 14 | RF_C6_IO2 | C6 的 IO2 |
-| 15 | SOC_EXTRF_RST | C6 的 EN |
+| 15 | SOC_EXTRF_RST | C6 的 EN，ESP-Hosted 用它复位 C6 |
 | 16、17 | STD_GPIO16、STD_GPIO17 | M5-Bus |
 | 18 | xSPI_MOSI_G18 | M5-Bus，STAMP 焊盘 |
 | 19 | xSPI_MISO_G19 | M5-Bus，STAMP 焊盘 |
