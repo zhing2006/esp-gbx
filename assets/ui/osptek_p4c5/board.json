@@ -54,14 +54,14 @@
     "l": {
       "sprite": "shoulder_l",
       "center": [
-        86.15,
+        69.6,
         558
       ]
     },
     "r": {
       "sprite": "shoulder_r",
       "center": [
-        393.85,
+        410.4,
         558
       ]
     },
