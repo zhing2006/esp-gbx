@@ -44,6 +44,7 @@
 | `12-usb-uart.png` | 第 4 页：COM 口、CH343P 和自动下载电路 |
 | `13-power.png` | 同页：SY8089A1AAC 降压 |
 | `14-usb-power.png` | 同页：PWR 口，以及不贴的 R50、R51 |
+| `15-usb-otg.png` | 同页：USB-A 口和 ESD 器件 E4、E5 |
 
 参考源码是厂商基础例程的原文件，文件头写着 Waiken-Smart 慧勤智远，没有许可声明：
 
@@ -165,7 +166,7 @@ KEY0 接 GPIO61，也就是 BOOT 引脚，按下接地；它的上拉 R7 没有�
 
 ## 电源
 
-板子由两个 USB-C 口中的任一个供 5V：COM 口（CH343P）和 PWR 口，经 1.5A 自恢复保险丝 F1 成为 SYS_5V。SY8089A1AAC（U10）的 EN 经 R39 接 5V，上电即输出 3.3V 给模组和外设。RT9013（U6）单独给音频供 3.3V。USB-A 口接模组的 USB 2.0 OTG（USB_DP/USB_DM），VBUS 直接接 SYS_5V。手册给出的整板电流：跑马灯例程 48mA，4.3 寸 RGB 屏加 OV5640 摄像头 445mA。
+板子由两个 USB-C 口中的任一个供 5V：COM 口（CH343P）和 PWR 口，经 1.5A 自恢复保险丝 F1 成为 SYS_5V。SY8089A1AAC（U10）的 EN 经 R39 接 5V，上电即输出 3.3V 给模组和外设。RT9013（U6）单独给音频供 3.3V。USB-A 口接模组的 USB 2.0 OTG（USB_DP/USB_DM），VBUS 直接接 SYS_5V（`15-usb-otg.png`），板子有电时就有电。手册给出的整板电流：跑马灯例程 48mA，4.3 寸 RGB 屏加 OV5640 摄像头 445mA。项目在这个口上接 USB 手柄，打开了 `GBX_USB_GAMEPAD`，并用 `CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM` 把 USB 控制器的 DMA 缓冲放在 PSRAM。
 
 ## GPIO 总表
 

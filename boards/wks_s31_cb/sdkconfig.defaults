@@ -48,3 +48,9 @@ CONFIG_GBX_GBA_JIT_STORE_KB=4096
 # The pause menu and the SAVE / LOAD screen took 53 KB of the PSRAM it
 # leaves; writing over a save first copies it, up to 132 KB.
 CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB=256
+
+# A HID gamepad on the USB-A port, whose VBUS is SYS_5V. The USB
+# controller's DMA buffers go to PSRAM; the library takes about 3.5 KB of
+# internal RAM, which the GBA's budgets above leave.
+CONFIG_GBX_USB_GAMEPAD=y
+CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM=y
