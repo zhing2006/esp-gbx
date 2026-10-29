@@ -11,4 +11,14 @@ config GBX_UI_STATIC_SHELL
         chip with one core enables it, where each redraw takes time from
         the emulation.
 
+config GBX_UI_PACK_IN_FLASH
+    bool "Draw the VFD from the asset pack in flash"
+    default n
+    help
+        The game page's VFD reads its font atlases and the shell under its
+        cells where they lie in the asset pack, in flash, instead of copies
+        in PSRAM. The copies take about 640 KB on an 800x480 layout; without
+        them each redraw of a reading reads flash. A board whose PSRAM is
+        short enables it in boards/<board>/sdkconfig.defaults.
+
 endmenu

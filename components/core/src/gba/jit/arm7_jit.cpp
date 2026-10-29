@@ -54,17 +54,8 @@ bool Arm7Jit::initialize(Memory& memory, const Capacity& capacity, const platfor
                       static_cast<unsigned>(platform::largest_executable()));
         return false;
     }
-    // Each segment of the second level starts with a copy of the gateway.
-    store_.initialize(capacity.store_bytes, capacity.store_records, cache_.shared().first(gateway_bytes_ / 4),
-                      reinterpret_cast<uintptr_t>(cache_.shared().data()));
-#ifdef GBX_PROFILER
-    // For attributing profiler samples in the copies, see the gateway's line.
-    if (!store_.storage().empty())
-        platform::log(platform::LogLevel::warn, "arm7-jit", "store %08lx %u bytes, segments of %u bytes",
-                      static_cast<unsigned long>(reinterpret_cast<uintptr_t>(store_.storage().data())),
-                      static_cast<unsigned>(store_.storage().size_bytes()),
-                      static_cast<unsigned>(jit::CodeStore::kSegmentBytes));
-#endif
+    // Without memory for it, the pool alone runs the blocks.
+    if (capacity.store_bytes) initialize_store(capacity.store_bytes, capacity.store_records);
     tables_.reset(static_cast<Tables*>(platform::allocate_internal(sizeof(Tables))));
     mid_.reset(external_array<MidEntry>(size_t{1} << kMidBits));
     reinstall_.reset(external_array<Reinstall>(size_t{1} << kReinstallBits));
@@ -81,6 +72,21 @@ bool Arm7Jit::initialize(Memory& memory, const Capacity& capacity, const platfor
     memory.code_written = &code_written;
     memory.code_context = this;
     clear();
+    return true;
+}
+
+bool Arm7Jit::initialize_store(size_t bytes, size_t records) {
+    // Each segment of the second level starts with a copy of the gateway.
+    if (!store_.initialize(bytes, records, cache_.shared().first(gateway_bytes_ / 4),
+                           reinterpret_cast<uintptr_t>(cache_.shared().data())))
+        return false;
+#ifdef GBX_PROFILER
+    // For attributing profiler samples in the copies, see the gateway's line.
+    platform::log(platform::LogLevel::warn, "arm7-jit", "store %08lx %u bytes, segments of %u bytes",
+                  static_cast<unsigned long>(reinterpret_cast<uintptr_t>(store_.storage().data())),
+                  static_cast<unsigned>(store_.storage().size_bytes()),
+                  static_cast<unsigned>(jit::CodeStore::kSegmentBytes));
+#endif
     return true;
 }
 

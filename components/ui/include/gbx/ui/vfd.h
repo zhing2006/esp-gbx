@@ -49,7 +49,7 @@ private:
     std::string_view chars_;
     Atlas atlases_[4];
     // The atlases' planes copied out of the pack, which is in flash: each
-    // glyph pixel reads them.
+    // glyph pixel reads them. None with GBX_UI_PACK_IN_FLASH.
     std::unique_ptr<uint8_t[], FreeExternal> copies_[4];
     int atlas_count_ = 0;
 };

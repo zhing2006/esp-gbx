@@ -99,6 +99,30 @@ const char* file_name(const char* path) {
     return name;
 }
 
+// Gives a JIT that has none a second level from the PSRAM left: up to
+// `most`, less `leave`, which stays free for what the menus and the saves
+// allocate while the game runs. See GBX_GB_JIT_STORE_LEAVE_KB and
+// GBX_GBA_JIT_STORE_LEAVE_KB.
+template<class Jit>
+[[maybe_unused]] void fill_store(Jit* jit, size_t most, size_t leave) {
+    if (!jit || jit->store_capacity()) return;
+    const size_t free = platform::heap_stats().external_free;
+    if (free <= leave) return;
+    const size_t room = free - leave;
+    // Its index takes a word for each of twice as many records, rounded up
+    // to a power of two, see jit::CodeStore.
+    const auto taken = [](size_t bytes) { return bytes + std::bit_ceil(bytes / 256 * 2) * 4; };
+    constexpr size_t kStep = 16 * 1024;
+    size_t bytes = std::min(most, room);
+    for (bytes -= bytes % kStep; bytes >= kStep && taken(bytes) > room;) bytes -= kStep;
+    // The free PSRAM may be in pieces smaller than that.
+    for (; bytes >= kStep; bytes -= kStep)
+        if (jit->initialize_store(bytes, bytes / 256)) break;
+    platform::log(platform::LogLevel::info, kTag, "JIT second level %u KiB, %u KiB of PSRAM left",
+                  static_cast<unsigned>(jit->store_capacity() / 1024),
+                  static_cast<unsigned>(platform::heap_stats().external_free / 1024));
+}
+
 #ifdef GBX_PROFILER
 // What the system and its backend left of internal RAM, for sizing the
 // JIT's pools and tables.
@@ -406,24 +430,16 @@ void Game::reserve_jit() {
 }
 
 void Game::fill_jit_store() {
+#if GBX_HAS_GBA
+    if (gba()) {
+#if GBX_GBA_JIT_STORE_LEAVE_BYTES
+        fill_store(gba_system_->jit(), GBX_GBA_JIT_STORE_BYTES, GBX_GBA_JIT_STORE_LEAVE_BYTES);
+#endif
+        return;
+    }
+#endif
 #if GBX_GB_JIT_STORE_LEAVE_BYTES
-    auto* jit = system_->jit();
-    if (!jit || jit->store_capacity()) return;
-    const size_t free = platform::heap_stats().external_free;
-    if (free <= GBX_GB_JIT_STORE_LEAVE_BYTES) return;
-    const size_t room = free - GBX_GB_JIT_STORE_LEAVE_BYTES;
-    // Its index takes a word for each of twice as many records, rounded up
-    // to a power of two, see jit::CodeStore.
-    const auto taken = [](size_t bytes) { return bytes + std::bit_ceil(bytes / 256 * 2) * 4; };
-    constexpr size_t kStep = 16 * 1024;
-    size_t bytes = std::min<size_t>(GBX_GB_JIT_STORE_BYTES, room);
-    for (bytes -= bytes % kStep; bytes >= kStep && taken(bytes) > room;) bytes -= kStep;
-    // The free PSRAM may be in pieces smaller than that.
-    for (; bytes >= kStep; bytes -= kStep)
-        if (jit->initialize_store(bytes, bytes / 256)) break;
-    platform::log(platform::LogLevel::info, kTag, "JIT second level %u KiB, %u KiB of PSRAM left",
-                  static_cast<unsigned>(jit->store_capacity() / 1024),
-                  static_cast<unsigned>(platform::heap_stats().external_free / 1024));
+    fill_store(system_->jit(), GBX_GB_JIT_STORE_BYTES, GBX_GB_JIT_STORE_LEAVE_BYTES);
 #endif
 }
 
@@ -1133,6 +1149,7 @@ void Game::change_backend() {
             faults_->add("Can't start the JIT: not enough memory for its code.");
             return;
         }
+        fill_jit_store();
         backend_.store(backend);
         lend_core();
         platform::log(platform::LogLevel::info, kTag, "backend %s", backend == Backend::jit ? "jit" : "int");
@@ -1621,6 +1638,15 @@ void Game::load_gba(const char* path, Backend backend, int64_t size, const char*
     // runs below the tasks of the UI, which its polls would hold up.
     gba_system_->set_worker_polling(false);
     gba_shared_.store(gba_system_.get());
+#if GBX_GBA_JIT_STORE_LEAVE_BYTES
+    {
+        // The second level waits for the PSRAM the game leaves, see
+        // fill_jit_store().
+        gba::Arm7JitCapacity capacity;
+        capacity.store_bytes = capacity.store_records = 0;
+        gba_system_->set_jit_capacity(capacity);
+    }
+#endif
     if (!gba_system_->select_backend(backend == Backend::jit ? gba::Backend::jit : gba::Backend::interpreter,
                                      &jit_reserved_)) {
         fail("The JIT cannot start: not enough memory for its code.");
@@ -1640,6 +1666,7 @@ void Game::load_gba(const char* path, Backend backend, int64_t size, const char*
         return;
     }
     if (!slots_.open(path, *gba_system_)) faults_->add("No memory for the instant saves of %s.", file_name(path));
+    fill_jit_store();
     shades_.store(false, std::memory_order_relaxed);
     if (!platform::display::show_game(window_, gba::kScreenWidth, gba::kScreenHeight,
                                       platform::display::PixelFormat::rgb565)) {

@@ -29,13 +29,14 @@ enum class Arm7JitFallback : uint8_t { none, unavailable, encoding, capacity, pu
 inline constexpr unsigned kArm7JitFallbacks = 6;
 
 // The code pool and the second level behind it for mapped execution, see
-// Arm7Jit::initialize(Memory&). On a P4 before v3 the CPU's part of the
-// GBA's core shares the upper internal RAM with the heap
-// (tools/link_core_layout.py), which then holds a pool of 192 KiB beside
-// the system.
+// Arm7Jit::initialize(Memory&). Each board sets their sizes, see
+// GBX_GBA_JIT_POOL_KB and GBX_GBA_JIT_STORE_KB in components/core/Kconfig.
+// On a P4 before v3 the CPU's part of the GBA's core shares the upper
+// internal RAM with the heap (tools/link_core_layout.py), which then holds
+// a pool of 192 KiB beside the system.
 struct Arm7JitCapacity {
-    size_t pool_bytes = 192 * 1024, pool_blocks = 1024;
-    size_t store_bytes = 4u << 20, store_records = 16384;
+    size_t pool_bytes = GBX_GBA_JIT_POOL_BYTES, pool_blocks = GBX_GBA_JIT_POOL_BYTES / 192;
+    size_t store_bytes = GBX_GBA_JIT_STORE_BYTES, store_records = GBX_GBA_JIT_STORE_BYTES / 256;
 };
 
 // Where the compiler reads code: the word, or in Thumb state the halfword,
@@ -89,6 +90,10 @@ public:
     // After the owner replaced the memory, as a saved state does: retires
     // the blocks in IWRAM and EWRAM. BIOS and ROM blocks stay.
     void forget_ram_code();
+    // The second level, when initialize() had no size for it: a game that
+    // gives it the PSRAM left once its other memory is allocated.
+    bool initialize_store(size_t bytes, size_t records);
+    size_t store_capacity() const { return store_.capacity_bytes(); }
     uint32_t invalidations() const { return invalidations_; }
     uint32_t evictions() const { return evictions_; }
     // Blocks copied from the second level into the pool, entries from C++

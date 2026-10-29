@@ -290,8 +290,9 @@ private:
     void release();
     // Sets jit_reserved_ aside unless it is already.
     void reserve_jit();
-    // Gives the GB JIT its second level from the PSRAM left, where the
-    // board says so, see GBX_GB_JIT_STORE_LEAVE_KB.
+    // Gives the running game's JIT its second level from the PSRAM left,
+    // where the board says so, see GBX_GB_JIT_STORE_LEAVE_KB and
+    // GBX_GBA_JIT_STORE_LEAVE_KB.
     void fill_jit_store();
     void unshare();
     bool load_save(const char* path, std::span<const uint8_t, 24> identity, Saves::System system, size_t capacity,

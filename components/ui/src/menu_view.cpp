@@ -60,10 +60,8 @@ struct MenuView::State {
     int marquee = 0;
     uint64_t marquee_start = 0;
 
-    // The SAVE / LOAD thumbnail at full size over the scaled grid: what the
-    // canvas shows and the next one, and the top left cell it is at.
-    uint16_t* thumbnail = nullptr;
-    uint16_t* thumbnail_next = nullptr;
+    // The SAVE / LOAD thumbnail at full size over the scaled grid: whether
+    // the canvas shows it, and the top left cell it is at.
     bool thumbnail_shown = false;
     int thumbnail_x = 0;
     int thumbnail_y = 0;
@@ -95,13 +93,10 @@ bool MenuView::create(const Pack& pack, std::span<const int16_t, 4> window) {
     st.next = static_cast<uint16_t*>(platform::allocate_external(bytes));
     st.backdrop = static_cast<uint16_t*>(platform::allocate_external(bytes));
     constexpr size_t kThumbnailBytes = 2 * kMaxFramePixels;
-    st.thumbnail = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
-    st.thumbnail_next = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
     st.source = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
     st.source_shown = static_cast<uint16_t*>(platform::allocate_external(kThumbnailBytes));
     buffer_ = lv_draw_buf_create(window[2], window[3], LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO);
-    if (!st.drawn || !st.next || !st.backdrop || !st.thumbnail || !st.thumbnail_next || !st.source ||
-        !st.source_shown || !buffer_) {
+    if (!st.drawn || !st.next || !st.backdrop || !st.source || !st.source_shown || !buffer_) {
         platform::log(platform::LogLevel::error, kTag, "no memory for the menus");
         return false;
     }
@@ -132,8 +127,6 @@ void MenuView::destroy() {
         platform::free_external(state_->drawn);
         platform::free_external(state_->next);
         platform::free_external(state_->backdrop);
-        platform::free_external(state_->thumbnail);
-        platform::free_external(state_->thumbnail_next);
         platform::free_external(state_->source);
         platform::free_external(state_->source_shown);
         delete state_;
@@ -197,6 +190,7 @@ bool MenuView::capture(std::span<uint16_t> out, int& width, int& height) const {
 void MenuView::apply() {
     State& st = *state_;
     bool redraw = !st.valid;
+    bool new_source = false;
     {
         std::lock_guard lock(st.mutex);
         if (st.frame_changed) {
@@ -210,7 +204,7 @@ void MenuView::apply() {
             st.shown_width = st.source_width;
             st.shown_height = st.source_height;
             st.source_changed = false;
-            redraw = true;
+            new_source = redraw = true;
         }
         if (st.wanted_changed) {
             const auto& old_row = st.shown.rows[std::clamp(st.shown.selected, 0, MenuScreen::kMaxItems - 1)];
@@ -279,13 +273,10 @@ void MenuView::apply() {
     }
     bool thumbnail_changed = false;
     if (thumbnail) {
-        MenuPainter::thumbnail(st.source_shown, kThumbnailW, kThumbnailH, st.thumbnail_next, kThumbnailW);
         // Scaling the cells under it covers it, so it is drawn again then too.
         const bool covered = x0 < tx + kThumbnailW / 2 && x1 > tx && y0 < ty + kThumbnailH / 2 && y1 > ty;
-        thumbnail_changed = covered || !st.thumbnail_shown || tx != st.thumbnail_x || ty != st.thumbnail_y ||
-                            kThumbnailW != st.thumbnail_width ||
-                            std::memcmp(st.thumbnail, st.thumbnail_next, size_t{2} * kThumbnailW * kThumbnailH) != 0;
-        std::swap(st.thumbnail, st.thumbnail_next);
+        thumbnail_changed = covered || new_source || !st.thumbnail_shown || tx != st.thumbnail_x ||
+                            ty != st.thumbnail_y || kThumbnailW != st.thumbnail_width;
     }
     st.thumbnail_shown = thumbnail;
     st.thumbnail_x = tx;
@@ -319,9 +310,8 @@ void MenuView::apply() {
         lv_obj_invalidate_area(canvas_, &area);
     }
     if (thumbnail_changed) {
-        for (int y = 0; y < kThumbnailH; ++y) {
-            std::copy_n(st.thumbnail + y * kThumbnailW, kThumbnailW, canvas + (ty * k + y) * stride + tx * k);
-        }
+        MenuPainter::thumbnail(st.source_shown, kThumbnailW, kThumbnailH, canvas + ty * k * stride + tx * k,
+                               static_cast<int>(stride));
         const lv_area_t area{st.window[0] + tx * k, st.window[1] + ty * k, st.window[0] + tx * k + kThumbnailW - 1,
                              st.window[1] + ty * k + kThumbnailH - 1};
         lv_obj_invalidate_area(canvas_, &area);

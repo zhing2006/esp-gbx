@@ -10,6 +10,7 @@
 #include "driver/gptimer.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_memory_utils.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -66,6 +67,11 @@ constexpr const char* kTag = "profile";
 //   heap [dump]       each internal RAM heap region's free bytes and largest
 //                     free block; with dump, every block of the regions code
 //                     may run from
+//   memory internal|psram
+//                     the heap's blocks of 1 KiB or more in MEM lines, with
+//                     the task whose stack each holds, the free bytes and
+//                     their lowest since boot, then every task's stack in
+//                     STACK lines
 // The status of "stat" adds a line on the slowest frame and the JIT.
 
 void log_tasks(uint32_t ms) {
@@ -89,6 +95,64 @@ void log_tasks(uint32_t ms) {
         }
     }
     ESP_LOGW(kTag, "%s", line);
+}
+
+// The heap's blocks of `min` bytes or more in internal RAM or PSRAM, with
+// the count and total of the smaller ones in use, then each task's stack:
+// where it lies and the bytes it never used. The walk only records, into
+// PSRAM set aside first: the heap is locked while it runs.
+struct HeapBlock { uintptr_t address; uint32_t size; bool used; };
+struct HeapWalk { HeapBlock* blocks; size_t count, capacity, min, small_count, small_bytes; };
+
+bool walk_block(walker_heap_into_t, walker_block_info_t block, void* data) {
+    auto& walk = *static_cast<HeapWalk*>(data);
+    if (block.size < walk.min) {
+        if (block.used) { ++walk.small_count; walk.small_bytes += block.size; }
+    } else if (walk.count < walk.capacity) {
+        walk.blocks[walk.count++] = {reinterpret_cast<uintptr_t>(block.ptr), static_cast<uint32_t>(block.size), block.used};
+    }
+    return true;
+}
+
+void log_memory(bool psram) {
+    constexpr size_t kBlocks = 2048;
+    constexpr UBaseType_t kMax = 40;
+    auto* blocks = static_cast<HeapBlock*>(heap_caps_malloc(kBlocks * sizeof(HeapBlock), MALLOC_CAP_SPIRAM));
+    auto* tasks = static_cast<TaskStatus_t*>(heap_caps_malloc(kMax * sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM));
+    if (!blocks || !tasks) {
+        heap_caps_free(blocks);
+        heap_caps_free(tasks);
+        ESP_LOGW(kTag, "memory: no PSRAM for the listing");
+        return;
+    }
+    HeapWalk walk{blocks, 0, kBlocks, 1024, 0, 0};
+    heap_caps_walk(psram ? MALLOC_CAP_SPIRAM : MALLOC_CAP_INTERNAL, walk_block, &walk);
+    const UBaseType_t count = uxTaskGetSystemState(tasks, kMax, nullptr);
+    for (size_t i = 0; i < walk.count; ++i) {
+        const auto& block = blocks[i];
+        const char* owner = "";
+        for (UBaseType_t t = 0; t < count; ++t) {
+            const auto base = reinterpret_cast<uintptr_t>(tasks[t].pxStackBase);
+            if (base >= block.address && base < block.address + block.size) owner = tasks[t].pcTaskName;
+        }
+        std::printf("MEM %s %08x %u %s %s\n", psram ? "psram" : "internal", static_cast<unsigned>(block.address),
+                    static_cast<unsigned>(block.size), block.used ? "used" : "free", owner);
+    }
+    const uint32_t caps = psram ? MALLOC_CAP_SPIRAM : MALLOC_CAP_INTERNAL;
+    std::printf("MEM %s smaller blocks in use: %u, %u bytes; free %u, lowest since boot %u, largest %u\n",
+                psram ? "psram" : "internal", static_cast<unsigned>(walk.small_count),
+                static_cast<unsigned>(walk.small_bytes), static_cast<unsigned>(heap_caps_get_free_size(caps)),
+                static_cast<unsigned>(heap_caps_get_minimum_free_size(caps)),
+                static_cast<unsigned>(heap_caps_get_largest_free_block(caps)));
+    for (UBaseType_t t = 0; t < count; ++t) {
+        const auto base = reinterpret_cast<uintptr_t>(tasks[t].pxStackBase);
+        std::printf("STACK %s %08x %s unused %u\n", tasks[t].pcTaskName, static_cast<unsigned>(base),
+                    esp_ptr_external_ram(tasks[t].pxStackBase) ? "psram" : "internal",
+                    static_cast<unsigned>(tasks[t].usStackHighWaterMark));
+    }
+    std::fflush(stdout);
+    heap_caps_free(blocks);
+    heap_caps_free(tasks);
 }
 
 // The stall watch: every 20 ms the tasks' run times, and at a new wait of
@@ -534,6 +598,8 @@ bool profile_command(char* line) {
         heap_caps_print_heap_info(MALLOC_CAP_INTERNAL);
     } else if (std::strcmp(line, "heap dump") == 0) {
         heap_caps_dump(MALLOC_CAP_INTERNAL | MALLOC_CAP_EXEC);
+    } else if (std::strcmp(line, "memory internal") == 0 || std::strcmp(line, "memory psram") == 0) {
+        log_memory(line[7] == 'p');
 #ifdef CACHE_L2_CACHE_ACS_CNT_CTRL_REG
     } else if (std::strcmp(line, "cacheprobe") == 0) {
         cache_probe();

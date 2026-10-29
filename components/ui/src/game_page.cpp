@@ -199,7 +199,7 @@ void GamePage::destroy() {
             lv_image_cache_drop(cell.buffer);
             lv_draw_buf_destroy(cell.buffer);
         }
-        platform::free_external(cell.shell);
+        if (!GBX_UI_PACK_IN_FLASH) platform::free_external(const_cast<uint16_t*>(cell.shell));
         cell = {};
     }
     pending_cells_ = 0;
@@ -256,14 +256,21 @@ bool GamePage::add_cell(const pack_format::VfdCell& cell) {
     view.pixels = {reinterpret_cast<uint16_t*>(view.buffer->data), x0, y0, x1 - x0, y1 - y0,
                    static_cast<int>(view.buffer->header.stride / 2)};
     const Canvas& c = view.pixels;
-    view.shell = static_cast<uint16_t*>(platform::allocate_external(size_t{static_cast<unsigned>(c.width * c.height)} * 2));
-    if (view.shell == nullptr) {
-        platform::log(platform::LogLevel::error, kTag, "no memory for a VFD cell");
-        return false;
-    }
     const int bg_row = background_.stride / 2;
-    for (int y = 0; y < c.height; ++y) {
-        std::memcpy(view.shell + y * c.width, background_.rgb + (c.y + y) * bg_row + c.x, c.width * sizeof(uint16_t));
+    if (GBX_UI_PACK_IN_FLASH) {
+        view.shell = background_.rgb + c.y * bg_row + c.x;
+        view.shell_stride = bg_row;
+    } else {
+        auto* shell = static_cast<uint16_t*>(platform::allocate_external(size_t{static_cast<unsigned>(c.width * c.height)} * 2));
+        if (shell == nullptr) {
+            platform::log(platform::LogLevel::error, kTag, "no memory for a VFD cell");
+            return false;
+        }
+        for (int y = 0; y < c.height; ++y) {
+            std::memcpy(shell + y * c.width, background_.rgb + (c.y + y) * bg_row + c.x, c.width * sizeof(uint16_t));
+        }
+        view.shell = shell;
+        view.shell_stride = c.width;
     }
     view.canvas = lv_canvas_create(root_);
     lv_canvas_set_draw_buf(view.canvas, view.buffer);
@@ -315,7 +322,7 @@ bool GamePage::draw_cell_text(CellView& view, const pack_format::VfdCell& cell, 
     // Start from the shell under the cell, then draw the text on it.
     Canvas& c = view.pixels;
     for (int y = 0; y < c.height; ++y) {
-        std::memcpy(c.pixels + y * c.stride, view.shell + y * c.width, c.width * sizeof(uint16_t));
+        std::memcpy(c.pixels + y * c.stride, view.shell + y * view.shell_stride, c.width * sizeof(uint16_t));
     }
     const auto drawn = std::span(lines).first(count);
     draw_cell(c, font_, cell, value_text, unit, drawn);

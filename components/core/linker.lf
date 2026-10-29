@@ -102,10 +102,14 @@ entries:
         arm7:_ZN3gbx3gba18arm7_set_registersERNS0_9Arm7StateERKNS0_13Arm7RegistersE (default)
         arm7:_ZN3gbx3gba14arm7_registersERKNS0_9Arm7StateE (default)
         # The interpreter on the memory map with the JIT dispatcher's single
-        # steps, its scheduler and the devices. The ROM cache's reads from the
-        # card and the backup chips stay in flash: the card access or the save
-        # is slower than the code.
-        arm7_mapped (noflash)
+        # steps, unless the board leaves its internal RAM to the JIT
+        # (GBX_GBA_INTERPRETER_IN_FLASH); then its scheduler and the devices.
+        # The ROM cache's reads from the card and the backup chips stay in
+        # flash: the card access or the save is slower than the code.
+        if GBX_GBA_INTERPRETER_IN_FLASH = y:
+            arm7_mapped (default)
+        else:
+            arm7_mapped (noflash)
         gba_scheduler (noflash)
         gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE5resetEv (default)
         gba_scheduler:_ZN3gbx14BasicSchedulerILj5EE7restoreEyRKSt5arrayIyLj5EERKS2_IPFvPvELj5EERKS2_IS6_Lj5EE (default)

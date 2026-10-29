@@ -81,7 +81,7 @@ bool VfdFont::load(const Pack& pack) {
         }
         ImageView view = *image;
         const size_t rgb = static_cast<size_t>(view.stride) * view.height, alpha = static_cast<size_t>(view.width) * view.height;
-        copies_[atlas_count_].reset(static_cast<uint8_t*>(platform::allocate_external(rgb + alpha)));
+        if (!GBX_UI_PACK_IN_FLASH) copies_[atlas_count_].reset(static_cast<uint8_t*>(platform::allocate_external(rgb + alpha)));
         if (uint8_t* copy = copies_[atlas_count_].get()) {
             std::memcpy(copy, view.rgb, rgb);
             std::memcpy(copy + rgb, view.alpha, alpha);

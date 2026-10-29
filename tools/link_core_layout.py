@@ -109,6 +109,10 @@ def main():
     options = enabled(sdkconfig)
     lines = Path(source).read_text().split('\n')
     core, other_core = (GB, GB_OTHER_CORE) if 'GBX_SYSTEMS_GB_ONLY' in options else (GBA, GBA_OTHER_CORE)
+    # A board may leave the GBA's interpreter in flash for the JIT's pool,
+    # see GBX_GBA_INTERPRETER_IN_FLASH in components/core/Kconfig.
+    if 'GBX_GBA_INTERPRETER_IN_FLASH' in options:
+        core = [obj for obj in core if obj != ('core', 'arm7_mapped')]
     objects = SHARED + core
     # P4 before v3 splits internal RAM: the code and data IDF links stay
     # below the second-stage bootloader, which leaves too little room for

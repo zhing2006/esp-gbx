@@ -7,7 +7,8 @@ choice GBX_SYSTEMS
         The systems the firmware and the test firmware run. A chip whose
         internal RAM holds the execution core of only one of them builds
         that one alone; the shared sdkconfig.defaults.<target> file makes
-        the choice. The PC build has both.
+        the choice, and a board's own sdkconfig.defaults may make another.
+        The PC build has both.
 
 config GBX_SYSTEMS_ALL
     bool "GB, GBC and GBA"
@@ -43,6 +44,31 @@ config GBX_GB_JIT_POOL_KB
         boards/<board>/sdkconfig.defaults; blocks the pool evicts run from
         the second level in PSRAM.
 
+config GBX_GBA_INTERPRETER_IN_FLASH
+    bool "GBA: the interpreter stays out of internal RAM"
+    depends on !GBX_SYSTEMS_GB_ONLY
+    default n
+    help
+        The GBA's interpreter on the memory map (arm7_mapped, about 52 KB)
+        stays in flash and runs from PSRAM, leaving its internal RAM to the
+        JIT's code pool (GBX_GBA_JIT_POOL_KB). The JIT runs it only for
+        single steps and the code it does not translate; the interpreter
+        backend runs slower. A board whose internal RAM cannot hold both
+        sets it in boards/<board>/sdkconfig.defaults.
+
+config GBX_GBA_JIT_POOL_KB
+    int "GBA JIT: code pool in internal RAM, KiB"
+    range 32 192
+    default 192
+    help
+        The GBA JIT's code pool, one contiguous block of internal RAM with
+        16 KiB of shared code before it, set aside when the app starts. Its
+        block table, also in internal RAM, holds one block per 192 bytes.
+        A board whose internal RAM cannot spare it beside the GBA's
+        execution core and run-time data sets less in
+        boards/<board>/sdkconfig.defaults; blocks the pool evicts run from
+        the second level in PSRAM.
+
 endmenu
 
 menu "GBX PSRAM budgets"
@@ -70,6 +96,27 @@ config GBX_GB_JIT_STORE_LEAVE_KB
         menus and the saves allocate while the game runs. A board whose
         PSRAM a large game fills sets it in
         boards/<board>/sdkconfig.defaults.
+
+config GBX_GBA_JIT_STORE_KB
+    int "GBA JIT: second level of the code cache, KiB"
+    range 256 16384
+    default 4096
+    help
+        The copies of the GBA JIT's blocks that run from PSRAM after the
+        code pool evicts them, one record per 256 bytes. With
+        GBX_GBA_JIT_STORE_LEAVE_KB, a game's second level takes at most
+        this much; the test firmware takes it whole.
+
+config GBX_GBA_JIT_STORE_LEAVE_KB
+    int "GBA JIT: PSRAM the second level leaves free, KiB"
+    range 0 4096
+    default 0
+    help
+        With 0, the GBA JIT's second level takes GBX_GBA_JIT_STORE_KB when
+        the JIT starts. Otherwise the game sets it up once the ROM's cache,
+        the save and the instant saves have their memory: it takes the
+        PSRAM left, up to GBX_GBA_JIT_STORE_KB, less this much, as
+        GBX_GB_JIT_STORE_LEAVE_KB does for the GB.
 
 config GBX_GBA_ROM_CACHE_KB
     int "GBA: ROM cache, KiB"

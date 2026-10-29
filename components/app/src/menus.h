@@ -165,7 +165,6 @@ private:
     // The thumbnail the view has: the slot's frame as the screen shows it,
     // what it shows, and its number, see MenuScreen::Slots::thumbnail_id.
     Slots::Thumbnail* thumbnail_ = nullptr;  // external memory
-    uint16_t* thumbnail_pixels_ = nullptr;   // 160x144 BGR555, external memory
     struct ThumbnailKey {
         int slot = 0;
         uint32_t generation = 0;

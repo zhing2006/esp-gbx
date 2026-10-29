@@ -42,10 +42,23 @@ set(gbx_gb_jit_store_leave_kb 0)
 if(CONFIG_GBX_GB_JIT_STORE_LEAVE_KB)
     set(gbx_gb_jit_store_leave_kb ${CONFIG_GBX_GB_JIT_STORE_LEAVE_KB})
 endif()
-# And the GB JIT's code pool in internal RAM.
+# The GBA JIT's second level and the PSRAM it leaves.
+set(gbx_gba_jit_store_kb 4096)
+set(gbx_gba_jit_store_leave_kb 0)
+if(CONFIG_GBX_GBA_JIT_STORE_KB)
+    set(gbx_gba_jit_store_kb ${CONFIG_GBX_GBA_JIT_STORE_KB})
+endif()
+if(CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB)
+    set(gbx_gba_jit_store_leave_kb ${CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB})
+endif()
+# And the JITs' code pools in internal RAM.
 set(gbx_gb_jit_pool_kb 192)
+set(gbx_gba_jit_pool_kb 192)
 if(CONFIG_GBX_GB_JIT_POOL_KB)
     set(gbx_gb_jit_pool_kb ${CONFIG_GBX_GB_JIT_POOL_KB})
+endif()
+if(CONFIG_GBX_GBA_JIT_POOL_KB)
+    set(gbx_gba_jit_pool_kb ${CONFIG_GBX_GBA_JIT_POOL_KB})
 endif()
 if(CONFIG_GBX_GB_JIT_STORE_KB)
     set(gbx_gb_jit_store_kb ${CONFIG_GBX_GB_JIT_STORE_KB})
@@ -57,10 +70,16 @@ math(EXPR gbx_gb_jit_store_bytes "${gbx_gb_jit_store_kb} * 1024")
 math(EXPR gbx_gba_rom_cache_bytes "${gbx_gba_rom_cache_kb} * 1024")
 math(EXPR gbx_gb_jit_pool_bytes "${gbx_gb_jit_pool_kb} * 1024")
 math(EXPR gbx_gb_jit_store_leave_bytes "${gbx_gb_jit_store_leave_kb} * 1024")
+math(EXPR gbx_gba_jit_pool_bytes "${gbx_gba_jit_pool_kb} * 1024")
+math(EXPR gbx_gba_jit_store_bytes "${gbx_gba_jit_store_kb} * 1024")
+math(EXPR gbx_gba_jit_store_leave_bytes "${gbx_gba_jit_store_leave_kb} * 1024")
 set(core_definitions GBX_HAS_GB=${gbx_has_gb} GBX_HAS_GBA=${gbx_has_gba}
                      GBX_GB_JIT_STORE_BYTES=${gbx_gb_jit_store_bytes} GBX_GBA_ROM_CACHE_BYTES=${gbx_gba_rom_cache_bytes}
                      GBX_GB_JIT_POOL_BYTES=${gbx_gb_jit_pool_bytes}
                      GBX_GB_JIT_STORE_LEAVE_BYTES=${gbx_gb_jit_store_leave_bytes}
+                     GBX_GBA_JIT_POOL_BYTES=${gbx_gba_jit_pool_bytes}
+                     GBX_GBA_JIT_STORE_BYTES=${gbx_gba_jit_store_bytes}
+                     GBX_GBA_JIT_STORE_LEAVE_BYTES=${gbx_gba_jit_store_leave_bytes}
                      GBX_SINGLE_CORE=${gbx_single_core})
 
 if(ESP_PLATFORM)

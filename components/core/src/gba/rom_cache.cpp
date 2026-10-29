@@ -162,9 +162,12 @@ bool RomCache::open(const char* path, size_t budget, Observe observe, void* cont
             table_[page] = data;
         }
     }
+    // The reader only reads the card, which takes far longer than its stack
+    // in PSRAM costs it.
     if (paged_ && !reader_started_) {
         reader_started_ = request_.initialize(1) && done_.initialize(1) &&
-                          reader_.start(reader_entry, this, platform::current_core() ^ 1, "gbx-rom", 4096, 4);
+                          reader_.start(reader_entry, this, platform::current_core() ^ 1, "gbx-rom", 4096, 4,
+                                        platform::StackMemory::external);
     }
     return true;
 }
@@ -182,7 +185,8 @@ bool RomCache::set_frames(size_t frames) {
     paged_ = frame_count_ < rom_pages_;
     if (paged_ && !reader_started_) {
         reader_started_ = request_.initialize(1) && done_.initialize(1) &&
-                          reader_.start(reader_entry, this, platform::current_core() ^ 1, "gbx-rom", 4096, 4);
+                          reader_.start(reader_entry, this, platform::current_core() ^ 1, "gbx-rom", 4096, 4,
+                                        platform::StackMemory::external);
     }
     return true;
 }

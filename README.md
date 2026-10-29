@@ -2,7 +2,7 @@
 
 English | [简体中文](README_CN.md)
 
-A GB / GBC / GBA emulator for ESP32-P4, ESP32-S31 and ESP32-C5, with an interpreter and RISC-V JIT written from scratch. ESP32-S31 and ESP32-C5 run GB and GBC games only.
+A GB / GBC / GBA emulator for ESP32-P4, ESP32-S31 and ESP32-C5, with an interpreter and RISC-V JIT written from scratch. The ESP32-S31 firmware runs GBA games only, and ESP32-C5 GB and GBC games only.
 
 ## License
 

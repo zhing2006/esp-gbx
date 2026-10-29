@@ -132,8 +132,7 @@ bool Menus::begin(const Parts& parts, const Settings& settings) {
     slot_info_ = info ? new (info) Slots::Info{} : nullptr;
     void* thumbnail = platform::allocate_external(sizeof(Slots::Thumbnail));
     thumbnail_ = thumbnail ? new (thumbnail) Slots::Thumbnail{} : nullptr;
-    thumbnail_pixels_ = static_cast<uint16_t*>(platform::allocate_external(sizeof(uint16_t) * Game::kMaxFramePixels));
-    if (!listing_ || !frame_ || !screen_ || !shown_ || !blank_ || !slot_info_ || !thumbnail_ || !thumbnail_pixels_) {
+    if (!listing_ || !frame_ || !screen_ || !shown_ || !blank_ || !slot_info_ || !thumbnail_) {
         platform::log(platform::LogLevel::error, kTag, "no memory for the menus");
         return false;
     }
@@ -158,9 +157,7 @@ void Menus::end() {
     platform::free_external(slot_info_);
     slot_info_ = nullptr;
     platform::free_external(thumbnail_);
-    platform::free_external(thumbnail_pixels_);
     thumbnail_ = nullptr;
-    thumbnail_pixels_ = nullptr;
     thumbnail_id_ = 0;
     listing_ = nullptr;
     frame_ = nullptr;
@@ -1512,26 +1509,24 @@ bool Menus::send_thumbnail(int slot, uint32_t generation) {
     // once it has.
     if (!parts_.game->slots().thumbnail(slot, *thumbnail_)) return false;
     thumbnail_key_ = key;
-    const Slots::Thumbnail& t = *thumbnail_;
+    // The colors are made in place: a new key fetches the thumbnail again.
+    Slots::Thumbnail& t = *thumbnail_;
 #if GBX_HAS_GBA
     if (t.gba) {
         // A GBA's colors as the game set them, at full size.
-        std::copy_n(t.colors.begin(), gba::kFramePixels, thumbnail_pixels_);
-        parts_.view->set_thumbnail({thumbnail_pixels_, gba::kFramePixels}, gba::kScreenWidth, gba::kScreenHeight);
+        parts_.view->set_thumbnail({t.colors.data(), gba::kFramePixels}, gba::kScreenWidth, gba::kScreenHeight);
         ++thumbnail_id_;
         return true;
     }
 #endif
     if (t.mode == gb::Mode::dmg) {
         // GB mode's shades in the current palette.
-        for (size_t i = 0; i < gb::kFramePixels; ++i)
-            thumbnail_pixels_[i] = key.palette[t.shades[i / 4] >> (i % 4 * 2) & 3];
-    } else {
+        for (size_t i = 0; i < gb::kFramePixels; ++i) t.colors[i] = key.palette[t.shades[i / 4] >> (i % 4 * 2) & 3];
+    } else if (key.color_fix) {
         // The colors as the game set them, shown as COLOR FIX shows them.
-        for (size_t i = 0; i < gb::kFramePixels; ++i)
-            thumbnail_pixels_[i] = key.color_fix ? color_fix(t.colors[i]) : t.colors[i];
+        for (size_t i = 0; i < gb::kFramePixels; ++i) t.colors[i] = color_fix(t.colors[i]);
     }
-    parts_.view->set_thumbnail({thumbnail_pixels_, gb::kFramePixels}, 160, 144);
+    parts_.view->set_thumbnail({t.colors.data(), gb::kFramePixels}, 160, 144);
     ++thumbnail_id_;
     return true;
 }

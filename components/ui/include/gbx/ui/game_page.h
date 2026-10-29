@@ -87,8 +87,11 @@ private:
         lv_draw_buf_t* buffer = nullptr;
         Canvas pixels{};
         // The shell under the cell, copied out of the pack: the pack is in
-        // flash, which a redraw would otherwise read again.
-        uint16_t* shell = nullptr;
+        // flash, which a redraw would otherwise read again. With
+        // GBX_UI_PACK_IN_FLASH it is the pack's background, `shell_stride`
+        // pixels a row.
+        const uint16_t* shell = nullptr;
+        int shell_stride = 0;
         char shown[512] = {};  // the value, unit and lines drawn last
     };
 

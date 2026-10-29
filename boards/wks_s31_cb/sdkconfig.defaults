@@ -18,9 +18,33 @@ CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_ESP_CONSOLE_UART_CUSTOM=y
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 
-# PSRAM budgets for 16 MB, see components/core/Kconfig. The GB JIT's second
-# level: on Sila P4, V-Rally's two instant saves of GB task 5-2 used at most
-# 340 KB of it. The GBA's ROM cache, for a build with the GBA: Golden Sun 2
-# loaded with 5 MiB beside the GBA's core (task 7-1 of the GBA plan).
+# The firmware runs GBA games alone: the GBA's budgets below fit it in this
+# board's internal RAM and PSRAM, see components/core/Kconfig.
+CONFIG_GBX_SYSTEMS_GBA_ONLY=y
+
+# PSRAM budgets for 16 MB. The GB JIT's second level, for a build with the
+# GB: on Sila P4, V-Rally's two instant saves of GB task 5-2 used at most
+# 340 KB of it. The GBA's ROM cache: a larger ROM's cache takes the PSRAM
+# the JIT's second level would get. With 5 MiB
+# Super Robot Taisen OG2 (18 MB) left the second level 512 KB, which
+# dropped blocks the game kept compiling again; 4 MiB leaves it 3 MB with
+# the two settings below.
 CONFIG_GBX_GB_JIT_STORE_KB=2048
-CONFIG_GBX_GBA_ROM_CACHE_KB=5120
+CONFIG_GBX_GBA_ROM_CACHE_KB=4096
+# The ROM list as the C5's, and the VFD drawn from the asset pack in flash
+# rather than from about 640 KB of copies.
+CONFIG_GBX_LIBRARY_ENTRIES=1024
+CONFIG_GBX_LIBRARY_NAMES_KB=64
+CONFIG_GBX_UI_PACK_IN_FLASH=y
+# The GBA's JIT. Internal RAM holds the GBA's
+# execution core and, once a game loads, about 100 KB of its run-time data
+# and the JIT's tables. The interpreter (52 KB), which the JIT runs only
+# for single steps, stays in flash, and the code pool takes its room.
+# The second level takes the PSRAM the game leaves, up to the 4 MB the P4
+# boards give it.
+CONFIG_GBX_GBA_INTERPRETER_IN_FLASH=y
+CONFIG_GBX_GBA_JIT_POOL_KB=128
+CONFIG_GBX_GBA_JIT_STORE_KB=4096
+# The pause menu and the SAVE / LOAD screen took 53 KB of the PSRAM it
+# leaves; writing over a save first copies it, up to 132 KB.
+CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB=256
