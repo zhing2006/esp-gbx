@@ -321,6 +321,7 @@ S31 的片内 SRAM 放不下 GB 和 GBA 两套执行核心，访问 PSRAM 也只
 
 - GB 和 GBC 在 S31 的 2X 档跑到 200%，并修好 LCD underrun 造成的画面错位，见 [7-1](plans/gba/task-7-1.md)。这时 S31 的构建关掉 GBA，片内 RAM 留给 GB 和 GBC。
 - 慧勤智远 S31 CB 改为只编入 GBA。为了让 JIT 的代码池和第二级够用，GBA 的解释器留在 flash，ROM 列表缩小，VFD 改为直接从 flash 里的资源包读字模。
+- 加入乐鑫 ESP32-S31-Korvo-1，只编入 GBA，沿用慧勤智远 S31 CB 的内存预算和 UI 布局。
 
 ### 未尽之事
 

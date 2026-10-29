@@ -14,6 +14,7 @@
 | M5Stack Tab5 | 720×1280 | [idle](m5stack_tab5/idle.png) | [gb](m5stack_tab5/gb.png) | [gbc](m5stack_tab5/gbc.png) | [gba](m5stack_tab5/gba.png) | [home](m5stack_tab5/home.png) | [pause](m5stack_tab5/pause.png) |
 | OSPTEK ESP32-P4C5 | 480×800 | [idle](osptek_p4c5/idle.png) | [gb](osptek_p4c5/gb.png) | [gbc](osptek_p4c5/gbc.png) | [gba](osptek_p4c5/gba.png) | [home](osptek_p4c5/home.png) | [pause](osptek_p4c5/pause.png) |
 | 慧勤智远 ESP32-S31 CB | 480×800 | [idle](wks_s31_cb/idle.png) | [gb](wks_s31_cb/gb.png) | [gbc](wks_s31_cb/gbc.png) | [gba](wks_s31_cb/gba.png) | [home](wks_s31_cb/home.png) | [pause](wks_s31_cb/pause.png) |
+| 乐鑫 ESP32-S31-Korvo-1 | 480×800 | [idle](esp32_s31_korvo_1/idle.png) | [gb](esp32_s31_korvo_1/gb.png) | [gbc](esp32_s31_korvo_1/gbc.png) | [gba](esp32_s31_korvo_1/gba.png) | [home](esp32_s31_korvo_1/home.png) | [pause](esp32_s31_korvo_1/pause.png) |
 | Waveshare ESP32-C5-Touch-LCD-2.8 | 240×320 | [idle](waveshare_c5_lcd28/idle.png) | [gb](waveshare_c5_lcd28/gb.png) | [gbc](waveshare_c5_lcd28/gbc.png) | [gba](waveshare_c5_lcd28/gba.png) | [home](waveshare_c5_lcd28/home.png) | [pause](waveshare_c5_lcd28/pause.png) |
 
 GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。
@@ -22,7 +23,7 @@ Sila P4X 的 6.2 英寸屏幕用横屏布局。它的底图是 `tools/ui/pasteup
 
 OSPTEK ESP32-P4C5 的 4.3 英寸屏幕是 480×800 的竖屏，布局按 JC1060P470 的竖屏布局缩小。游戏窗口和屏幕一样宽，镜片横贯整个屏幕，只在窗口上下露出来。窗口外没有地方露出屏幕不发光的边框，所以 `plate.display_border` 为 0。七个灯在镜片下沿排成一行，VFD 是 2×2 四格。它的底图和 Sila P4X 一样直接使用 `pasteup.py` 拼出的底稿，没有序列号贴纸。
 
-慧勤智远 ESP32-S31 CB 配的 4.3 英寸 RGB 屏同样按 480×800 竖屏使用，`raws/ui/wks_s31_cb/` 复制了 OSPTEK ESP32-P4C5 的底稿和 `spec.json`，只改了板名，所以两块板子的底图和布局相同。
+慧勤智远 ESP32-S31 CB 配的 4.3 英寸 RGB 屏同样按 480×800 竖屏使用，`raws/ui/wks_s31_cb/` 复制了 OSPTEK ESP32-P4C5 的底稿和 `spec.json`，只改了板名，所以两块板子的底图和布局相同。乐鑫 ESP32-S31-Korvo-1 的屏幕也是 4.3 英寸 800×480，`raws/ui/esp32_s31_korvo_1/` 又复制了慧勤智远 ESP32-S31 CB 的这两个文件，只改了板名。
 
 Waveshare ESP32-C5-Touch-LCD-2.8 的 2.8 英寸屏幕是 240×320 的竖屏，布局按慧勤智远 ESP32-S31 CB 的布局缩小一半，`control_scale` 是 0.3。屏幕只有 240 像素宽，放不下 480×320 的窗口，所以游戏窗口是 240×160，游戏画面和菜单都按原大小显示。游戏画面每隔一帧显示一次，见[架构](../architecture.md#显示和触摸)。GB 没有 L/R，屏幕上也没有地方放，所以去掉了 L/R。ESP32-C5 只有一个核，UI 和模拟在同一个核上运行，所以这块板子没有 VFD，固件还打开了 `GBX_UI_STATIC_SHELL`：控件开机时画好以后不再随触摸改变外观，只有 SPEED 拨杆跟着倍速移动，指示灯照常亮灭。七个灯在镜片下沿排成一行。底图直接使用 `pasteup.py` 拼出的底稿。SETTINGS 没有 SCALING 这一行，见 [settings](waveshare_c5_lcd28/settings.png)。
 
@@ -162,7 +163,7 @@ ERR 灯点亮以后不会自己熄灭，要在 ERRORS 页面按 CLEAR。故障�
 
 布局使用板子的逻辑像素坐标，具体位置和缩放以 `board.json` 为准。UI 先绘制，游戏画面独立合成，按 SCALING 选择整数倍最近邻或平滑缩放，UI 不参与游戏像素的混合。游戏画面按游戏窗口放得下的最大整数倍放大。游戏窗口一般是 480×320，GBA 放大 2 倍铺满，GB/GBC 放大 2 倍居中留黑边。Waveshare ESP32-C5-Touch-LCD-2.8 的游戏窗口是 240×160，画面不放大，GB/GBC 居中留黑边。
 
-JC1060P470 的面板是 1024×600，UI 使用竖屏的 600×1024。板子按 USB 口朝下竖着拿，所以 UI 顺时针转 270° 显示在面板上，触摸坐标按同样的方向换算回 UI 坐标。这个方向还没有上板确认。Sila P4X 的面板是 452×1280，UI 使用横屏的 1280×452，同样顺时针转 270° 显示，方向见 [Sila P4X](../boards/sila_p4x.md#显示配置)。Sila P4、Tab5 和 OSPTEK ESP32-P4C5 的 UI 尺寸和面板一致，见 [Sila P4](../boards/sila_p4.md)、[Tab5](../boards/m5stack_tab5.md) 和 [OSPTEK ESP32-P4C5](../boards/osptek_p4c5.md)。慧勤智远 ESP32-S31 CB 的面板是 800×480，按面板扫描方向的右边朝上竖着拿，UI 顺时针转 90° 显示，见 [慧勤智远 ESP32-S31 CB](../boards/wks_s31_cb.md#显示配置)。Waveshare ESP32-C5-Touch-LCD-2.8 的 UI 尺寸和面板一致，都是 240×320，见 [Waveshare ESP32-C5-Touch-LCD-2.8](../boards/waveshare_c5_lcd28.md)。
+JC1060P470 的面板是 1024×600，UI 使用竖屏的 600×1024。板子按 USB 口朝下竖着拿，所以 UI 顺时针转 270° 显示在面板上，触摸坐标按同样的方向换算回 UI 坐标。这个方向还没有上板确认。Sila P4X 的面板是 452×1280，UI 使用横屏的 1280×452，同样顺时针转 270° 显示，方向见 [Sila P4X](../boards/sila_p4x.md#显示配置)。Sila P4、Tab5 和 OSPTEK ESP32-P4C5 的 UI 尺寸和面板一致，见 [Sila P4](../boards/sila_p4.md)、[Tab5](../boards/m5stack_tab5.md) 和 [OSPTEK ESP32-P4C5](../boards/osptek_p4c5.md)。慧勤智远 ESP32-S31 CB 的面板是 800×480，按面板扫描方向的右边朝上竖着拿，UI 顺时针转 90° 显示，见 [慧勤智远 ESP32-S31 CB](../boards/wks_s31_cb.md#显示配置)。乐鑫 ESP32-S31-Korvo-1 的面板也是 800×480，但按面板扫描方向的左边朝上竖着拿，UI 顺时针转 270° 显示，见 [乐鑫 ESP32-S31-Korvo-1](../boards/esp32_s31_korvo_1.md#显示配置)。Waveshare ESP32-C5-Touch-LCD-2.8 的 UI 尺寸和面板一致，都是 240×320，见 [Waveshare ESP32-C5-Touch-LCD-2.8](../boards/waveshare_c5_lcd28.md)。
 
 sprite 的尺寸是画出来的轮廓，包括阴影，不是触摸范围。
 

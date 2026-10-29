@@ -1,0 +1,34 @@
+CONFIG_IDF_TARGET="esp32s31"
+
+# ESP32-S31-WROOM-3 with 16 MB flash and 16 MB octal PSRAM, as on the
+# Waiken-Smart S31 CB. The CPU runs at 320 MHz, as there.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_320=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# JEDEC 46 40 18, an XMC D-series chip; the bootloader sets QE through its
+# default QIO entry. The vendor's factory demo runs it in QIO as well.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+
+# The CP2102N connects the UART port to UART0 (GPIO58/59). The
+# USB-Serial/JTAG PHY sits on GPIO33/34, which carry LCD_R4/R5, so there is
+# no USB console.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# The firmware runs GBA games alone, with the GBA's budgets of the S31 CB,
+# which has the same module and screen size; see
+# boards/wks_s31_cb/sdkconfig.defaults for how they were chosen.
+CONFIG_GBX_SYSTEMS_GBA_ONLY=y
+CONFIG_GBX_GB_JIT_STORE_KB=2048
+CONFIG_GBX_GBA_ROM_CACHE_KB=4096
+CONFIG_GBX_LIBRARY_ENTRIES=1024
+CONFIG_GBX_LIBRARY_NAMES_KB=64
+CONFIG_GBX_UI_PACK_IN_FLASH=y
+CONFIG_GBX_GBA_INTERPRETER_IN_FLASH=y
+CONFIG_GBX_GBA_JIT_POOL_KB=128
+CONFIG_GBX_GBA_JIT_STORE_KB=4096
+CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB=256

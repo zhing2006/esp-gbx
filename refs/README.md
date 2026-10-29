@@ -50,6 +50,7 @@
 
 | 路径 | 内容 | 来源 |
 |---|---|---|
+| `boards/esp32_s31_korvo_1/` | 乐鑫 ESP32-S31-Korvo-1 V1.1 主板和 ESP32-S3-LCD-EV-Board-SUB3 屏板按电路区域裁剪的原理图（`schematic/`），以及乐鑫 BSP 的引脚、RGB 屏时序、GT1151 触摸、TF 卡、ES8389 和 ADC 按键代码与出厂例程的 sdkconfig，整理结果见 `docs/boards/esp32_s31_korvo_1.md` | 乐鑫 dl.espressif.com 上的原理图；espressif/esp-dev-kits，提交 `bd4d4ac18657e73583af3d7c0b0a23c3cddf3735`；校验值见板子文档 |
 | `boards/jc1060p470/` | GUITION JC1060P470 的原理图（`schematic/`）、JD9165 初始化序列（`jd9165-init.dtsi.txt`）和厂商对 BSP 的修改说明（`vendor-readme.txt`），整理结果见 `docs/boards/jc1060p470.md` | 厂商资料包的镜像 cheops/JC1060P470C_I_W，提交 7d6f3ce |
 | `boards/m5stack_tab5/` | M5Stack Tab5 的原理图（`schematic/`，由厂商的 PDF 逐页转成 PNG）、M5Stack 的 ST7121 驱动（`esp_lcd_st7121.c.txt`）和出厂固件的 BSP（`m5stack_tab5.c.txt`），整理结果见 `docs/boards/m5stack_tab5.md` | 原理图来自 M5Stack 文档站，两个源码文件来自 m5stack/M5Tab5-UserDemo，提交 b4e356b |
 | `boards/osptek_p4c5/` | OSPTEK ESP32-P4C5-Module 底板 V1.5 和 4.3 寸 LCD 转接板按电路区域裁剪的原理图（`schematic/`）、IDF 6.1 示例的触摸和 DSI 配置、ST7102 驱动和时序宏、面板初始化序列、屏厂 GX09C 初始化文件，整理结果见 `docs/boards/osptek_p4c5.md` | gitee osptek/esp32-p4c5-module-dev-board，提交 `dacb40fa25d6400bfa2524c4e6d4ecbf11b7fea5`；osptek/tft-4.3-480x800-mipi-st7102，提交 `601868ee4a83271281689be94cb4164c1270076c`；校验值见板子文档 |

@@ -91,7 +91,8 @@ void lend_emulator_core(bool lend);
 
 // Backlight brightness, 0 to 100 percent. The backlight comes on with the
 // first frame shown, at the brightness set by then. False where it cannot be
-// changed, as on the PC; set_brightness() then does nothing. Any task.
+// changed, as on the PC or a screen whose backlight is always on;
+// set_brightness() then does nothing. Any task, after start().
 bool brightness_supported();
 void set_brightness(int percent);
 

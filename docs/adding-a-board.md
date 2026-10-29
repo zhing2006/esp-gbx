@@ -83,7 +83,7 @@ boards/example_board/
 
 板级接口声明在 `components/board/include/gbx/esp/board.h`，正式固件使用名称、初始化、显示和触摸接口，测试固件使用 `name()`、`init()` 和 `sdmmc()`。各函数的职责写在头文件的注释里。可以参照 `boards/sila_p4/board.cpp`：它的屏幕和触摸都直接接在 GPIO 上，不经过 IO 扩展器，是现有板子里最简单的。MIPI DSI 的公共步骤用 `components/board/include/gbx/esp/board_support.h` 里的函数，它们只在有 MIPI DSI 的芯片上编译。RGB 并口屏由板子自己创建 RGB 面板，`display_init()` 返回 `PanelDriver::rgb`，可以参照 `boards/wks_s31_cb/board.cpp`。SPI 屏由板子创建 esp_lcd 的 SPI IO 和面板，`display_init()` 返回 `PanelDriver::spi` 和这个 IO，平台从 IO 的传输完成事件知道什么时候可以再改帧缓冲。平台按低字节在前的 RGB565 发送像素，面板要设成同样的字节序，可以参照 `boards/waveshare_c5_lcd28/board.cpp`。面板不旋转时，平台在片内 RAM 里另外分配两段缓冲，游戏画面从这里发送，不经过帧缓冲；分配不到时退回帧缓冲。分段发送直接发 CASET、RASET、RAMWR 和 RAMWRC，所以面板控制器要支持 MIPI DCS 的 write_memory_continue（3Ch），板子也不能用 `esp_lcd_panel_set_gap()` 给面板设偏移。
 
-如果 UI 的方向和面板的扫描方向不同，在 `display_init()` 返回的旋转方向里写明，由 `components/platform/src/esp/` 旋转画面并换算触摸坐标。触摸坐标范围和面板分辨率不同时，`touch_init()` 返回控制器的坐标范围，平台按比例换算。这两项都要上板确认。
+如果 UI 的方向和面板的扫描方向不同，在 `display_init()` 返回的旋转方向里写明，由 `components/platform/src/esp/` 旋转画面并换算触摸坐标。触摸坐标范围和面板分辨率不同时，`touch_init()` 返回控制器的坐标范围，平台按比例换算。这两项都要上板确认。屏幕的背光只要有电就亮、板子控制不了时，`display_init()` 返回的 `backlight` 设为 false，设置里的 BRIGHTNESS 就不可用。
 
 `name()` 返回日志里显示的板子名。正式固件和测试固件都会在启动时调用一次 `init()`，它只打开电源和共用的总线，初始化失败时返回 `false`，调用方不能继续访问依赖它们的外设。还没有驱动的外设在文档里说明现状，代码里用 TODO 标出，不要让占位代码看起来像已经完成了初始化。
 
@@ -138,7 +138,7 @@ eim run 'idf.py --preset example_board-debug build; exit $LASTEXITCODE' v6.1
 
 检查生成的 sdkconfig 和构建日志，确认 target、芯片修订、主频、flash、PSRAM 和控制台都与预期一致。如果此前用 `menuconfig` 改过配置，保留需要的修改后，把对应的 build 目录移走，再从 defaults 构建一次，避免本地旧配置掩盖遗漏。
 
-ESP-IDF v6.1 把 S31 作为 preview target。每个 preset 的构建目录第一次构建以前，要先用 `idf.py --preset example_board-debug --preview set-target esp32s31` 选择 target，同样通过 EIM 执行；target 设置好以后，普通 build 不需要 `--preview`。现有的 S31 板子是[慧勤智远 ESP32-S31 CB](boards/wks_s31_cb.md)，它的配置只能参考，不能当作 S31 的通用模板。
+ESP-IDF v6.1 把 S31 作为 preview target。每个 preset 的构建目录第一次构建以前，要先用 `idf.py --preset example_board-debug --preview set-target esp32s31` 选择 target，同样通过 EIM 执行；target 设置好以后，普通 build 不需要 `--preview`。现有的 S31 板子是[慧勤智远 ESP32-S31 CB](boards/wks_s31_cb.md)和[乐鑫 ESP32-S31-Korvo-1](boards/esp32_s31_korvo_1.md)，它们的配置只能参考，不能当作 S31 的通用模板。
 
 接好文档里确认的烧录接口，以 debug 固件检查启动。把 `PORT` 换成实际端口；下面两组命令按操作系统选用。
 

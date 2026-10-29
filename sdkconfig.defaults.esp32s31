@@ -14,5 +14,6 @@ CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW=y
 # to the JIT's code pool, so this chip builds the GB alone, whose execution
 # core takes internal RAM instead (docs/plans/gba/task-7-1.md). A board that
 # sets the GBA's budgets in its own sdkconfig.defaults may build the GBA
-# alone instead, as wks_s31_cb does. See components/core/Kconfig.
+# alone instead, as wks_s31_cb and esp32_s31_korvo_1 do. See
+# components/core/Kconfig.
 CONFIG_GBX_SYSTEMS_GB_ONLY=y

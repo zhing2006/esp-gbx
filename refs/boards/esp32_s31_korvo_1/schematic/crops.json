@@ -1,0 +1,168 @@
+{
+  "sources": [
+    {
+      "source": "esp32-s31-korvo-1-schematics.pdf",
+      "sha256": "6841cdb55bc4749376a4309365a0efeb45b2cb4cc882a48008bf592d029ae0ec",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "01-module.png",
+          "page": 3,
+          "rect_points": [
+            7,
+            10,
+            524,
+            288
+          ]
+        },
+        {
+          "file": "02-tf-card.png",
+          "page": 3,
+          "rect_points": [
+            7,
+            291,
+            308,
+            458
+          ]
+        },
+        {
+          "file": "03-lcd-connector.png",
+          "page": 3,
+          "rect_points": [
+            537,
+            321,
+            831,
+            504
+          ]
+        },
+        {
+          "file": "04-boot-reset.png",
+          "page": 3,
+          "rect_points": [
+            537,
+            7,
+            831,
+            154
+          ]
+        },
+        {
+          "file": "05-usb-uart.png",
+          "page": 2,
+          "rect_points": [
+            7,
+            7,
+            543,
+            327
+          ]
+        },
+        {
+          "file": "06-usb-host-power-in.png",
+          "page": 2,
+          "rect_points": [
+            7,
+            330,
+            543,
+            583
+          ]
+        },
+        {
+          "file": "07-power-rails.png",
+          "page": 2,
+          "rect_points": [
+            543,
+            7,
+            831,
+            517
+          ]
+        },
+        {
+          "file": "08-codec.png",
+          "page": 4,
+          "rect_points": [
+            7,
+            7,
+            406,
+            245
+          ]
+        },
+        {
+          "file": "09-amplifiers.png",
+          "page": 4,
+          "rect_points": [
+            7,
+            249,
+            406,
+            517
+          ]
+        },
+        {
+          "file": "10-key-array.png",
+          "page": 4,
+          "rect_points": [
+            406,
+            249,
+            831,
+            471
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SCH_ESP32-S3-LCD-EV-Board-SUB3_V1.1_20230315.pdf",
+      "sha256": "b3e5ceacde87bffa134ff05ebe391a1eea5c693d6097ca2e1e93ad82f252b189",
+      "dpi": 300,
+      "crops": [
+        {
+          "file": "11-sub3-connector.png",
+          "page": 1,
+          "rect_points": [
+            8,
+            8,
+            753,
+            372
+          ]
+        },
+        {
+          "file": "12-sub3-backlight.png",
+          "page": 1,
+          "rect_points": [
+            757,
+            8,
+            1564,
+            372
+          ]
+        },
+        {
+          "file": "13-sub3-lcd-fpc.png",
+          "page": 1,
+          "rect_points": [
+            8,
+            372,
+            626,
+            994
+          ]
+        },
+        {
+          "file": "14-sub3-touch.png",
+          "page": 1,
+          "rect_points": [
+            645,
+            456,
+            1191,
+            687
+          ]
+        },
+        {
+          "file": "15-sub3-low-bits.png",
+          "page": 1,
+          "rect_points": [
+            679,
+            821,
+            1103,
+            909
+          ]
+        }
+      ]
+    }
+  ]
+}

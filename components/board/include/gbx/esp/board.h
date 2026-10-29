@@ -57,12 +57,15 @@ struct Display {
     // PanelDriver::spi: the panel's IO, whose color transfers report their
     // end on on_color_trans_done. The panel takes little-endian RGB565.
     esp_lcd_panel_io_handle_t io = nullptr;
+    // False when the screen's backlight is on whenever the board has power:
+    // set_backlight() does nothing and the settings disable BRIGHTNESS.
+    bool backlight = true;
 };
 
 // Creates the panel with `frame_buffers` RGB565 frame buffers in PSRAM, sends
 // the panel's init sequence if it has one and starts the scanout; an SPI
-// panel has no frame buffers of its own. The backlight stays off. Returns a
-// display with a null panel on failure.
+// panel has no frame buffers of its own. A backlight the board switches
+// stays off. Returns a display with a null panel on failure.
 Display display_init(int frame_buffers);
 
 // Backlight brightness, 0 (off) to 100. The backlight driver's enable pin is

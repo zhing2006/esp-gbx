@@ -39,7 +39,7 @@ MIN_HIT_MM = 10  # thin controls get a margin that makes their hit area at least
 # Nominal panel diagonals in inches, from docs/boards; Sila's is the "4IN"
 # label on its schematic. They turn MIN_HIT_MM into pixels.
 PANEL_INCHES = {"sila_p4": 4.0, "sila_p4x": 6.2, "jc1060p470": 7.0, "m5stack_tab5": 5.0, "osptek_p4c5": 4.3, "wks_s31_cb": 4.3,
-                "waveshare_c5_lcd28": 2.8}
+                "esp32_s31_korvo_1": 4.3, "waveshare_c5_lcd28": 2.8}
 
 HEADER = struct.Struct("<8sIIIII HH32s")
 ENTRY = struct.Struct("<32sIII4x")

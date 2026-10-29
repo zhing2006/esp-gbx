@@ -838,7 +838,8 @@ void set_color_table(const uint16_t* table) {
 }
 
 bool brightness_supported() {
-    return true;
+    // Known once start() has the panel, before the menus ask.
+    return panel.backlight;
 }
 
 void set_brightness(int percent) {

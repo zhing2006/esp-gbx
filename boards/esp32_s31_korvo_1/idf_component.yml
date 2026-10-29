@@ -1,0 +1,6 @@
+## Touch driver for the SUB3 screen's GT1151, which reports touches in the
+## GT911's coordinate registers, see docs/boards/esp32_s31_korvo_1.md. The
+## RGB panel needs no driver of its own.
+dependencies:
+  espressif/esp_lcd_touch: "==1.2.1"
+  espressif/esp_lcd_touch_gt911: "==1.2.1"

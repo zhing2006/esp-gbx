@@ -363,6 +363,68 @@
             }
         },
         {
+            "name": "esp32_s31_korvo_1-debug",
+            "displayName": "Espressif ESP32-S31-Korvo-1, debug",
+            "binaryDir": "build/esp32_s31_korvo_1-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "esp32_s31_korvo_1-release",
+            "displayName": "Espressif ESP32-S31-Korvo-1, release",
+            "binaryDir": "build/esp32_s31_korvo_1-release",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main"
+            }
+        },
+        {
+            "name": "esp32_s31_korvo_1-profile",
+            "displayName": "Espressif ESP32-S31-Korvo-1, release, profiler",
+            "binaryDir": "build/esp32_s31_korvo_1-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "main",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
+            "name": "esp32_s31_korvo_1-test-debug",
+            "displayName": "Espressif ESP32-S31-Korvo-1, test firmware, debug",
+            "binaryDir": "build/esp32_s31_korvo_1-test-debug",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "debug",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "esp32_s31_korvo_1-test-release",
+            "displayName": "Espressif ESP32-S31-Korvo-1, test firmware, release",
+            "binaryDir": "build/esp32_s31_korvo_1-test-release",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device"
+            }
+        },
+        {
+            "name": "esp32_s31_korvo_1-test-profile",
+            "displayName": "Espressif ESP32-S31-Korvo-1, test firmware, release, profiler",
+            "binaryDir": "build/esp32_s31_korvo_1-test-profile",
+            "cacheVariables": {
+                "GBX_BOARD": "esp32_s31_korvo_1",
+                "GBX_BUILD_TYPE": "release",
+                "GBX_APP": "device",
+                "GBX_PROFILER": "ON"
+            }
+        },
+        {
             "name": "waveshare_c5_lcd28-debug",
             "displayName": "Waveshare ESP32-C5-Touch-LCD-2.8, debug",
             "binaryDir": "build/waveshare_c5_lcd28-debug",
