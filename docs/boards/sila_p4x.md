@@ -182,7 +182,7 @@ SC7A20HTR 的 INT1 接 GPIO32，INT2 未接，SDO 和 CS 接 3.3V。7 位 I2C �
 | 6 | AXP_IRQ | 经 HL3400 转换到 3.3V |
 | 7、8 | I2C_SDA0、I2C_SCL0 | codec、SC7A20、摄像头共用 |
 | 9～13 | I2S_DO、WS、DI、BCK、MCK | 11 为录音输入，13 为 MCLK |
-| 14～19 | C5 D0～D3、CLK、CMD | 上游 slot 1，本项目尚未驱动 |
+| 14～19 | C5 D0～D3、CLK、CMD | SDMMC slot 1，项目只用 1-bit 总线 |
 | 20～23 | 主图未接 | 不套用旧板摄像头配置 |
 | 24、25 | SERIAL_DN、SERIAL_DP | 原生 USB-Serial/JTAG |
 | 26 | LCD_RST、TP_RST | 共用低有效复位 |
@@ -201,9 +201,9 @@ SC7A20HTR 的 INT1 接 GPIO32，INT2 未接，SDO 和 CS 接 3.3V。7 位 I2C �
 | 51 | SD_PWRn | 低电平给卡供电 |
 | 52 | SD_CD | 卡检测，暂未使用 |
 | 53 | C5_BOOT，接 C5 GPIO28 | 不是旧板功放使能 |
-| 54 | C5_EN | 项目不操作 C5 复位或烧录 |
+| 54 | C5_EN | ESP-Hosted 用它复位 C5 |
 
-C5 侧 D0～D3、CLK、CMD 分别接 GPIO8、7、14、13、9、10。上游使用 1-bit SDIO，报告其板上的 4-bit D2/D3 存在问题，这不是本项目的实测结论。图纸 GPIO26/27 各有 10kΩ 下拉、BOOT 有 5.1kΩ 上拉、EN 有 10kΩ 上拉和 1µF 电容。U14 引出 3.3V、GND、C5 TXD0、RXD0、EN、BOOT，不用于 P4 烧录。
+C5 侧 D0～D3、CLK、CMD 分别接 GPIO8、7、14、13、9、10。上游使用 1-bit SDIO，报告其板上的 4-bit D2/D3 存在问题，这不是本项目的实测结论。项目同样只用 1-bit 总线：D0 传数据，D1 作中断线，P4 的 GPIO16、17 不用。图纸 GPIO26/27 各有 10kΩ 下拉、BOOT 有 5.1kΩ 上拉、EN 有 10kΩ 上拉和 1µF 电容。U14 引出 3.3V、GND、C5 TXD0、RXD0、EN、BOOT，不用于 P4 烧录。
 
 ## 烧录、恢复与项目边界
 
@@ -213,7 +213,9 @@ C5 侧 D0～D3、CLK、CMD 分别接 GPIO8、7、14、13、9、10。上游使用
 
 恢复完整 Flash 镜像需要使用与这块板子对应的 32MiB 备份文件。
 
-COM 号可能随重插变化。上游固件包含 C5 首刷功能，本项目没有接入这段流程。板级组件提供 SD 电源与 IO 供电、屏幕、触摸和 USB 控制台，音频、PMU 状态、电池、SC7A20、摄像头和 C5 尚未接入。
+COM 号可能随重插变化。上游固件包含 C5 首刷功能，本项目没有接入这段流程，只使用 C5 上已有的固件。板级组件提供 SD 电源与 IO 供电、屏幕、触摸和 USB 控制台，音频、PMU 状态、电池、SC7A20 和摄像头尚未接入。
+
+C5 跑 ESP-Hosted，作为蓝牙手柄的 Controller。P4 上的 ESP-Hosted 3.0.10 报告 C5 固件的主版本号和自己不同，具体版本没有读出；上游配置的注释写的是 ESP-Hosted-MCU 2.12.9。P4 上的 ESP-Hosted 要设成 C5，否则会因为芯片 ID 不符丢掉 C5 的启动事件。
 
 ## 来源
 

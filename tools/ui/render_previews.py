@@ -42,7 +42,7 @@ PREVIEWS = {
 
 # Boards whose firmware is built with the Bluetooth gamepad. Keep in step with
 # their build configuration.
-BLUETOOTH_GAMEPAD = {"jc1060p470"}
+BLUETOOTH_GAMEPAD = {"jc1060p470", "sila_p4x"}
 
 
 class Board:
