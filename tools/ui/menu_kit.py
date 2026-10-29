@@ -1,7 +1,7 @@
 """Draw the menus in the game window, for the design previews.
 
-The menus are pixel art on a 240x160 grid, shown at 2x in a 480x320 window
-and at 1x in a 240x160 one, as SCALE says: the 12 px font, lines
+The menus are pixel art on a 240x160 grid, shown at 2x in a 480x320 window,
+at 3x in a 720x480 one and at 1x in a 240x160 one, as SCALE says: the 12 px font, lines
 and corners all keep the same pixel size. Colors, palettes and icons come from
 assets/ui/common/menu.json and glyphs from menu_font.bin, the same data the
 firmware packs. Each screen function takes a plain description of what the
@@ -34,7 +34,7 @@ CORNERS = {0: [], 1: [1], 2: [2, 1], 3: [3, 1, 1], 4: [4, 2, 1, 1]}
 
 
 def use_scale(scale):
-    """Draw the screens from now on at `scale`, 1 or 2."""
+    """Draw the screens from now on at `scale`, 1, 2 or 3."""
     global SCALE
     SCALE = scale
 
@@ -47,13 +47,15 @@ class Canvas:
         self.pictures = []
 
     def image(self):
-        if SCALE == 1:
+        if SCALE != 2:
             # The grid takes a picture at half size, from the top left pixel
-            # of each 2x2, as the firmware draws it.
+            # of each 2x2, as the firmware draws it; at 3x the picture is
+            # scaled with the grid.
             for x, y, picture in self.pictures:
                 half = np.asarray(picture)[::2, ::2]
                 self.a[y:y + half.shape[0], x:x + half.shape[1]] = half
-            return Image.fromarray(self.a)
+            im = Image.fromarray(self.a)
+            return im if SCALE == 1 else im.resize((W * SCALE, H * SCALE), Image.NEAREST)
         im = Image.fromarray(self.a).resize((W * SCALE, H * SCALE), Image.NEAREST)
         for x, y, picture in self.pictures:
             im.paste(picture, (x * SCALE, y * SCALE))
@@ -61,7 +63,7 @@ class Canvas:
 
     def picture(self, x, y, im):
         """Place `im` at one screen pixel per pixel, its top left on cell (x, y),
-        over whatever the grid draws. At 1x the grid holds it at half size."""
+        over whatever the grid draws. Except at 2x the grid holds it at half size."""
         self.pictures.append((x, y, im.convert("RGB")))
 
     def fill(self, x, y, w, h, color):

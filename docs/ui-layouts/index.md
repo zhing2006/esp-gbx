@@ -12,16 +12,19 @@
 | Sila P4 | 720×720 | [idle](sila_p4/idle.png) | [gb](sila_p4/gb.png) | [gbc](sila_p4/gbc.png) | [gba](sila_p4/gba.png) | [home](sila_p4/home.png) | [pause](sila_p4/pause.png) |
 | JC1060P470 | 600×1024 | [idle](jc1060p470/idle.png) | [gb](jc1060p470/gb.png) | [gbc](jc1060p470/gbc.png) | [gba](jc1060p470/gba.png) | [home](jc1060p470/home.png) | [pause](jc1060p470/pause.png) |
 | M5Stack Tab5 | 720×1280 | [idle](m5stack_tab5/idle.png) | [gb](m5stack_tab5/gb.png) | [gbc](m5stack_tab5/gbc.png) | [gba](m5stack_tab5/gba.png) | [home](m5stack_tab5/home.png) | [pause](m5stack_tab5/pause.png) |
+| M5Stack Tab5，3 倍窗口 | 720×1280 | [idle](m5stack_tab5_x3/idle.png) | [gb](m5stack_tab5_x3/gb.png) | [gbc](m5stack_tab5_x3/gbc.png) | [gba](m5stack_tab5_x3/gba.png) | [home](m5stack_tab5_x3/home.png) | [pause](m5stack_tab5_x3/pause.png) |
 | OSPTEK ESP32-P4C5 | 480×800 | [idle](osptek_p4c5/idle.png) | [gb](osptek_p4c5/gb.png) | [gbc](osptek_p4c5/gbc.png) | [gba](osptek_p4c5/gba.png) | [home](osptek_p4c5/home.png) | [pause](osptek_p4c5/pause.png) |
 | 慧勤智远 ESP32-S31 CB | 480×800 | [idle](wks_s31_cb/idle.png) | [gb](wks_s31_cb/gb.png) | [gbc](wks_s31_cb/gbc.png) | [gba](wks_s31_cb/gba.png) | [home](wks_s31_cb/home.png) | [pause](wks_s31_cb/pause.png) |
 | 乐鑫 ESP32-S31-Korvo-1 | 480×800 | [idle](esp32_s31_korvo_1/idle.png) | [gb](esp32_s31_korvo_1/gb.png) | [gbc](esp32_s31_korvo_1/gbc.png) | [gba](esp32_s31_korvo_1/gba.png) | [home](esp32_s31_korvo_1/home.png) | [pause](esp32_s31_korvo_1/pause.png) |
 | Waveshare ESP32-C5-Touch-LCD-2.8 | 240×320 | [idle](waveshare_c5_lcd28/idle.png) | [gb](waveshare_c5_lcd28/gb.png) | [gbc](waveshare_c5_lcd28/gbc.png) | [gba](waveshare_c5_lcd28/gba.png) | [home](waveshare_c5_lcd28/home.png) | [pause](waveshare_c5_lcd28/pause.png) |
 
-GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。JC1060P470、Sila P4X、OSPTEK ESP32-P4C5 和 Tab5 的固件编入了蓝牙手柄，所以它们的主界面效果图比其他板子多一张 WIRELESS GAMEPAD 卡片。
+GB 效果图点亮了 GB 灯和 INT 灯。GBC 效果图点亮了 GBC 灯和 JIT 灯。GBA 效果图点亮了 GBA、JIT 和 SAVE 灯，速度拨在 2X。未载入游戏时和主界面上，所有灯都不亮，`SPEED` 格显示 `NO ROM`。暂停菜单的效果图保留了游戏中的 GB 灯和 INT 灯，`SPEED` 格显示 `PAUSE`。[states.png](states.png) 在 Tab5 上列出了每个控件、拨杆和指示灯的全部状态。菜单的每个界面和提示框另外按窗口大小输出在 [menus/](menus/) 里，见“菜单”一节。JC1060P470、Sila P4X、OSPTEK ESP32-P4C5 和 Tab5 的固件编入了蓝牙手柄，所以它们的主界面效果图比其他板子多一张 WIRELESS GAMEPAD 卡片，Tab5 的两套布局都有。
 
 Sila P4X 的 6.2 英寸屏幕用横屏布局。它的底图是 `tools/ui/pasteup.py` 按 `raws/ui/sila_p4x/spec.json` 拼出的底稿，直接使用，没有再生成成品底图，也没有序列号贴纸。屏幕和触摸的接线条件见 [Sila P4X 板级文档](../boards/sila_p4x.md#屏幕与触摸)，显示方向和触摸尚未上板确认。
 
 OSPTEK ESP32-P4C5 的 4.3 英寸屏幕是 480×800 的竖屏，布局按 JC1060P470 的竖屏布局缩小。游戏窗口和屏幕一样宽，镜片横贯整个屏幕，只在窗口上下露出来。窗口外没有地方露出屏幕不发光的边框，所以 `plate.display_border` 为 0。七个灯在镜片下沿排成一行，VFD 是 2×2 四格。它的底图和 Sila P4X 一样直接使用 `pasteup.py` 拼出的底稿，没有序列号贴纸。
+
+`m5stack_tab5_x3` 是 Tab5 的另一套布局，游戏窗口是 720×480，和屏幕一样宽，GBA 放大 3 倍铺满。它按慧勤智远 ESP32-S31 CB 的布局放大 1.5 倍排列，VFD 和 L/R 紧贴在镜片下面，`control_scale` 是 0.8，十字键和 A/B 跟在 L/R 下面，和底部的 SELECT/START 之间留出距离，减少误触。底图直接使用 `pasteup.py` 拼出的底稿。Tab5 的固件构建打包的仍是 `m5stack_tab5` 的布局，这套布局还没有接进构建。
 
 慧勤智远 ESP32-S31 CB 配的 4.3 英寸 RGB 屏同样按 480×800 竖屏使用，`raws/ui/wks_s31_cb/` 复制了 OSPTEK ESP32-P4C5 的底稿和 `spec.json`，只改了板名，所以两块板子的底图和布局相同。乐鑫 ESP32-S31-Korvo-1 的屏幕也是 4.3 英寸 800×480，`raws/ui/esp32_s31_korvo_1/` 又复制了慧勤智远 ESP32-S31 CB 的这两个文件，只改了板名。
 
@@ -60,7 +63,7 @@ Waveshare ESP32-C5-Touch-LCD-2.8 的 2.8 英寸屏幕是 240×320 的竖屏，�
 
 ### 网格、字体和配色
 
-菜单画在 240×160 的网格上，在 480×320 的窗口里整体放大 2 倍显示，所以字形、线条和圆角的像素一样大。不直接按 480×320 画，是因为窗口在 Tab5 上只有约 41×28mm，在 Sila P4 上约 48×32mm，12px 的字原样显示只有 1mm 左右高。Waveshare ESP32-C5-Touch-LCD-2.8 的窗口只有 240×160，菜单按原大小显示。
+菜单画在 240×160 的网格上，在 480×320 的窗口里整体放大 2 倍显示，在 720×480 的窗口里放大 3 倍，所以字形、线条和圆角的像素一样大。不直接按 480×320 画，是因为窗口在 Tab5 上只有约 41×28mm，在 Sila P4 上约 48×32mm，12px 的字原样显示只有 1mm 左右高。Waveshare ESP32-C5-Touch-LCD-2.8 的窗口只有 240×160，菜单按原大小显示。
 
 字体是缝合像素字体 12px 比例宽度的简体中文字形版，覆盖拉丁字母、中文、假名和韩文，日文汉字也按简体中文的字形显示。`tools/ui/menu_font.py` 把 `raws/ui/common/fonts/` 里的 BDF 转成 `assets/ui/common/menu_font.bin`，格式写在脚本开头。字体里没有的字符和不合法的 UTF-8 字节，都画成和汉字等宽的空心方框，用户能看出缺了几个字。一行放不下的文字截断，以 `...` 结尾；ROMS 列表里选中的那一行横向滚动，显示全名。
 
@@ -121,7 +124,7 @@ ERR 灯点亮以后不会自己熄灭，要在 ERRORS 页面按 CLEAR。故障�
 
 打开 SAVE / LOAD 时，后台读出 4 个槽位的文件并校验，还没读完的槽位第二行显示 `READING`。光标停在这一局上次存档或读档用过的槽位，没有用过时停在 SLOT 1。B 回到暂停菜单，MENU 和在 SETTINGS 里一样直接回到游戏。触摸时，SAVE 和 LOAD 按钮和列表的行一样，点一次选中，再点一次等于按 A。
 
-缩略图是存档时的那一帧。GB 模式的槽位保存 160×144 的 4 个灰阶，显示时用当前 PALETTE 的颜色，PALETTE 选 COLOR 时用 GRAY。CGB 模式和兼容模式的槽位保存 160×144 的 BGR555，也就是游戏写进调色板 RAM 的颜色，不经过颜色校正，显示时按当前的 COLOR FIX 处理。GBA 的槽位保存 240×160 的 BGR555，COLOR FIX 对 GBA 游戏不起作用，所以按原样显示。缩略图按游戏的一个像素对应屏幕的一个像素来画，不跟着菜单放大 2 倍，所以 GB 的在网格上占 80×72，GBA 的占 120×80。菜单按原大小显示时，网格上只画得下一半大小的缩略图，取每 2×2 像素的左上角那个。空的、损坏的和其他版本的槽位只画一个空框。效果图里暂停的游戏画面和缩略图都是 `preview_scene.py` 的示意图经过翻转、平移得到的，不是模拟器的画面。
+缩略图是存档时的那一帧。GB 模式的槽位保存 160×144 的 4 个灰阶，显示时用当前 PALETTE 的颜色，PALETTE 选 COLOR 时用 GRAY。CGB 模式和兼容模式的槽位保存 160×144 的 BGR555，也就是游戏写进调色板 RAM 的颜色，不经过颜色校正，显示时按当前的 COLOR FIX 处理。GBA 的槽位保存 240×160 的 BGR555，COLOR FIX 对 GBA 游戏不起作用，所以按原样显示。缩略图按游戏的一个像素对应屏幕的一个像素来画，不跟着菜单放大 2 倍，所以 GB 的在网格上占 80×72，GBA 的占 120×80。菜单按原大小显示时，网格上只画得下一半大小的缩略图，取每 2×2 像素的左上角那个。菜单放大 3 倍时也用网格上这个一半大小的缩略图，跟着菜单一起放大。空的、损坏的和其他版本的槽位只画一个空框。效果图里暂停的游戏画面和缩略图都是 `preview_scene.py` 的示意图经过翻转、平移得到的，不是模拟器的画面。
 
 空槽位选 SAVE 以后直接开始写。槽位里已经有文件时要先确认，损坏的和其他版本的槽位也一样。选 SAVE 以后，模拟所在的核复制一份状态，编码和写卡在另一个核上进行，所以这时回到游戏不用等文件写完。QUIT 要等写完，见 dialog-slot-saving。
 
@@ -163,7 +166,7 @@ ERR 灯点亮以后不会自己熄灭，要在 ERRORS 页面按 CLEAR。故障�
 
 ## 坐标和绘制
 
-布局使用板子的逻辑像素坐标，具体位置和缩放以 `board.json` 为准。UI 先绘制，游戏画面独立合成，按 SCALING 选择整数倍最近邻或平滑缩放，UI 不参与游戏像素的混合。游戏画面按游戏窗口放得下的最大整数倍放大。游戏窗口一般是 480×320，GBA 放大 2 倍铺满，GB/GBC 放大 2 倍居中留黑边。Waveshare ESP32-C5-Touch-LCD-2.8 的游戏窗口是 240×160，画面不放大，GB/GBC 居中留黑边。
+布局使用板子的逻辑像素坐标，具体位置和缩放以 `board.json` 为准。UI 先绘制，游戏画面独立合成，按 SCALING 选择整数倍最近邻或平滑缩放，UI 不参与游戏像素的混合。游戏画面按游戏窗口放得下的最大整数倍放大。游戏窗口一般是 480×320，GBA 放大 2 倍铺满，GB/GBC 放大 2 倍居中留黑边。Tab5 的 3 倍布局窗口是 720×480，GBA 和 GB/GBC 都放大 3 倍。Waveshare ESP32-C5-Touch-LCD-2.8 的游戏窗口是 240×160，画面不放大，GB/GBC 居中留黑边。
 
 JC1060P470 的面板是 1024×600，UI 使用竖屏的 600×1024。板子按 USB 口朝下竖着拿，所以 UI 顺时针转 270° 显示在面板上，触摸坐标按同样的方向换算回 UI 坐标。这个方向还没有上板确认。Sila P4X 的面板是 452×1280，UI 使用横屏的 1280×452，同样顺时针转 270° 显示，方向见 [Sila P4X](../boards/sila_p4x.md#显示配置)。Sila P4、Tab5 和 OSPTEK ESP32-P4C5 的 UI 尺寸和面板一致，见 [Sila P4](../boards/sila_p4.md)、[Tab5](../boards/m5stack_tab5.md) 和 [OSPTEK ESP32-P4C5](../boards/osptek_p4c5.md)。慧勤智远 ESP32-S31 CB 的面板是 800×480，按面板扫描方向的右边朝上竖着拿，UI 顺时针转 90° 显示，见 [慧勤智远 ESP32-S31 CB](../boards/wks_s31_cb.md#显示配置)。乐鑫 ESP32-S31-Korvo-1 的面板也是 800×480，但按面板扫描方向的左边朝上竖着拿，UI 顺时针转 270° 显示，见 [乐鑫 ESP32-S31-Korvo-1](../boards/esp32_s31_korvo_1.md#显示配置)。Waveshare ESP32-C5-Touch-LCD-2.8 的 UI 尺寸和面板一致，都是 240×320，见 [Waveshare ESP32-C5-Touch-LCD-2.8](../boards/waveshare_c5_lcd28.md)。
 
@@ -218,6 +221,6 @@ uv run tools/ui/render_previews.py --check
 
 ## 添加板子
 
-1. 在 `raws/ui/<板子>/spec.json` 中定义布局，沿用共用控件和各项状态含义。游戏窗口是 480×320，屏幕宽度不到 480 时用 240×160。没有 VFD 的板子在 `spec.json` 里不写 `vfd`，底稿的 `pasteup` 里也不写 VFD 的 `windows`。
+1. 在 `raws/ui/<板子>/spec.json` 中定义布局，沿用共用控件和各项状态含义。游戏窗口是 480×320，屏幕宽度不到 480 时用 240×160，720 像素宽的屏幕也可以用 720×480。没有 VFD 的板子在 `spec.json` 里不写 `vfd`，底稿的 `pasteup` 里也不写 VFD 的 `windows`。
 2. 准备板子底图。需要拼贴时可用 `tools/ui/pasteup.py`，原始素材保存在对应的 `raws/ui/` 目录。
 3. 运行导出与预览工具，检查屏幕开口、控件、指示灯和 VFD 的位置，再上板确认显示方向与触摸。

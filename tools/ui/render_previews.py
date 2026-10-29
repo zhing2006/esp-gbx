@@ -42,7 +42,7 @@ PREVIEWS = {
 
 # Boards whose firmware is built with the Bluetooth gamepad. Keep in step with
 # their build configuration.
-BLUETOOTH_GAMEPAD = {"jc1060p470", "m5stack_tab5", "osptek_p4c5", "sila_p4x"}
+BLUETOOTH_GAMEPAD = {"jc1060p470", "m5stack_tab5", "m5stack_tab5_x3", "osptek_p4c5", "sila_p4x"}
 
 
 class Board:
@@ -135,12 +135,15 @@ def outputs():
         b = Board(name)
         previews, windows = PREVIEWS, menus
         _, _, w, h = b.m["display"]
-        small = w < 2 * menu_kit.W or h < 2 * menu_kit.H
-        menu_kit.use_scale(1 if small else 2)
-        if small:
+        # The menus fill the game window at a whole scale, as pack_assets.py checks.
+        scale = w // menu_kit.W
+        menu_kit.use_scale(scale)
+        if scale == 1:
             # The menus at 1x; SETTINGS has no SCALING, as frames are not scaled.
             windows = dict(screens() + small_window_screens())
             previews = PREVIEWS | {"settings": dict(PREVIEWS["home"], window="settings-no-scaling")}
+        elif scale != 2:
+            windows = dict(screens())
         if name in BLUETOOTH_GAMEPAD:
             windows = windows | dict(gamepad_home_screens())
         menu_kit.use_scale(2)

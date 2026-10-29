@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "board": "m5stack_tab5_x3",
+  "size": [
+    720,
+    1280
+  ],
+  "control_scale": 0.8,
+  "plate": {
+    "base": "pasteup.png",
+    "blend": [],
+    "soften_vfd": true,
+    "display_border": 0
+  },
+  "display": [
+    0,
+    96,
+    720,
+    480
+  ],
+  "slot": [
+    24,
+    23.2,
+    119.2,
+    25.6
+  ],
+  "lamps": {
+    "gb": [
+      51,
+      598
+    ],
+    "gbc": [
+      101.67,
+      598
+    ],
+    "gba": [
+      152.33,
+      598
+    ],
+    "int": [
+      517.0,
+      598
+    ],
+    "jit": [
+      567.67,
+      598
+    ],
+    "save": [
+      618.33,
+      598
+    ],
+    "err": [
+      669,
+      598
+    ]
+  },
+  "controls": {
+    "dpad": [
+      190.19,
+      1022.47
+    ],
+    "a": [
+      555.7,
+      991.18
+    ],
+    "b": [
+      457.7,
+      1073.44
+    ],
+    "select": [
+      306.87,
+      1205
+    ],
+    "start": [
+      402.41,
+      1205.31
+    ],
+    "l": [
+      92.8,
+      863.4
+    ],
+    "r": [
+      627.2,
+      863.4
+    ],
+    "menu": [
+      654,
+      36
+    ]
+  },
+  "pasteup": {
+    "shell_radii": [
+      21,
+      21,
+      120,
+      21
+    ],
+    "seam_y": 644,
+    "groove_y": 64,
+    "lens": [
+      0,
+      68,
+      720,
+      570
+    ],
+    "lens_radii": [
+      14,
+      14,
+      54,
+      14
+    ],
+    "print_lines": [
+      24,
+      78,
+      696,
+      255,
+      465
+    ],
+    "lamp_r": 5,
+    "dpad": {
+      "center": [
+        190.19,
+        1022.47
+      ],
+      "dish_r": 99.31
+    },
+    "ab_capsule": {
+      "center": [
+        506.7,
+        1032.31
+      ],
+      "length": 232.09,
+      "thick": 113.71,
+      "angle": -40
+    },
+    "pill_wells": [
+      [
+        306.87,
+        1205,
+        77.47,
+        23.87,
+        -25.6
+      ],
+      [
+        402.41,
+        1205.31,
+        77.47,
+        23.87,
+        -25.6
+      ]
+    ],
+    "speaker": [
+      [
+        541.5,
+        1216.88,
+        51.2,
+        7.2,
+        -60
+      ],
+      [
+        557.5,
+        1208.88,
+        51.2,
+        7.2,
+        -60
+      ],
+      [
+        573.5,
+        1200.88,
+        51.2,
+        7.2,
+        -60
+      ],
+      [
+        589.5,
+        1192.88,
+        51.2,
+        7.2,
+        -60
+      ],
+      [
+        605.5,
+        1184.88,
+        51.2,
+        7.2,
+        -60
+      ]
+    ],
+    "logo": {
+      "center": [
+        400,
+        36
+      ],
+      "scale": 0.6
+    },
+    "windows": [
+      {
+        "rect": [
+          6,
+          647,
+          708,
+          192
+        ],
+        "dividers": [
+          [
+            360,
+            659,
+            360,
+            827
+          ],
+          [
+            14,
+            743,
+            706,
+            743
+          ]
+        ]
+      }
+    ]
+  },
+  "vfd": {
+    "cells": {
+      "speed": [
+        12,
+        653,
+        345,
+        88
+      ],
+      "frame": [
+        363,
+        653,
+        345,
+        88
+      ],
+      "audio": [
+        12,
+        745,
+        345,
+        88
+      ],
+      "memory": [
+        363,
+        745,
+        345,
+        88
+      ]
+    },
+    "value_pitch": 4,
+    "unit_pitch": 3,
+    "unit_position": "right",
+    "line_pitch": 2,
+    "formats": {
+      "speed": {
+        "value": "{speed_percent:.0f}",
+        "unit": "%",
+        "lines": [
+          {
+            "text": "EMU {emu_fps:.1f} DRW {drw_fps:.1f}",
+            "row": 0
+          }
+        ]
+      },
+      "frame": {
+        "value": "{frame_work_p95_ms:.1f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "AVG {frame_work_avg_ms:.1f} N {frame_sample_count}",
+            "row": 0
+          }
+        ]
+      },
+      "audio": {
+        "value": "BUF {audio_queue_ms:.0f}",
+        "unit": "ms",
+        "lines": [
+          {
+            "text": "U {audio_underruns_total}(+{audio_underruns_window}) MIN {audio_min_ms:.0f}",
+            "row": 0
+          }
+        ]
+      },
+      "memory": {
+        "value": "{heap_internal_free_kib:.0f}",
+        "unit": "KiB",
+        "lines": [
+          {
+            "text": "PSRAM {heap_psram_free_mib:.1f}M IDLE {idle_core0_percent:.0f} {idle_core1_percent:.0f}",
+            "row": 0
+          }
+        ]
+      }
+    },
+    "value_row": "label"
+  }
+}
