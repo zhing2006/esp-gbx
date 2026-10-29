@@ -34,8 +34,7 @@ CONFIG_GBX_GBA_JIT_STORE_KB=4096
 CONFIG_GBX_GBA_JIT_STORE_LEAVE_KB=256
 
 # A HID gamepad on the USB-A port, whose VBUS switch is on whenever the
-# board has 5 V. No gamepad has been tried on it yet. The USB controller's
-# DMA buffers go to PSRAM; the library takes about 3.5 KB of internal RAM,
-# which the GBA's budgets above leave.
+# board has 5 V. The USB controller's DMA buffers go to PSRAM; the library
+# takes about 3.5 KB of internal RAM, which the GBA's budgets above leave.
 CONFIG_GBX_USB_GAMEPAD=y
 CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM=y

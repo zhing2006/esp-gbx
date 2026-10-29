@@ -265,7 +265,7 @@ P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，
 板子的差异放在 `boards/<板子>/`，描述板上焊了什么：
 
 - 引脚、屏幕和初始化序列、触摸、codec 和 RTC 的型号、按键的接法、电池 ADC 和 LDO 通道。接口声明在 `components/board/include/gbx/esp/board.h`，各板子相同的步骤在 `components/board/src/board_support.cpp`，其中 MIPI DSI 的部分只在有 DSI 的芯片上编译。显示呈现、触摸坐标换算和 SD 挂载由平台实现统一处理。SD 卡接在 SDMMC 控制器上，或者和 SPI 屏共用一条 SPI 总线，由 `board::sdmmc()` 说明；共用总线时，板子在 `init()` 里初始化总线，平台只在上面加一个设备。
-- `sdkconfig.defaults`，写芯片、芯片修订、PSRAM、flash 和主频。P4 v1.x 和 v3.x 要用不同的芯片修订配置编译，所以这些配置跟着板子走。USB host 口能给手柄供 5V 的板子在这里打开 `GBX_USB_GAMEPAD`，手柄有没有在这个口上用过写在板子文档里，见“显示和触摸”。
+- `sdkconfig.defaults`，写芯片、芯片修订、PSRAM、flash 和主频。P4 v1.x 和 v3.x 要用不同的芯片修订配置编译，所以这些配置跟着板子走。USB host 口能给手柄供 5V 的板子在这里打开 `GBX_USB_GAMEPAD`，见“显示和触摸”。
 - 用到的乐鑫组件在 `idf_component.yml` 里列出并锁定版本。
 
 几块板子都可能用到的外设驱动放在 `drivers/`，可以使用乐鑫的组件，因为 AGENTS.md 要求从零编写的只是模拟核心、解释器、JIT 和设备模型。板子的资料整理成 `docs/boards/<板子>.md`，原始资料放在 `refs/boards/<板子>/`。

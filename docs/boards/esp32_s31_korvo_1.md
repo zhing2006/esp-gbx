@@ -154,7 +154,7 @@ TF 卡座 J7 接在 S31 SDMMC slot 0 的 IOMUX 引脚上：CLK GPIO24、CMD GPIO
 
 KEY Array 的四个按键经分压接 GPIO42（BT_ARRAY_ADC，R78 0Ω），R77 10kΩ 上拉到 VCC_3V3。原理图标注的电压是 SET 1.87V、MODE 1.34V、VOL- 0.82V、VOL+ 0.38V，下拉电阻依次是 R79 13kΩ、R80 6.8kΩ、R81 3.3kΩ、R82 1.3kΩ；用户指南把 MODE 写作 PLAY。乐鑫 BSP 用 ADC1 通道 0 读它。项目没有使用这些按键。BOOT 键 SW2 接 GPIO61，RESET 键 SW1 接 EN。
 
-USB-A 口 J2 接模组的 USB_DP、USB_DM（经 R8、R9），VBUS 由 TPS2051C 从 VCC_5V 接出，EN 经 R73 10kΩ 上拉，所以板子有电时 VBUS 就有电。项目在这个口上接 USB 手柄，打开了 `GBX_USB_GAMEPAD`，并用 `CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM` 把 USB 控制器的 DMA 缓冲放在 PSRAM。手柄在这个口上未实测。
+USB-A 口 J2 接模组的 USB_DP、USB_DM（经 R8、R9），VBUS 由 TPS2051C 从 VCC_5V 接出，EN 经 R73 10kΩ 上拉，所以板子有电时 VBUS 就有电。项目在这个口上接 USB 手柄，打开了 `GBX_USB_GAMEPAD`，并用 `CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM` 把 USB 控制器的 DMA 缓冲放在 PSRAM。
 
 摄像头接口 J4 上是 OV3660 模组：D0-D7 为 GPIO46-53，PCLK GPIO54，XCLK GPIO55，VSYNC GPIO56，HREF GPIO57，SCCB 与触摸共用 GPIO0/1。项目不用摄像头。WS2812 的数据线是 GPIO37。
 
@@ -202,7 +202,6 @@ eim run 'esptool --chip esp32s31 -p PORT -b 460800 --no-stub write-flash 0x0 rom
 ## 待确认的硬件约束
 
 - 手上这块板的 PCB 版本没有核对丝印。
-- USB 手柄在 USB-A 口上未实测。
 - 屏幕工作在 SYNC-DE 还是 SYNC 模式，资料里没有写屏上模式脚的接法。
 - ETA1611 的数据手册不在资料里，背光 LED 电流没有算。
 - esptool 列出 300MHz，项目和出厂例程都跑 320MHz，依据待查，和慧勤智远 S31 CB 相同。
