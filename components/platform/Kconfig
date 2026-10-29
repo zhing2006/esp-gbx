@@ -68,7 +68,8 @@ config GBX_USB_GAMEPAD
         A HID gamepad on the board's USB host port presses the keys of
         platform::keys::read(), see src/esp/usb_gamepad.cpp. The USB Host
         Library is in the build only with this option. A board turns it on
-        in boards/<board>/sdkconfig.defaults once a gamepad has worked on
-        its port: not every board's port gives a gamepad 5 V.
+        in boards/<board>/sdkconfig.defaults when its port gives a gamepad
+        5 V, which not every board's does; its board doc says whether a
+        gamepad has worked there.
 
 endmenu
