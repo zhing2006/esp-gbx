@@ -260,7 +260,7 @@ P4 上发布代码时先写回 L1 数据缓存，再使 L1 指令缓存失效，
 
 芯片的差异和板子的差异分开处理。芯片的差异放在 `components/platform/src/esp/`，按 ESP-IDF 的 SOC 能力宏处理，包括可执行内存和缓存同步、双核任务和显示提交。P4 和 S31 都有 PPA 与 2D-DMA，不能用是否有 PPA 区分这两种芯片。
 
-显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。C5 的 `sdkconfig.defaults.esp32c5` 还打开了 `GBX_UI_STATIC_SHELL`，因为 UI 和模拟在同一个核上：游戏页的控件开机画好以后不再随触摸改变外观，只有速度拨杆会动，也不画 VFD。S31 的 RGB 屏一边扫描一边由 DMA 从 PSRAM 读帧缓冲，LVGL 画界面和 PPA 画游戏帧同时进行时，DMA 会取数不及，所以 `sdkconfig.defaults.esp32s31` 打开 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`：present 任务画游戏帧时也拿着 LVGL 锁。
+显示后端在构建时按 SoC 选择，开关是 `CONFIG_GBX_DISPLAY_ACCEL`，配置在 `sdkconfig.defaults.<target>`。ESP32-P4 和 ESP32-S31 用 PPA 和 2D-DMA 的加速后端（`display_accel.cpp`），默认缩放为 SMOOTH；ESP32-C5 这类没有它们的目标用 CPU 后端（`display_cpu.cpp`），只有 NEAREST，构建里不能引入 PPA 和 2D-DMA 的依赖。两种后端不会一起编入固件。C5 的 `sdkconfig.defaults.esp32c5` 还打开了 `GBX_UI_STATIC_SHELL`，因为 UI 和模拟在同一个核上：游戏页的控件开机画好以后不再随触摸改变外观，只有速度拨杆会动，也不画 VFD。S31 的 RGB 屏一边扫描一边由 DMA 从 PSRAM 读帧缓冲，LVGL 画界面和 PPA 画游戏帧同时进行时，DMA 会取数不及，所以 `sdkconfig.defaults.esp32s31` 打开 `CONFIG_GBX_DISPLAY_LOCK_GAME_DRAW`：present 任务画游戏帧时也拿着 LVGL 锁。M5Stack Tab5 的 DSI 屏用 3x 布局时也报过 underrun，画面闪了一下，所以 Tab5 的 `GBX_TAB5_X3_LAYOUT` 会选上这个开关，2x 布局和其它 P4 板子不打开它。
 
 板子的差异放在 `boards/<板子>/`，描述板上焊了什么：
 

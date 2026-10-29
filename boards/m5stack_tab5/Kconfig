@@ -3,10 +3,15 @@ menu "M5Stack Tab5"
 config GBX_TAB5_X3_LAYOUT
     bool "UI layout with a 3x game window"
     default n
+    select GBX_DISPLAY_LOCK_GAME_DRAW
     help
         The asset pack is built from assets/ui/m5stack_tab5_x3, whose
         720x480 game window is as wide as the screen and shows GBA frames
         at 3x. Without it the pack takes assets/ui/m5stack_tab5, with a
         480x320 window at 2x. See docs/ui-layouts/index.md.
+
+        With this layout the DSI panel underran, and the picture flashed,
+        so the present task holds the LVGL lock while it draws a game
+        frame, see GBX_DISPLAY_LOCK_GAME_DRAW.
 
 endmenu

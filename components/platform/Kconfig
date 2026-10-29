@@ -15,11 +15,13 @@ config GBX_DISPLAY_LOCK_GAME_DRAW
     default n
     help
         The present task holds the LVGL lock while it draws a game frame,
-        as it does while it copies the UI. An RGB panel's DMA reads the
-        frame buffer from PSRAM while the panel scans out; on the
-        ESP32-S31 it underran, and the picture shifted, when LVGL drew
-        while the PPA drew a game frame. LVGL's changes then show after
-        the frame.
+        as it does while it copies the UI. LVGL's changes then show after
+        the frame. An RGB or DSI panel's DMA reads the frame buffer from
+        PSRAM while the panel scans out. On the ESP32-S31 it underran, and
+        the picture shifted, when LVGL drew while the PPA drew a game
+        frame, and sdkconfig.defaults.esp32s31 turns it on. The M5Stack
+        Tab5's DSI panel underran too with the 3x layout, and the picture
+        flashed, so GBX_TAB5_X3_LAYOUT selects it.
 
 config GBX_DISPLAY_GAME_HALF_RATE
     bool "Show every other game frame"
