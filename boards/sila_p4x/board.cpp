@@ -140,9 +140,9 @@ Display display_init(int frame_buffers) {
         ESP_LOGE(kTag, "AXS15260D: %s", esp_err_to_name(err));
         return {};
     }
-    // The UI is landscape, 1280 x 452, turned the way the AIBox's USB screen
-    // turns its image: UI (x, y) = (1279 - panel y, panel x).
-    return {.panel = panel, .width = kWidth, .height = kHeight, .rotation = Rotation::cw270};
+    // The UI is landscape, 1280 x 452, rotated clockwise by 90 degrees:
+    // UI (x, y) = (panel y, 451 - panel x).
+    return {.panel = panel, .width = kWidth, .height = kHeight, .rotation = Rotation::cw90};
 }
 
 void set_backlight(int percent) {
