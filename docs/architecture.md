@@ -338,7 +338,7 @@ app 里另外几部分：
 
 ## 构建
 
-仓库里的 PNG 和 PDF 用 Git LFS 保存，规则写在 `.gitattributes` 里。clone 之前要先安装 Git LFS，并运行一次 `git lfs install`，否则检出的图片只是几行文本的指针文件。
+仓库里的 PNG、JPEG 和 PDF 用 Git LFS 保存，规则写在 `.gitattributes` 里。clone 之前要先安装 Git LFS，并运行一次 `git lfs install`，否则检出的图片只是几行文本的指针文件。
 
 仓库根目录是 ESP-IDF 工程，用 `CMakePresets.json` 里的 preset 选择板子、构建类型和要编译的程序：
 
