@@ -11,7 +11,7 @@ The firmware has:
 - An interpreter and a JIT that translates SM83 and ARM7TDMI code to RISC-V. The interpreter is the correctness baseline and the JIT's fallback, and the CPU setting switches between them.
 - Cartridge saves, the clock of MBC3 and GBA cartridges with an RTC, and four instant-save slots per game. Cartridge saves are written in turn to two files, so a power cut while writing leaves the previous save intact.
 - A home screen and a pause menu. The settings cover volume, backlight, execution backend, palette, GBC colour correction and scaling, and are kept on the card.
-- A touch UI drawn as a handheld, with on-screen buttons and a speed lever for 1X and 2X; 2X mutes the sound. Boards with the ports for them also take USB HID gamepads and Bluetooth LE HID gamepads.
+- A touch UI drawn as a handheld, with on-screen buttons and a speed lever for 1X and 2X; 2X mutes the sound. Boards with the ports for them also take USB HID gamepads, such as the PS5 DualSense controller, and Bluetooth LE HID gamepads, such as the Xbox Wireless Controller of the Xbox Series X|S; see [Gamepads](#gamepads).
 
 Tests run on the board, on the interpreter and on the JIT alike, with [SingleStepTests](https://github.com/SingleStepTests) and third-party test ROMs, each judged by its suite's own criteria; see [docs/hardware-testing.md](docs/hardware-testing.md). The PC build in `host/` runs the same menus with the interpreter only, for development and debugging.
 
@@ -103,6 +103,12 @@ Preset `sila_p4x`. ESP32-P4 v3.2 with 32 MB of PSRAM and 32 MB of flash. The 6.2
 ### Espressif ESP32-S31-Korvo-1
 
 Preset `esp32_s31_korvo_1`. ESP32-S31-WROOM-3 with 16 MB of octal PSRAM. The kit's screen is the ESP32-S3-LCD-EV-Board-SUB3, a 4.3″ 800×480 RGB screen with an ST7262E43 driver and GT1151 touch, turned to portrait. Its backlight is on whenever the board has power and cannot be dimmed, so BRIGHTNESS is unavailable. The ES8389 drives two speakers in stereo. The USB-A port takes a HID gamepad. The firmware builds the GBA alone.
+
+## Gamepads
+
+The USB-A port takes HID gamepads; the PS5 DualSense controller has been tested on it. Xbox controllers on USB use XInput or GIP, which the firmware does not support. Bluetooth LE gamepads are paired from WIRELESS GAMEPAD on the home screen; the Xbox Wireless Controller of the Xbox Series X|S (model 1914) has been tested. Other gamepads have not been tested. The board table lists which boards take which kind.
+
+Buttons map by position: the right face button is A and the bottom one is B. L1 or LB and R1 or RB are L and R, Options or Menu is Start, Create or View is Select, and the PS or Xbox button is MENU.
 
 ## Flashing a release
 

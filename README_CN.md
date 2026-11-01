@@ -11,7 +11,7 @@ esp-gbx 是在 ESP32-P4、ESP32-S31 和 ESP32-C5 上运行的 GB / GBC / GBA 模
 - 解释器，以及把 SM83 和 ARM7TDMI 代码翻译成 RISC-V 的 JIT。解释器是正确性的基线，也是 JIT 的回退路径，设置里的 CPU 一项在两者之间切换。
 - 卡带存档、带 RTC 的 MBC3 和 GBA 卡带的时钟，以及每个游戏 4 个即时存档槽位。卡带存档轮流写进两个文件，所以写到一半掉电时，上一份存档还在。
 - 主界面和暂停菜单。设置包括音量、背光亮度、执行后端、调色板、GBC 画面的颜色校正和缩放方式，保存在卡上。
-- 画成掌机样子的触摸界面，有屏幕按键和 1X、2X 两档的速度拨杆，2X 时关闭声音。有相应接口的板子还可以用 USB HID 手柄和蓝牙 LE HID 手柄。
+- 画成掌机样子的触摸界面，有屏幕按键和 1X、2X 两档的速度拨杆，2X 时关闭声音。有相应接口的板子还可以用 USB HID 手柄，比如 PS5 的 DualSense 手柄，以及蓝牙 LE HID 手柄，比如 Xbox Series X|S 的 Xbox 无线控制器，见[手柄](#手柄)。
 
 测试在板子上运行，解释器和 JIT 都要跑。用例来自 [SingleStepTests](https://github.com/SingleStepTests) 和第三方测试 ROM，每个测试按所属套件自己的判据判断，见[真机测试计划](docs/hardware-testing.md)。`host/` 下的 PC 版有和固件相同的菜单，但是只有解释器，用来开发和调试。
 
@@ -103,6 +103,12 @@ preset 是 `sila_p4x`。ESP32-P4 v3.2，32MB PSRAM，32MB flash。屏幕是 6.2 
 ### 乐鑫 ESP32-S31-Korvo-1
 
 preset 是 `esp32_s31_korvo_1`。ESP32-S31-WROOM-3，16MB 八线 PSRAM。套件里的屏幕是 ESP32-S3-LCD-EV-Board-SUB3，4.3 寸 800×480 RGB，显示驱动是 ST7262E43，触摸是 GT1151，转成竖屏使用。板子有电时背光就亮着，不能调光，所以设置里的 BRIGHTNESS 不可用。ES8389 驱动左右两个喇叭，是立体声。USB-A 口可以接 HID 手柄。固件只编入 GBA。
+
+## 手柄
+
+USB-A 口可以接 HID 手柄，PS5 的 DualSense 手柄在上面测试过。Xbox 手柄接 USB 时用的是 XInput 或 GIP 协议，固件不支持。蓝牙 LE 手柄在主界面的 WIRELESS GAMEPAD 里配对，Xbox Series X|S 的 Xbox 无线控制器（型号 1914）测试过。其他手柄还没有测试过。哪些板子能接哪种手柄，见上面板子的表。
+
+按键按物理位置对应：右边的面键是 A，下边的面键是 B。L1 或 LB、R1 或 RB 是 L 和 R，Options 或菜单键是 Start，Create 或 View 键是 Select，PS 键或 Xbox 键是 MENU。
 
 ## 烧录发布的固件
 

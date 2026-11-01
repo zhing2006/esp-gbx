@@ -17,7 +17,7 @@ The firmware has:
 - An interpreter and a RISC-V JIT; the CPU setting switches between them.
 - Cartridge saves, the clock of MBC3 and GBA cartridges with an RTC, and four instant-save slots per game.
 - A home screen, a pause menu and settings, which are kept on the SD card.
-- A touch UI with on-screen buttons and a speed lever for 1X and 2X. Boards with the ports for them also take USB HID or Bluetooth LE HID gamepads; the README lists which board takes which.
+- A touch UI with on-screen buttons and a speed lever for 1X and 2X. Boards with the ports for them also take USB HID gamepads, tested with the PS5 DualSense controller, or Bluetooth LE HID gamepads, tested with the Xbox Wireless Controller of the Xbox Series X|S; the README lists which board takes which.
 
 Each board has one complete firmware, `esp-gbx-v0.1.0-<board>.bin`, with the bootloader, the partition table, the app and the UI assets, written at 0x0; see [Flashing a release](https://github.com/zhing2006/esp-gbx/blob/v0.1.0/README.md#flashing-a-release) in the README. A P4 firmware runs only on the chip revisions it was built for: those of `jc1060p470`, `m5stack_tab5` and `sila_p4` on v1.x, those of `osptek_p4c5` and `sila_p4x` on v3.x. `SHA256SUMS` lists the SHA-256 of each firmware.
 
