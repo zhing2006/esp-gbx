@@ -1,6 +1,6 @@
 # 产品设计
 
-esp-gbx 是运行在自制掌机上的 GB、GBC 和 GBA 模拟器，主控用 ESP32-P4 和 ESP32-S31。掌机从 SD 卡直接加载 ROM，不需要先在电脑上转换。项目要让游戏以原速运行、音画同步、卡带存档可靠，并做出可以复用的 RISC-V JIT。
+esp-gbx 是运行在自制掌机上的 GB、GBC 和 GBA 模拟器，主控用 ESP32-P4、ESP32-S31 和 ESP32-C5。掌机从 SD 卡直接加载 ROM，不需要先在电脑上转换。项目要让游戏以原速运行、音画同步、卡带存档可靠，并做出可以复用的 RISC-V JIT。
 
 模拟核心、解释器、JIT 和设备模型都依据硬件规格和指令集文档从零编写，不采用、也不移植现有模拟器的实现。第三方的测试用例、测试 ROM 和它们的预期结果可以拿来检查指令、设备时序和画面是否正确。
 
@@ -56,23 +56,23 @@ GBA 的 CPU 和设备时序一起实现。CPU 部分覆盖 ARM 和 Thumb 指令�
 
 ## 目标平台
 
-两个平台从架构设计开始就同等支持，各自适配自己的硬件能力。但是 ESP32-S31 的片内 SRAM 放不下 GB 和 GBA 两套执行核心，所以它的固件只编入一个系统：现在的板子只跑 GBA，GBA 的解释器留在 flash，片内 RAM 给 JIT 代码池，见[路线图](roadmap.md)的里程碑 7。两块板子的到货时间和 SDK 的支持进度可以不同，不要求同一天交付。
+三个平台共用同一套架构，各自适配自己的硬件能力，ESP32-P4 和 ESP32-S31 从架构设计开始就同等支持。但是 ESP32-S31 的片内 SRAM 放不下 GB 和 GBA 两套执行核心，所以它的固件只编入一个系统：现在的板子只跑 GBA，GBA 的解释器留在 flash，片内 RAM 给 JIT 代码池，见[路线图](roadmap.md)的里程碑 7。ESP32-C5 只有一个高性能核，片内 SRAM 也比另外两个少，所以它的固件只编入 GB 和 GBC，UI 和模拟在同一个核上运行，见[架构](architecture.md#板子)。各平台板子的到货时间和 SDK 的支持进度可以不同，不要求同一天交付。
 
-| 项目 | ESP32-P4 v3.x | ESP32-S31 |
-|---|---|---|
-| HP CPU | 双核 RISC-V，最高 400MHz | 双核 RISC-V，最高 320MHz |
-| L1 指令缓存 | 16KB | 每核 32KB |
-| HP 片内内存 | 768KB L2MEM + 8KB SPM | 512KB SRAM |
-| PSRAM 接口上限 | 16 位 DDR，250MHz | 8 位 DDR，250MHz |
-| 目标配置 | ESP32-P4NRW32X，32MB PSRAM | ESP32-S31NRV32，32MB PSRAM |
+| 项目 | ESP32-P4 v3.x | ESP32-S31 | ESP32-C5 |
+|---|---|---|---|
+| HP CPU | 双核 RISC-V，最高 400MHz | 双核 RISC-V，最高 320MHz | 单核 RISC-V，最高 240MHz |
+| L1 指令缓存 | 16KB | 每核 32KB | 32KB，指令和数据共用 |
+| HP 片内内存 | 768KB L2MEM + 8KB SPM | 512KB SRAM | 384KB SRAM |
+| PSRAM 接口上限 | 16 位 DDR，250MHz | 8 位 DDR，250MHz | Quad SPI 或 QPI |
+| 目标配置 | ESP32-P4NRW32X，32MB PSRAM | ESP32-S31NRV32，32MB PSRAM | ESP32-C5HR8，封装内 8MB PSRAM |
 
-表中是硬件规格的上限。S31 的 PSRAM 接口只有 P4 的一半宽，所以理论峰值带宽大约是 P4 的一半，但是不能拿它直接推算模拟器的速度。P4 的 L2MEM 还要划出一部分给 L2 缓存、系统和固件使用。来源：[P4 数据手册](https://documentation.espressif.com/esp32-p4_datasheet_en.html)、[S31 数据手册](https://documentation.espressif.com/esp32-s31_datasheet_en.html)、[S31 接口规格](https://www.espressif.com/en/products/socs/esp32-s31)、[P4 内存分配说明](https://documentation.espressif.com/en/PCN202600801_ESP32-P4_Chip_Revision_v3.2_Upgrade_Chip_Revision_v1.3_Demand_Collection_and_EOL_Plan_Description.html)。
+表中是硬件规格的上限。S31 的 PSRAM 接口只有 P4 的一半宽，所以理论峰值带宽大约是 P4 的一半，但是不能拿它直接推算模拟器的速度。P4 的 L2MEM 还要划出一部分给 L2 缓存、系统和固件使用。C5 的手册没有写 PSRAM 接口的频率上限，项目用的是 ESP-IDF v6.1 给 C5 提供的最高一档 120MHz。来源：[P4 数据手册](https://documentation.espressif.com/esp32-p4_datasheet_en.html)、[S31 数据手册](https://documentation.espressif.com/esp32-s31_datasheet_en.html)、[C5 数据手册](https://documentation.espressif.com/esp32-c5_datasheet_en.html)、[S31 接口规格](https://www.espressif.com/en/products/socs/esp32-s31)、[P4 内存分配说明](https://documentation.espressif.com/en/PCN202600801_ESP32-P4_Chip_Revision_v3.2_Upgrade_Chip_Revision_v1.3_Demand_Collection_and_EOL_Plan_Description.html)。
 
-本文参考的 S31 数据手册是 Pre-release v0.5，P4 手册也标着预发布，所以开发时要固定芯片修订、SDK 版本和勘误清单。SDK 用 ESP-IDF v6.1。在这个版本里 ESP32-S31 还是 preview target，选择它时要给 `idf.py` 加 `--preview`。
+本文参考的 S31 数据手册是 Pre-release v0.5，P4 手册也标着预发布，所以开发时要固定芯片修订、SDK 版本和勘误清单。C5 参考的是数据手册 v1.5。SDK 用 ESP-IDF v6.1。在这个版本里 ESP32-S31 还是 preview target，选择它时要给 `idf.py` 加 `--preview`。
 
 P4 旧版 v1.x 最高只有 360MHz，不作为本项目的性能基线。v3.x 把封装引脚 54 改成了 VDD_HP_1，PCB 必须按对应的版本设计。这里说的是封装脚号，不是 GPIO54。见 [v3.x 修订差异](https://documentation.espressif.com/esp32-p4-chip-revision-v3.x_user_guide_en.pdf)。
 
-两者的基础指令集都是 RV32IMAFC，手册还列出了 Zc（Zcb、Zcmp、Zcmt）、Zb、XespV 和 XespLoop 扩展。公共的 JIT 后端按构建选定的芯片修订，只使用上板核对过的扩展指令：P4 v1.3 没有 Zba、Zbb、Zbs，v3.2 有，核对结果见[任务 5-2](plans/gb/task-5-2.md#扩展指令的核对)；S31 还没有核对。缓存同步、可执行内存、DMA 和外设由各平台的适配层处理。
+P4 和 S31 的基础指令集都是 RV32IMAFC，手册还列出了 Zc（Zcb、Zcmp、Zcmt）、Zb、XespV 和 XespLoop 扩展。C5 的基础指令集是 RV32IMAC，没有 F 扩展，手册列出的扩展是 Zc（Zcb、Zcmp、Zcmt）和 Xhwlp，没有 Zb。公共的 JIT 后端按构建选定的芯片修订，只使用上板核对过的扩展指令：P4 v1.3 没有 Zba、Zbb、Zbs，v3.2 有，核对结果见[任务 5-2](plans/gb/task-5-2.md#扩展指令的核对)；S31 还没有核对。所以 JIT 只在 P4 v3.x 上使用这几条指令。缓存同步、可执行内存、DMA 和外设由各平台的适配层处理。
 
 ## 掌机硬件
 
@@ -157,7 +157,7 @@ EEPROM 要实现 512B 和 8KiB 两种容量，Flash 要实现不同的容量、�
 
 ### 双核分工
 
-一个核心负责 CPU 和关键时序，另一个核心按实际耗时承担图形合成、混音等工作。两个核心之间用按扫描线或片段划分的任务队列交接工作。每个任务带上对应的寄存器状态和必要的显存快照或版本号，并且保留行中修改的事件，这样另一个核心不会读到已经变化的实时状态。显示提交和 I2S 传输主要交给 DMA，负载轻时也可以只用一个核心计算。
+一个核心负责 CPU 和关键时序，另一个核心按实际耗时承担图形合成、混音等工作。两个核心之间用按扫描线或片段划分的任务队列交接工作。每个任务带上对应的寄存器状态和必要的显存快照或版本号，并且保留行中修改的事件，这样另一个核心不会读到已经变化的实时状态。显示提交和 I2S 传输主要交给 DMA，负载轻时也可以只用一个核心计算。ESP32-C5 只有一个核，模拟任务交出扫描线任务或声音任务时就地处理掉，见[架构](architecture.md)。
 
 ### 内存布局
 
@@ -165,7 +165,7 @@ EEPROM 要实现 512B 和 8KiB 两种容量，Flash 要实现不同的容量、�
 
 ### 平台接口
 
-模拟核心不依赖 ESP-IDF。屏幕、I2S、按键、SD 卡和 RTC 都通过平台接口访问，所以同一个核心既能在 PC 上调试，也能在两个主控上共用。
+模拟核心不依赖 ESP-IDF。屏幕、I2S、按键、SD 卡和 RTC 都通过平台接口访问，所以同一个核心既能在 PC 上调试，也能在各个主控上共用。
 
 ## 正确性验证
 
