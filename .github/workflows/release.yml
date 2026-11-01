@@ -65,6 +65,9 @@ jobs:
 
       - name: Fetch the UI assets from Git LFS
         run: |
+          # The checkout belongs to the runner's user, not to the container's
+          # root, and checkout marks it safe only in a temporary HOME.
+          git config --global --add safe.directory "$PWD"
           git lfs install --local
           git lfs pull --include="assets/ui/**"
 
