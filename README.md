@@ -104,6 +104,16 @@ Preset `sila_p4x`. ESP32-P4 v3.2 with 32 MB of PSRAM and 32 MB of flash. The 6.2
 
 Preset `esp32_s31_korvo_1`. ESP32-S31-WROOM-3 with 16 MB of octal PSRAM. The kit's screen is the ESP32-S3-LCD-EV-Board-SUB3, a 4.3″ 800×480 RGB screen with an ST7262E43 driver and GT1151 touch, turned to portrait. Its backlight is on whenever the board has power and cannot be dimmed, so BRIGHTNESS is unavailable. The ES8389 drives two speakers in stereo. The USB-A port takes a HID gamepad. The firmware builds the GBA alone.
 
+## Flashing a release
+
+Each [GitHub release](https://github.com/zhing2006/esp-gbx/releases) has a complete firmware for every board, `esp-gbx-<version>-<board>.bin`, with the bootloader, the partition table, the app and the UI assets in one image. Write it at 0x0 with the esptool of ESP-IDF v6.1:
+
+```
+esptool --chip esp32p4 -p <port> -b 460800 write-flash 0x0 esp-gbx-v0.1.0-sila_p4.bin
+```
+
+The chip is `esp32p4`, `esp32s31` or `esp32c5`, and the S31 boards also need `--no-stub` before `write-flash`. A P4 firmware runs only on the chip revisions it was built for: those of `jc1060p470`, `m5stack_tab5` and `sila_p4` on v1.x, those of `osptek_p4c5` and `sila_p4x` on v3.x. `SHA256SUMS` in the release lists the images' SHA-256. What each release changes is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Building
 
 The PNG, JPEG and PDF files are kept in Git LFS: install Git LFS and run `git lfs install` before cloning.

@@ -1,0 +1,131 @@
+# Builds the release firmware of every board under boards/ when a version tag
+# such as v0.1.0 is pushed, and publishes them in a GitHub release whose notes
+# are the tag's section of CHANGELOG.md (tools/release_notes.py). A tag with a
+# hyphen, such as v0.2.0-rc1, publishes a pre-release. Run by hand, the
+# workflow only builds, and the firmware stays in the run's artifacts.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Check out LFS pointers only; the build fetches the LFS files it needs.
+  GIT_LFS_SKIP_SMUDGE: "1"
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      boards: ${{ steps.boards.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: List the boards
+        id: boards
+        run: |
+          boards=$(for dir in boards/*/; do
+            [ -f "$dir/sdkconfig.defaults" ] && basename "$dir"
+          done | jq -R . | jq -sc .)
+          echo "boards=$boards" >> "$GITHUB_OUTPUT"
+
+      # Checked before the builds, so that a tag without notes fails early.
+      - name: Take the release notes from CHANGELOG.md
+        if: github.ref_type == 'tag'
+        run: python3 tools/release_notes.py "$GITHUB_REF_NAME" > release-notes.md
+
+      - uses: actions/upload-artifact@v7
+        if: github.ref_type == 'tag'
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The ESP-IDF release the project builds with, see AGENTS.md
+    container: espressif/idf:v6.1
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.setup.outputs.boards) }}
+    steps:
+      # The UI asset pack is built with uv; the image has curl and git-lfs.
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/0.13.6/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
+
+      - uses: actions/checkout@v7
+
+      - name: Fetch the UI assets from Git LFS
+        run: |
+          git lfs install --local
+          git lfs pull --include="assets/ui/**"
+
+      - name: Build ${{ matrix.board }}
+        shell: bash
+        env:
+          BOARD: ${{ matrix.board }}
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          preset="$BOARD-release"
+          # ESP32-S31 is a preview target in ESP-IDF v6.1: a build directory
+          # selects it once with --preview before its first build.
+          if grep -q '^CONFIG_IDF_TARGET="esp32s31"' "boards/$BOARD/sdkconfig.defaults"; then
+            idf.py --preset "$preset" --preview set-target esp32s31
+          fi
+          idf.py --preset "$preset" build
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="${GITHUB_SHA::7}"
+          fi
+          # One image to write at 0x0: bootloader, partition table, OTA data,
+          # app and UI assets, everything flash_args lists.
+          mkdir -p dist
+          idf.py --preset "$preset" merge-bin -o "$PWD/dist/esp-gbx-$version-$BOARD.bin"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.board }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  release:
+    needs: [setup, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: firmware-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum *.bin > SHA256SUMS)
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "esp-gbx $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            "${prerelease[@]}"

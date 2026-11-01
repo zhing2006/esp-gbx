@@ -104,6 +104,16 @@ preset 是 `sila_p4x`。ESP32-P4 v3.2，32MB PSRAM，32MB flash。屏幕是 6.2 
 
 preset 是 `esp32_s31_korvo_1`。ESP32-S31-WROOM-3，16MB 八线 PSRAM。套件里的屏幕是 ESP32-S3-LCD-EV-Board-SUB3，4.3 寸 800×480 RGB，显示驱动是 ST7262E43，触摸是 GT1151，转成竖屏使用。板子有电时背光就亮着，不能调光，所以设置里的 BRIGHTNESS 不可用。ES8389 驱动左右两个喇叭，是立体声。USB-A 口可以接 HID 手柄。固件只编入 GBA。
 
+## 烧录发布的固件
+
+每个 [GitHub Release](https://github.com/zhing2006/esp-gbx/releases) 里每块板子有一个完整固件 `esp-gbx-<版本>-<板子>.bin`，bootloader、分区表、应用和 UI 素材都在这一个文件里。用 ESP-IDF v6.1 的 esptool 从 0x0 烧录：
+
+```
+esptool --chip esp32p4 -p <端口> -b 460800 write-flash 0x0 esp-gbx-v0.1.0-sila_p4.bin
+```
+
+芯片写 `esp32p4`、`esp32s31` 或 `esp32c5`，S31 的板子还要在 `write-flash` 前面加 `--no-stub`。P4 的固件只能在构建时选定的芯片修订上运行：`jc1060p470`、`m5stack_tab5` 和 `sila_p4` 的固件用于 v1.x，`osptek_p4c5` 和 `sila_p4x` 的用于 v3.x。Release 里的 `SHA256SUMS` 列出了各个固件的 SHA-256。每个版本的改动见 [CHANGELOG.md](CHANGELOG.md)，用英文写。
+
 ## 构建
 
 仓库里的 PNG、JPEG 和 PDF 用 Git LFS 保存，clone 之前要先安装 Git LFS，并运行一次 `git lfs install`。

@@ -371,6 +371,8 @@ cmake --build --preset debug
 
 `components/` 下除了 `board/`，各组件的 CMakeLists 都写成两用：在 ESP-IDF 里注册成组件，在 PC 上是普通的静态库。
 
+推送 `v` 开头的 tag 时，`.github/workflows/release.yml` 在 `espressif/idf:v6.1` 容器里构建 `boards/` 下每块板子的正式固件，用 `idf.py merge-bin` 合成从 0x0 烧录的完整固件，再发布 GitHub Release。Release 的说明取自 `CHANGELOG.md` 里这个 tag 的一节，所以打 tag 之前要先写好这一节。手动运行这个 workflow 只构建，固件留在这次运行的 artifacts 里。
+
 各板共用 `partitions.csv`，布局只用前 16MB flash。代码和 UI 素材在不同的分区，可以分开烧录：只改素材时用 `idf.py assets-flash`，只改代码时用 `app-flash`。资源包由 `tools/ui/pack_assets.py` 在正式固件构建时生成，见 [UI 布局](ui-layouts/index.md#资源包)。
 
 ## 测试

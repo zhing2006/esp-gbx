@@ -4,7 +4,7 @@ Project overview and license: [README.md](README.md). The scripts in `tools/` an
 
 ## Rules
 
-- Comments and output messages in code, scripts and config files are in English, as is this file. `README.md` is in English and `README_CN.md` in Chinese; keep the two in sync, each with a language switch at the top. Other docs are in Chinese.
+- Comments and output messages in code, scripts and config files are in English, as is this file. `README.md` is in English and `README_CN.md` in Chinese; keep the two in sync, each with a language switch at the top. `CHANGELOG.md` is in English: its sections are the GitHub release notes. Other docs are in Chinese.
 - The emulation core, interpreter, JIT and device models are written from scratch; do not adopt or port code from existing emulators. Third-party test ROMs, test cases and their expected results may be used as references.
 
 ## Build
